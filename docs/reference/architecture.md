@@ -1,6 +1,6 @@
 # ZeppBridge architecture summary
 
-This page describes the product boundaries and current implementation of [v3.3.0-beta.3](https://github.com/lingcang728/ZeppBridge/releases).
+This page describes the product boundaries and current implementation of [v3.3.0-beta.4](https://github.com/lingcang728/ZeppBridge/releases).
 For the usage entry point see the project [README](../../README.md); for
 engineering gates see the [development guide](../development/development.md);
 for what each capability's status is, see [capability maturity](capability-maturity.md).
@@ -251,11 +251,12 @@ this number".
   areas you chose on first launch (heart rate, steps, sleep, body, training);
   the others fold away. Sync time and heart-rate sample time are kept visibly
   separate.
-- Secondary pages are reached from Overview cards: `/recent`, `/heart`,
+- Secondary pages are reached from Overview cards: `/heart`,
   `/activity`, `/sleep` and `/sleep/:sleepId`, `/workouts` and
   `/workouts/:workoutId`, body status `/body`, training status `/training`,
-  `/rings`, `/devices/:deviceKey` and `/health-check`. The journal (`/journal`:
-  shoes, races, injuries, eras and life events), letters (`/letters`) and the
+  `/rings`, `/devices/:deviceKey` and `/health-check`. The journal (shoes, races,
+  injuries, eras and life events) is the workout list zoomed out to the year
+  level (`/workouts?zoom=year`; `/journal` redirects there), letters (`/letters`) and the
   AI pages (`/ai/plan`, `/ai/memory`, task history) have their own entries. All
   of them only render what is already in the local database, stating honestly
   "M of N days have records"; days without data break the curve rather than

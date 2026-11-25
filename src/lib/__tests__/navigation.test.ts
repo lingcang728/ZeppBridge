@@ -8,7 +8,7 @@ const stops = [
 ];
 describe('navigation gestures', () => {
   it('keeps overview details selected through nested routes', () => {
-    for (const path of ['/body', '/training', '/heart', '/sleep/42', '/activity', '/workouts/1', '/recent']) {
+    for (const path of ['/body', '/training', '/heart', '/sleep/42', '/activity', '/workouts/1', '/workouts']) {
       expect(navigationBranch(path)).toBe('/');
     }
     expect(navigationBranch('/ai')).toBe('/ai');
@@ -39,7 +39,7 @@ describe('back navigation', () => {
   it('returns to wherever the page was opened from', () => {
     // 概览「数据来源 · 管理」→ 设置的账号卡：返回回概览，不是设置首页。
     expect(backDestination('/settings/account', '/')).toEqual({ path: '/', viaHistory: true });
-    expect(backDestination('/sleep/42', '/recent')).toEqual({ path: '/recent', viaHistory: true });
+    expect(backDestination('/sleep/42', '/sleep')).toEqual({ path: '/sleep', viaHistory: true });
   });
   it('falls back to the tab root when there is nowhere to go back to', () => {
     expect(backDestination('/sleep/42', null)).toEqual({ path: '/', viaHistory: false });

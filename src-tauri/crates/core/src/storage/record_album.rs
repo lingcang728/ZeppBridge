@@ -172,7 +172,8 @@ impl Database {
                     CASE WHEN deep_available THEN deep_minutes END,
                     CASE WHEN light_available THEN light_minutes END,
                     CASE WHEN rem_available THEN rem_minutes END,
-                    CASE WHEN awake_available THEN awake_minutes END
+                    CASE WHEN awake_available THEN awake_minutes END,
+                    score
              FROM sleep_sessions_shown ORDER BY start_time DESC",
         )?;
         let rows = stmt.query_map([], |row| {
@@ -184,6 +185,7 @@ impl Database {
                 row.get::<_, Option<f64>>(4)?,
                 row.get::<_, Option<f64>>(5)?,
                 row.get::<_, Option<f64>>(6)?,
+                row.get::<_, Option<f64>>(7)?,
             ))
         })?;
         struct Acc {
@@ -192,12 +194,15 @@ impl Database {
             durations: i64,
             onset: f64,
             onsets: i64,
+            onset_sq: f64,
+            score: f64,
+            scores: i64,
             stages: [f64; 4],
         }
         let mut order: Vec<String> = Vec::new();
         let mut by_month: HashMap<String, Acc> = HashMap::new();
         for row in rows {
-            let (month, clock, duration, deep, light, rem, awake) = row?;
+            let (month, clock, duration, deep, light, rem, awake, score) = row?;
             let Some(month) = month else { continue };
             let acc = by_month.entry(month.clone()).or_insert_with(|| {
                 order.push(month.clone());
@@ -207,6 +212,9 @@ impl Database {
                     durations: 0,
                     onset: 0.0,
                     onsets: 0,
+                    onset_sq: 0.0,
+                    score: 0.0,
+                    scores: 0,
                     stages: [0.0; 4],
                 }
             });
@@ -217,7 +225,12 @@ impl Database {
             }
             if let Some(onset) = clock.as_deref().and_then(minutes_after_noon) {
                 acc.onset += onset;
+                acc.onset_sq += onset * onset;
                 acc.onsets += 1;
+            }
+            if let Some(score) = score.filter(|value| *value > 0.0) {
+                acc.score += score;
+                acc.scores += 1;
             }
             for (slot, value) in [deep, light, rem, awake].into_iter().enumerate() {
                 acc.stages[slot] += value.unwrap_or_default().max(0.0);
@@ -240,6 +253,15 @@ impl Database {
                     } else {
                         0.0
                     },
+                    onset_nights: acc.onsets,
+                    onset_sd_min: (acc.onsets > 0).then(|| {
+                        let mean = acc.onset / acc.onsets as f64;
+                        (acc.onset_sq / acc.onsets as f64 - mean * mean)
+                            .max(0.0)
+                            .sqrt()
+                    }),
+                    avg_score: (acc.scores > 0).then(|| acc.score / acc.scores as f64),
+                    score_nights: acc.scores,
                     deep_min: acc.stages[0],
                     light_min: acc.stages[1],
                     rem_min: acc.stages[2],

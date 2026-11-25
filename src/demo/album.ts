@@ -60,15 +60,24 @@ export const createDemoAlbum = (data: DemoData) => {
   const sleepMonths = (): SleepMonth[] => {
     const groups = new Map<string, SleepSession[]>();
     for (const s of data.sleeps) groups.set(monthOf(s.start_time), [...(groups.get(monthOf(s.start_time)) ?? []), s]);
-    return [...groups.entries()].sort(([a], [b]) => b.localeCompare(a)).map(([month, list]) => ({
+    return [...groups.entries()].sort(([a], [b]) => b.localeCompare(a)).map(([month, list]) => {
+      const onsets = list.map((s) => afterNoon(s.start_time));
+      const mean = onsets.reduce((sum, v) => sum + v, 0) / list.length;
+      const scored = list.filter((s) => typeof s.score === 'number' && s.score > 0);
+      return {
       month, nights: list.length,
       avg_duration_min: list.reduce((sum, s) => sum + (s.duration_minutes ?? 0), 0) / list.length,
-      avg_onset_min: list.reduce((sum, s) => sum + afterNoon(s.start_time), 0) / list.length,
+      avg_onset_min: mean,
+      onset_nights: list.length,
+      onset_sd_min: Math.sqrt(onsets.reduce((sum, v) => sum + (v - mean) ** 2, 0) / list.length),
+      avg_score: scored.length ? scored.reduce((sum, s) => sum + (s.score ?? 0), 0) / scored.length : null,
+      score_nights: scored.length,
       deep_min: list.reduce((sum, s) => sum + (s.deep_minutes ?? 0), 0),
       light_min: list.reduce((sum, s) => sum + (s.light_minutes ?? 0), 0),
       rem_min: list.reduce((sum, s) => sum + (s.rem_minutes ?? 0), 0),
       awake_min: list.reduce((sum, s) => sum + (s.awake_minutes ?? 0), 0),
-    }));
+      };
+    });
   };
   const strips = (ids: string[]): SleepStrip[] => ids.flatMap((id) => {
     const session = data.sleeps.find((s) => s.sleep_id === id);

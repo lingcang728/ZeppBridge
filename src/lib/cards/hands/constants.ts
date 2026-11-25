@@ -71,5 +71,11 @@ export const COMEBACK_SPAN_DAYS = 14;
 /** 一次运动至少这么长才上牌（几分钟的自动识别活动不值得占一张牌）。 */
 export const MIN_WORKOUT_SECONDS = 10 * 60;
 
+/* —— 首页「今日一问」的推荐顺序（rank.ts） —— */
+/** 这么多天内（含今天）比过赛：推荐复盘比赛。 */
+export const RACE_RECENT_DAYS = 3;
+/** 这么多天内（含今天）刷了 PR：推荐「我进步了吗」。 */
+export const PR_RECENT_DAYS = 7;
+
 /** 一次最多取几次运动的小图（和后端 `MAX_LINE_WORKOUTS` 一致）。 */
 export const MAX_LINE_WORKOUTS = 40;

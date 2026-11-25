@@ -1183,12 +1183,14 @@ Wenn du weitere Informationen von mir brauchst (welcher Client verwendet wird, w
       watch: 'Uhr',
     },
     'components/album/album': {
+      avgDuration: 'Ø Schlafdauer',
       avgOnset: 'Ø Schlafbeginn',
-      close: 'Zurück zur Liste',
+      avgScore: 'Ø Schlafscore',
+      bestMonth: 'Bester Schlafmonat',
+      count: 'Trainings',
       day: 'Tage',
       distance: 'Distanz',
       duration: 'Dauer',
-      hrZones: 'Herzfrequenzzonen',
       levels: 'Ansichtsebene',
       month: 'Monate',
       nights: (count: number) =>
@@ -1196,14 +1198,31 @@ Wenn du weitere Informationen von mir brauchst (welcher Client verwendet wird, w
           one: '1 Nacht',
           other: `${count} Nächte`,
         }),
-      open: 'Nach Jahr, Monat und Tag durchsuchen',
-      openPeriod: (period: string) => `Öffne ${period}`,
+      nightsLabel: 'Erfasste Nächte',
+      onsetSpread: 'Einschlafregelmäßigkeit',
+      scoreLabel: (score: number) => `Schlafscore ${score}`,
+      scoreOf: (score: number) => `${score} Punkte`,
+      spread: (minutes: string) => `±${minutes}`,
+      stageShare: 'Anteil der Schlafphasen',
+      tray: 'Ansicht und Aktionen',
+      trayHandle: (zoom: string) => {
+        const view = zoom === 'Tage' ? 'Tagesansicht' : zoom === 'Monate' ? 'Monatsansicht' : 'Jahresansicht';
+        return `In der ${view} navigieren. Ziehe nach oben oder unten, um die Ebene zu wechseln, und klicke zum Öffnen.`;
+      },
+      vsLastYear: 'Gegenüber dem Vorjahr',
+      vsMonth: (month: string) => `Gegenüber dem ${month}`,
+      worstMonth: 'Schlechtester Schlafmonat',
       workouts: (count: number) =>
         plural(count, {
           one: '1 Training',
           other: `${count} Trainings`,
         }),
       year: 'Jahre',
+      yearNights: (count: number) =>
+        plural(count, {
+          one: '1 Nacht erfasst',
+          other: `${count} Nächte erfasst`,
+        }),
     },
     'components/HeartRateZonePicker': {
       basesSeparator: ', ',
@@ -1507,16 +1526,17 @@ Wenn du weitere Informationen von mir brauchst (welcher Client verwendet wird, w
     },
     'components/overview/RecentCard': {
       avgHr: (value: number) => `Ø HF ${value}`,
+      linksAria: 'Schlaf- und Trainingslisten öffnen',
       newest: 'Neueste',
       recentAria: 'Letzte Einträge',
       recentEmpty:
         'Noch keine Einträge – nach der Synchronisierung sichtbar.',
       recentSub: 'Schlaf, Läufe und Krafttraining',
       recentTitle: 'Letzte Einträge',
-      seeAll: 'Alle ansehen',
       sleepRecordTitle: 'Schlaf',
       sleepScore: (score: number) => `Schlafscore ${score}`,
       timeUnknown: 'Zeit unbekannt',
+      workoutsLink: 'Trainings',
     },
     'components/overview/SleepCard': {
       durationHours: (hours: number, minutes: number) => `${hours} Std. ${minutes} Min.`,
@@ -1609,25 +1629,43 @@ Wenn du weitere Informationen von mir brauchst (welcher Client verwendet wird, w
       weekTitle: 'Letzte 7 Tage',
     },
     'components/overview/suggest': {
-      aria: 'Vorschläge für dich',
-      workoutEyebrow: 'Gerade fertig',
-      workoutLine: (what: string, amount: string, count: number) => {
-        const prefix = `Heutiges Training: ${what}, ${amount}.`;
-        return count
-          ? `${prefix} ${count === 1 ? 'Vergleiche es mit deiner letzten ähnlichen Trainingseinheit.' : `Vergleiche es mit deinen letzten ${count} ähnlichen Trainingseinheiten.`}`
-          : `${prefix} Nimm dir einen Moment für einen Rückblick.`;
+      aria: 'Frage des Tages',
+      bestTitle: (bucket: string) => `Werde ich auf dieser Distanz (${bucket}) schneller?`,
+      comebackTitle: (days: number) =>
+        `${days} ${days === 1 ? 'Tag' : 'Tage'} ohne Training – wie steige ich wieder ein?`,
+      collapse: 'Einklappen',
+      desktopOnly: 'Die direkte Übergabe an eine KI ist nur in der Desktop-App möglich',
+      dismiss: 'Für heute ausblenden',
+      expand: 'Frage öffnen',
+      raceTitle: (date: string, what: string) => `Wettkampf vom ${date} auswerten (${what})`,
+      refresh: 'Neue Frage',
+      refine: 'In „An KI senden“ anpassen',
+      reviewOn: (date: string, amount: string, what: string) =>
+        `${what} vom ${date} auswerten (${amount})`,
+      reviewToday: (amount: string, what: string) => `${what} von heute auswerten (${amount})`,
+      sendFailed: 'Nicht übergeben. Öffne „An KI senden“, um zu sehen, woran es hängt.',
+      sendTo: (name: string) => `Für ${name} kopieren`,
+      sending: 'Wird vorbereitet…',
+      sent: (name: string) => `Kopiert. Füge den Text im Chat mit ${name} ein.`,
+      sub: {
+        comeback: 'Letzte Trainings vor der Pause + Erholung der letzten zwei Wochen',
+        distance_best: 'Alle Läufe dieser Distanz + Entwicklung der Bestzeiten',
+        plan_tomorrow: 'Erholung und Training der letzten 7 Tage',
+        race_review: 'Wettkampf + Training und Schlaf der vier Wochen davor',
+        recovery_nights: 'Nächte außerhalb des üblichen Bereichs + Training vom Vortag',
+        review_workout: 'Dieses Training + ähnliche Trainings der letzten Zeit',
+        same_route: 'Alle Läufe auf dieser Strecke',
+        sleep_review: 'Schlaf und Erholung der letzten Nächte',
       },
-      sleepEyebrow: 'Unruhige Nacht',
-      sleepShort: (duration: string, gap: string) => `Du hast letzte Nacht ${duration} geschlafen – ${gap} weniger als dein üblicher Wert der letzten vier Wochen.`,
-      sleepDeep: (deep: string, gap: string) => `Tiefschlaf: ${deep} – ${gap} weniger als dein üblicher Wert der letzten vier Wochen.`,
-      idleEyebrow: (days: number) => (days === 1 ? 'Ein Tag ohne Training' : `${days} Tage ohne Training`),
-      idleLine: (date: string, what: string) => `Zuletzt: ${what} am ${date}`,
-      tomorrowSub: 'Mit Erholung und Training der letzten 7 Tage',
-      sleepReview: 'Wie habe ich letzte Nacht geschlafen?',
-      sleepReviewSub: 'Mit Schlaf und Erholung der letzten Nächte',
+      swap: 'Einige Karten tauschen',
+      swapDone: 'Tausch abgeschlossen',
+      title: {
+        plan_tomorrow: 'Morgen planen',
+        recovery_nights: 'Was steckt hinter den Nächten mit schlechter Erholung?',
+        same_route: 'Wie läuft es auf meiner üblichen Strecke?',
+        sleep_review: 'Wie war mein Schlaf letzte Nacht?',
+      },
       sleepReviewQuestion: 'Ich habe die Schlaf- und Erholungswerte von letzter Nacht und den Nächten davor sowie meine Trainings der letzten Tage angehängt. Bitte schau dir an, wie ich letzte Nacht geschlafen habe: Was war im Vergleich zu den Nächten davor anders, woran könnte das liegen und sollte ich mein Training heute deshalb anpassen?',
-      dismiss: 'Diesen Vorschlag schließen',
-      failed: 'Gerade können keine Karten ausgeteilt werden. Versuche es später noch einmal.',
     },
     'components/shell/AppTopBar': {
       today: 'Heute',
@@ -2647,37 +2685,6 @@ Wenn du weitere Informationen von mir brauchst (welcher Client verwendet wird, w
       entrySparse: 'Letzte 90 Tage',
       focusLabel: 'Mein Fokus',
     },
-    'views/RecentRecords': {
-      avgHr: (bpm: number) => `Ø HF ${bpm}`,
-      desktopOnly:
-        'Erfordert die Desktop-App (die Browser-Vorschau liest keine Kontodaten).',
-      filterAll: 'Alle',
-      filterSleep: (count: number) => `Schlaf ${count}`,
-      filterWorkouts: (count: number) => `Trainings ${count}`,
-      hiddenIncomplete: (count: number) =>
-        plural(count, {
-          one: `${count} unvollständiger Eintrag ausgeblendet`,
-          other: `${count} unvollständige Einträge ausgeblendet`,
-        }),
-      introTimeline:
-        'Zuletzt synchronisierte Schlaf- und Trainingseinträge (neueste zuerst).',
-      loadFailedTitle: 'Die letzten Einträge konnten nicht geladen werden',
-      loadingLabel: 'Letzte Einträge werden geladen',
-      noRecords: 'In diesem Zeitraum noch keine Schlaf- oder Trainingseinträge.',
-      noSleep: 'Noch keine Schlafeinträge',
-      noWorkouts: 'Nichts anzuzeigen.',
-      noWorkoutsOfType: 'Für diese Trainingsart nichts anzuzeigen.',
-      notProvided: 'Nicht angegeben',
-      partialUnavailable: 'Teile der Daten gerade nicht verfügbar',
-      retry: 'Wiederholen',
-      showMore: (count: number) => `${count} weitere anzeigen`,
-      sleepScore: (score: number) => `Schlafscore ${score}`,
-      sleepTitle: 'Schlaf',
-      title: 'Letzte Einträge',
-      today: 'Heute',
-      workoutTypeAria: 'Trainingsart',
-      yesterday: 'Gestern',
-    },
     'lib/deviceName': {
       undetermined: 'Gerät unbestimmt',
       fused: 'Kombinierte Quellen',
@@ -2736,14 +2743,11 @@ Wenn du weitere Informationen von mir brauchst (welcher Client verwendet wird, w
           one: `${count} Eintrag · seit ${from}`,
           other: `${count} Einträge · seit ${from}`,
         }),
-      intro:
-        'Lokal synchronisierte Schlafeinträge. Ohne detaillierte Zeitreihe wird die Zusammenfassung angezeigt.',
       loadFailed: 'Schlafliste gerade nicht verfügbar',
       loadFailedTitle: 'Die Schlafeinträge konnten nicht gelesen werden',
       loadMore: 'Mehr laden',
       loadingMore: 'Wird geladen…',
       retry: 'Wiederholen',
-      scoreLabel: 'Score',
       shown: (shown: number, total: number) => `${shown} von ${total} angezeigt`,
       title: 'Schlaf',
     },
@@ -3289,7 +3293,6 @@ Wenn du weitere Informationen von mir brauchst (welcher Client verwendet wird, w
           one: `${count} Eintrag angezeigt`,
           other: `${count} Einträge angezeigt`,
         }),
-      intro: 'Lokal synchronisierte Trainings. Ohne Track wird keine Karte gezeichnet.',
       avgHr: (bpm: number) => `Ø HF ${bpm}`,
       loadFailed: 'Trainingsliste gerade nicht verfügbar',
       loadFailedTitle: 'Die Trainings konnten nicht gelesen werden',
@@ -3925,8 +3928,6 @@ Wenn du weitere Informationen von mir brauchst (welcher Client verwendet wird, w
       attachments: 'Anhänge',
     },
     'components/cards/hands': {
-      dealByQuestion: 'Nach Frage austeilen',
-      dealByQuestionAria: 'Nach Frage austeilen: Wähle eine Frage. Passende Trainings und Nächte werden automatisch ausgewählt.',
       kind: {
         distance_best: 'Gleiche Distanz · PRs',
         same_route: 'Gleiche Strecke',
@@ -3943,13 +3944,6 @@ Wenn du weitere Informationen von mir brauchst (welcher Client verwendet wird, w
         race_review: 'Wettkampf + Training und Schlaf in den vier Wochen davor',
         recovery_nights: 'Nächte mit auffälligem HRV, Ruhepuls oder Schlaf',
       },
-      empty: {
-        no_routes: 'Noch keine Strecke mindestens dreimal gelaufen',
-        no_distance: 'Noch keine zwei Läufe in derselben Distanzklasse (5K / 10K / Halbmarathon / Marathon)',
-        no_race: 'Kein Wettkampf markiert und kein Lauf deutlich schneller als sonst',
-        no_outliers: 'Deine Erholungswerte lagen in den letzten zwei Monaten im üblichen Bereich',
-        no_data: 'Nicht genug aktuelle Daten',
-      },
       bucket: { '5k': '5K', '10k': '10K', half: 'Halbmarathon', full: 'Marathon' },
       role: {
         anchor: 'Diese Einheit', pr: 'PR', race: 'Wettkampf', build: 'Vorbereitung', same: 'Ähnlich', recent: 'Zuletzt', outlier: 'Auffällig', day_before: 'Vortag', night: 'Nacht',
@@ -3958,14 +3952,10 @@ Wenn du weitere Informationen von mir brauchst (welcher Client verwendet wird, w
       hrvNote: (value: number) => `HRV ${value}`,
       bench: 'Reserve',
       benchEmpty: 'Die Reserve ist leer',
-      tableTip: 'Ziehe eine Karte nach unten in die Reserve, um sie aus der Hand zu nehmen, oder aus der Reserve nach oben, um sie einzuwechseln. Beides geht auch per Tippen. Die KI erhält die Karten aus dieser Hand.',
-      useHand: 'Diese Hand verwenden',
       handEmpty: 'Alle Karten liegen in der Reserve. Nimm eine davon zurück in die Hand.',
       cardCount: (count: number) => (count === 1 ? '1 Karte' : `${count} Karten`),
       drawOutAria: (label: string) => `${label}. Drücken, um die Karte in die Reserve zu legen`,
       swapInAria: (label: string) => `${label}. Drücken, um die Karte in die Hand zu nehmen`,
-      dealing: 'Karten werden ausgeteilt…',
-      failed: 'Daten nicht lesbar. Karten konnten nicht ausgeteilt werden.',
       question: {
         distance_best: (bucket: string) => `Das sind meine bisherigen Bestzeiten und letzten Läufe in der Distanzklasse ${bucket}. Vergleiche Tempo, Herzfrequenz und Trainingsbelastung: Woher kommt mein Fortschritt, was fehlt noch bis zur nächsten Bestzeit und worauf sollte ich mich in den nächsten vier Wochen bei dieser Distanz konzentrieren?`,
         same_route: (km: string) => `Das sind meine Läufe auf derselben Strecke (etwa ${km}). Vergleiche Tempo, Herzfrequenz und die Herzfrequenzdrift in der zweiten Hälfte: Bin ich auf derselben Strecke schneller, effizienter oder eher schlechter geworden? Nenne mögliche Gründe.`,
@@ -4336,9 +4326,9 @@ Wenn du weitere Informationen von mir brauchst (welcher Client verwendet wird, w
       trayOnlySub: 'Bei der Anmeldung kein Fenster öffnen. Wenn du die App selbst startest, wird sie wie gewohnt angezeigt.',
     },
     'views/settings/sections/SuggestCardsRow': {
-      title: 'Vorschlagskarten auf der Startseite',
-      on: 'Nach einem Training, einer schlechten Nacht oder einer längeren Pause zeigt die Startseite eine passende Vorschlagskarte. Mit einem Tipp gibst du die zugehörigen Daten an die KI weiter.',
-      off: 'Keine Vorschlagskarten auf der Startseite',
+      off: 'Keine Frage des Tages auf der Startseite',
+      on: 'Die Startseite wählt täglich passend zu deiner Situation eine Frage aus. Öffne sie, um passende Daten für deine KI zusammenzustellen, oder wechsle die Frage.',
+      title: 'Frage des Tages',
     },
     'views/settings/sections/archive': {
       secKeep: 'Aufbewahrung',

@@ -63,8 +63,8 @@ export interface YearMark {
 }
 
 /**
- * 每年第一行（列表按时间倒排时就是那一年最晚的一条）标一个年份。
- * 两个刻度挨得太近只留前一个，免得字叠在一起；最顶上那一年不标（滑块停在那里时本来就是它）。
+ * 每年第一行（列表按时间倒排时就是那一年最晚的一条）标一个年份，最顶上那一年也标（一眼看出整条从哪年到哪年）。
+ * 两个刻度挨得太近只留前一个，免得字叠在一起。
  */
 export function yearMarks(rows: TimelineRow[], place: (top: number) => number, minGap = 22): YearMark[] {
   const marks: YearMark[] = [];
@@ -72,15 +72,21 @@ export function yearMarks(rows: TimelineRow[], place: (top: number) => number, m
   for (const row of rows) {
     const rowYear = row.key.slice(0, 4);
     if (rowYear === year) continue;
-    const first = year === '';
     year = rowYear;
-    if (first) continue;
     const at = place(row.top);
     const last = marks[marks.length - 1];
     if (last && at - last.at < minGap) continue;
     marks.push({ year: rowYear, at });
   }
   return marks;
+}
+
+/** 长列表（内容超过这么多屏）且带时间的行跨了不止一年：年份刻度一直显示，不等滚动才出。 */
+export const PIN_SCREENS = 3;
+export function pinYears(rows: TimelineRow[], box: Pick<ScrollBox, 'scrollHeight' | 'clientHeight'>): boolean {
+  if (box.clientHeight <= 0 || box.scrollHeight < box.clientHeight * PIN_SCREENS || !rows.length) return false;
+  const first = rows[0]!.key.slice(0, 4);
+  return rows.some((row) => row.key.slice(0, 4) !== first);
 }
 
 /** 内容位置 y 处是哪一行（最后一个上沿不超过 y 的行；y 在第一行以上就算第一行）。行按 top 升序。 */

@@ -7,7 +7,8 @@ you can see them next to your data.
 
 ## Where to find them
 
-Open the **Journal** card on Overview, then **Eras & life events**. **Log an
+Open the **Journal** card on Overview (the workout list zoomed out to the
+year level), then **Eras & life events**. **Log an
 event** adds one; **New era** adds a named stretch of time. Click any entry to
 edit or delete it.
 

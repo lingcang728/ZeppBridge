@@ -1,9 +1,10 @@
 <script setup lang="ts">
-/* 「日」这一层捏密之后的两档：
-   - 方块（density 1）：按月分组的一格格小卡，内容由列表页用 #tile 插槽给（运动：类型图标 + 轨迹 + 主读数；睡眠：时长 + 分期条）；
-   - 全年热图（density 2）：和履历页的全年活动记录同一种排法——一年一块、一列一周（周一在上）、一格一天，
-     那天越久格子越亮；窄窗口里整年横着滚。悬停 / 聚焦的那格放大一圈，上面浮出那天的记录；点一下从这一格长成详情页。
-   每格都带 data-album-id / data-album-day，捏合换档时靠它把那一条钉住。 */
+/* 列表的「月」「年」两档：
+   - 月（view = 'month'）：按月分组的一格格小卡，组头由列表页用 #head 插槽给（月度分析），格子内容用 #tile 给
+     （运动：类型图标 + 轨迹 + 主读数；睡眠：时长 + 评分）；
+   - 年（view = 'year'，睡眠用）：一年一块、一列一周（周一在上）、一格一天，那天越久格子越亮；块上方是 #year-head（年度分析）。
+     窄窗口里整年横着滚。悬停 / 聚焦的那格放大一圈，上面浮出那天的记录；点一下回到日档、滚到那一天（`day` 事件）。
+   每格都带 data-album-id / data-album-day，组和月份标记带 data-timeline（滚动条的年份刻度靠它），换档时靠它们把那一条钉住。 */
 import { computed, ref } from 'vue';
 import { RouterLink } from 'vue-router';
 import { displayDateTimeFormatter } from '../../lib/dateTime';
@@ -13,8 +14,9 @@ import { useMessages } from '../../i18n';
 import { albumMessages } from './album.i18n';
 import { useYearText } from '../journal/year/year.i18n';
 
-const props = defineProps<{ tiles: AlbumTile[]; density: 1 | 2; kind?: 'workouts' | 'sleep' }>();
-defineSlots<{ tile(props: { tile: AlbumTile }): unknown }>();
+const props = defineProps<{ tiles: AlbumTile[]; view: 'month' | 'year'; kind?: 'workouts' | 'sleep' }>();
+const emit = defineEmits<{ day: [day: string, cell: HTMLElement] }>();
+defineSlots<{ tile(props: { tile: AlbumTile }): unknown; head?(props: { month: string }): unknown; 'year-head'?(props: { year: number }): unknown }>();
 const t = useMessages(albumMessages);
 const y = useYearText();
 
@@ -26,10 +28,10 @@ const groups = computed(() => byMonth(props.tiles));
 /* ---------- 全年热图 ---------- */
 
 const pad = (n: number) => String(n).padStart(2, '0');
-const heat = computed(() => (props.density === 2 ? heatDays(props.tiles) : new Map()));
+const heat = computed(() => (props.view === 'year' ? heatDays(props.tiles) : new Map()));
 const levelOf = (strength: number) => (strength > 0.75 ? 4 : strength > 0.5 ? 3 : strength > 0.25 ? 2 : 1);
 const years = computed(() => {
-  if (props.density !== 2 || !props.tiles.length) return [];
+  if (props.view !== 'year' || !props.tiles.length) return [];
   const days = [...heat.value.keys()].sort();
   const newest = Number(days[days.length - 1].slice(0, 4));
   const oldest = Number(days[0].slice(0, 4));
@@ -82,19 +84,21 @@ const showTip = (event: Event, year: number) => {
 };
 const hideTip = () => { tip.value = null; };
 
-/* 点一格 / 一块：详情页从这一格长出来，返回时缩回这一格（不然小格子会退到整个月份那块板上）。 */
+/* 点月档的一格：详情页从这一格长出来，返回时缩回这一格（不然小格子会退到整个月份那块板上）。 */
 const arm = (event: Event) => {
   const el = event.currentTarget as HTMLElement;
   const href = el.getAttribute('href');
   if (href) armPageMorph(el, href, { anySize: true });
 };
 const onKeyArm = (event: KeyboardEvent) => { if (event.key === 'Enter') arm(event); };
+/* 点热图的一格：不进详情，放大回日档并滚到那一天。 */
+const pickDay = (day: string, event: Event) => emit('day', day, event.currentTarget as HTMLElement);
 </script>
 
 <template>
-  <div v-if="density === 1" class="album-tiles">
+  <div v-if="view === 'month'" class="album-tiles">
     <section v-for="group in groups" :key="group.month" class="tile-month" :data-album-month="group.month" :data-timeline="group.month">
-      <h3 class="month-title">{{ monthTitle(group.month) }}</h3>
+      <slot name="head" :month="group.month"><h3 class="month-title">{{ monthTitle(group.month) }}</h3></slot>
       <div class="tiles">
         <RouterLink v-for="tile in group.items" :key="tile.id" :to="tile.to" class="tile" data-album-item
           :data-album-id="tile.id" :data-album-day="tile.day" :aria-label="tile.label" :title="tile.label" @pointerdown="arm" @keydown="onKeyArm">
@@ -105,16 +109,16 @@ const onKeyArm = (event: KeyboardEvent) => { if (event.key === 'Enter') arm(even
   </div>
   <div v-else :class="['album-heat', `tone-${kind ?? 'workouts'}`]">
     <section v-for="block in years" :key="block.year" class="heat-year">
-      <h3 class="year-title">{{ block.year }}<small>{{ kind === 'sleep' ? t.nights(block.count) : t.workouts(block.count) }}</small></h3>
+      <slot name="year-head" :year="block.year"><h3 class="year-title">{{ block.year }}<small>{{ kind === 'sleep' ? t.nights(block.count) : t.workouts(block.count) }}</small></h3></slot>
       <div class="heat-scroll">
         <div class="heat-board" @pointerover="showTip($event, block.year)" @pointerleave="hideTip" @focusin="showTip($event, block.year)" @focusout="hideTip">
           <span v-for="(label, row) in weekdays" :key="`w${row}`" class="weekday" :style="{ gridRow: row + 2 }" aria-hidden="true">{{ label }}</span>
           <span v-for="month in block.months" :key="month.key" class="month" :style="{ gridColumn: `${month.col} / span 4` }"
             :data-album-month="month.inRange ? month.key : undefined" :data-timeline="month.inRange ? month.key : undefined">{{ month.label }}</span>
           <template v-for="cell in block.cells" :key="cell.key">
-            <RouterLink v-if="cell.hit" :to="cell.hit.lead.to" :class="['cell', 'on', `l${cell.level}`]" data-album-item
+            <button v-if="cell.hit" type="button" :class="['cell', 'on', `l${cell.level}`]" data-album-item
               :data-album-id="cell.hit.lead.id" :data-album-day="cell.key" :aria-label="cell.hit.lead.label"
-              :style="{ gridColumn: cell.col, gridRow: cell.row }" @pointerdown="arm" @keydown="onKeyArm" />
+              :style="{ gridColumn: cell.col, gridRow: cell.row }" @click="pickDay(cell.key, $event)" />
             <span v-else :class="['cell', { future: cell.future }]" :data-album-day="cell.key" :style="{ gridColumn: cell.col, gridRow: cell.row }" aria-hidden="true" />
           </template>
         </div>
@@ -183,7 +187,7 @@ const onKeyArm = (event: KeyboardEvent) => { if (event.key === 'Enter') arm(even
 .tone-sleep .l2 { --cell: color-mix(in srgb, var(--sleep) 52%, var(--cal-0)); }
 .tone-sleep .l3 { --cell: color-mix(in srgb, var(--sleep) 76%, var(--cal-0)); }
 .tone-sleep .l4 { --cell: var(--sleep); }
-.cell.on { position: relative; background: var(--cell); transition: scale 160ms var(--ease-out); }
+.cell.on { position: relative; padding: 0; border: 0; background: var(--cell); cursor: pointer; transition: scale 160ms var(--ease-out); }
 /* 悬停的那一格放大一圈（不发光、不画竖线），和履历页一样。 */
 .cell.on:hover, .cell.on:focus-visible { z-index: 1; scale: 1.45; }
 .cell.on:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }

@@ -1,118 +1,34 @@
 import { nextTick, onActivated, onBeforeUnmount, onDeactivated, onMounted, type Ref } from 'vue';
-import { levelDepth, stretchAtEdge, wheelFactor, zoomStep, ZOOM_STEP_IN, ZOOM_STEP_OUT, type AlbumDensity, type AlbumLevel } from '../lib/album/album';
-import { collapseToCard, expandFromCard, headLine, scroller, zoomSwap } from '../lib/album/albumMotion';
-import { lessMotion } from '../lib/motion/lessMotion';
+import { stretchAtEdge, wheelFactor, zoomIndex, zoomStep, ZOOMS, type AlbumZoom } from '../lib/album/album';
+import { headLine, scroller, zoomSwap } from '../lib/album/albumMotion';
 
 /**
- * 相册的手势和层级切换（运动、睡眠列表共用）：
+ * 列表三档缩放（运动、睡眠列表共用）。入口只有两条，走同一个 `go()`：
  *
  * - **Ctrl + 滚轮 / 触控板捏合**（Chromium 里捏合就是带 ctrlKey 的 wheel）：页面本身一律不缩放（passive: false + preventDefault）；
- *   在「日」这一层、没在选择 / 看已隐藏时，跟手把列表放大缩小一点，累计够一档就换密度（lib/album/albumMotion.ts 的 zoomSwap），
- *   手停下来还没够一档就弹回原样。最密的全年热图再往里捏 → 月卡，月卡再捏 → 年卡；年 / 月卡上往外拉 → 指针下那张卡展开。
- * - **一次手势只走一档**：换过一档以后，要等手停一下（滚轮 / 捏合停 180ms）才接着认，不会一下子从列表冲到年卡。
+ *   跟手把列表放大缩小一点，累计够一档就换（lib/album/albumMotion.ts 的 zoomSwap），手停下来还没够一档就弹回原样。
+ *   放大 = 往细（年 → 月 → 日），缩小 = 往粗。
+ * - **左下托盘**（components/album/AlbumTray.vue）：把手上下拖吸附到某一档，面板里点某一档。
+ * - **一次手势只走一档**：换过一档以后，要等手停一下（滚轮 / 捏合停 180ms）才接着认，不会一下子从日冲到年。
  * - **不朝指针漂**：缩放的原点和钉住的那一条都取视口正中，不取指针（指针在边上时整块往那边飘，用户看着像在滑走）。
- * - **层级**：点年卡 → 月、点月卡 → 那个月的日列表，从被点的卡展开；胶囊上切到更浅的一层，当前这一层缩回到对应的卡里。
  */
 export function useAlbumNav(options: {
   stage: Ref<HTMLElement | null>;
-  level: Ref<AlbumLevel>;
-  density: Ref<AlbumDensity>;
-  /** 此刻能不能换密度（选择中、看已隐藏时不能）。 */
+  zoom: Ref<AlbumZoom>;
+  /** 此刻能不能换档（选择中、看已隐藏时不能）。 */
   zoomable: () => boolean;
-  /** 日列表里把这个月读进来（分页列表要先往下读到那个月）。 */
-  ensureMonth: (month: string) => Promise<void>;
-  /** 月 / 年卡的汇总读好（第一次切过去时才读）。 */
-  loadPeriods: () => Promise<void>;
+  /** 换到 `next` 之前要读好的东西（按月汇总、热图要的更多记录）。 */
+  prepare: (next: AlbumZoom) => Promise<void>;
+  /** 日列表里把这一天所在的月读进来并画出来（分页列表要先往下读到那个月）。 */
+  ensureDay?: (day: string) => Promise<void>;
 }) {
-  const { stage, level, density } = options;
+  const { stage, zoom } = options;
   const body = () => stage.value?.querySelector<HTMLElement>(':scope > [data-album-body]') ?? null;
   const main = () => scroller();
-  const scrollTo = (el: Element | null, gap = 12) => {
-    const box = main();
-    if (!el || !box) return;
-    box.scrollTop += el.getBoundingClientRect().top - (headLine() + gap);
-  };
 
-  /* ---------- 层级 ---------- */
+  /* ---------- 锚点：换档前后钉在同一高度的那一条 ---------- */
 
-  /** 视口顶上那一条属于哪个月（YYYY-MM）。 */
-  const monthAtTop = (): string | null => {
-    const line = headLine() + 8;
-    const items = stage.value?.querySelectorAll<HTMLElement>('[data-timeline]') ?? [];
-    for (const item of items) {
-      const box = item.getBoundingClientRect();
-      if (box.bottom > line) return item.dataset.timeline ?? null;
-    }
-    return items.length ? items[items.length - 1].dataset.timeline ?? null : null;
-  };
-  const periodKey = (month: string, at: AlbumLevel) => (at === 'year' ? month.slice(0, 4) : month);
-  const cardFor = (key: string) => stage.value?.querySelector<HTMLElement>(`[data-period="${CSS.escape(key)}"]`) ?? null;
-  /** 切到 `next` 之后，把 `key` 那一段滚到顶栏下面。 */
-  const landOn = async (next: AlbumLevel, key: string | null) => {
-    if (next === 'day' && key) await options.ensureMonth(key.length === 4 ? `${key}-12` : key);
-    level.value = next;
-    await nextTick();
-    if (!key) return;
-    if (next === 'day') {
-      scrollTo(stage.value?.querySelector(`[data-timeline^="${CSS.escape(key)}"]`) ?? null);
-    } else if (next === 'month') {
-      scrollTo(stage.value?.querySelector(`[data-period-group="${CSS.escape(key.slice(0, 4))}"]`) ?? cardFor(key));
-    } else {
-      scrollTo(cardFor(key.slice(0, 4)));
-    }
-  };
-
-  let busy = false;
-  const go = async (next: AlbumLevel, from?: { key: string; card: HTMLElement }) => {
-    if (busy || next === level.value) return;
-    busy = true;
-    const prev = level.value;
-    const before = main()?.scrollTop ?? 0;
-    const switchBack = async () => { level.value = prev; await nextTick(); const box = main(); if (box) box.scrollTop = before; };
-    try {
-      if (next !== 'day') await options.loadPeriods();
-      if (levelDepth(next) > levelDepth(prev)) {
-        // 往深处：从被点的卡（胶囊上切的话，就是视口顶上那张卡）展开。
-        const top = monthAtTop();
-        const key = from?.key ?? (top ? periodKey(top, prev) : null);
-        const card = from?.card ?? (key ? cardFor(key) : null);
-        await expandFromCard({ card, body, switchBack, switchTo: () => landOn(next, key) });
-      } else {
-        // 往浅处：当前这一层缩回到对应的那张卡。
-        const top = monthAtTop();
-        const key = top ? periodKey(top, next) : null;
-        await collapseToCard({
-          body, switchBack,
-          switchTo: async () => {
-            level.value = next;
-            await nextTick();
-            const card = key ? cardFor(key) : null;
-            if (card) {
-              const box = main();
-              if (box) box.scrollTop += card.getBoundingClientRect().top - (headLine() + Math.max(24, (box.clientHeight - card.offsetHeight) / 3));
-            }
-            return card;
-          },
-        });
-      }
-    } finally {
-      busy = false;
-    }
-  };
-  const openPeriod = (key: string, card: HTMLElement) => { void go(key.length === 4 ? 'month' : 'day', { key, card }); };
-
-  /* ---------- 捏合换密度 ---------- */
-
-  let scale = 1;
-  /** 换过一档 / 一层以后锁住，等手停下来才放开（一次手势只走一档）。 */
-  let locked = false;
-  let unlock = 0;
-  const holdUntilIdle = () => { locked = true; window.clearTimeout(unlock); unlock = window.setTimeout(() => { locked = false; }, 180); };
-  let anchor: HTMLElement | null = null;
   let anchorKey: { id?: string; day?: string; month?: string } = {};
-  let idle = 0;
-  let swapping = false;
-
   /** 视口正中（顶栏以下那一块的中线）。 */
   const viewCenter = () => {
     const box = main()?.getBoundingClientRect();
@@ -121,21 +37,23 @@ export function useAlbumNav(options: {
     return { x: box ? box.left + box.width / 2 : window.innerWidth / 2, y: (top + bottom) / 2 };
   };
   const pick = (x: number, y: number): HTMLElement | null => {
-    // 取离 (x, y) 最近的那一条（竖直方向为主）。
+    // 取离 (x, y) 最近的那一条（竖直方向为主）；没有条目（运动的年档是整页履历）就取最近的月份标记。
     let best: HTMLElement | null = null;
     let distance = Infinity;
-    stage.value?.querySelectorAll<HTMLElement>('[data-album-item]').forEach((el) => {
+    const scan = (selector: string) => stage.value?.querySelectorAll<HTMLElement>(selector).forEach((el) => {
       const box = el.getBoundingClientRect();
       if (box.bottom < headLine() || box.top > window.innerHeight) return;
       const d = Math.abs(box.top + box.height / 2 - y) + Math.abs(box.left + box.width / 2 - x) * 0.2;
       if (d < distance) { distance = d; best = el; }
     });
+    scan('[data-album-item]');
+    if (!best) scan('[data-timeline]');
     return best;
   };
   const keyOf = (el: HTMLElement | null) => ({
     id: el?.dataset.albumId,
     day: el?.dataset.albumDay,
-    month: el?.dataset.albumMonth ?? el?.dataset.albumDay?.slice(0, 7) ?? el?.closest<HTMLElement>('[data-timeline]')?.dataset.timeline,
+    month: el?.dataset.albumMonth ?? el?.dataset.albumDay?.slice(0, 7) ?? el?.closest<HTMLElement>('[data-timeline]')?.dataset.timeline ?? el?.dataset.timeline,
   });
   const find = (): HTMLElement | null => {
     const root = stage.value;
@@ -143,109 +61,106 @@ export function useAlbumNav(options: {
     const q = (selector: string) => root.querySelector<HTMLElement>(selector);
     return (anchorKey.id && q(`[data-album-id="${CSS.escape(anchorKey.id)}"]`))
       || (anchorKey.day && (q(`[data-album-item][data-album-day="${anchorKey.day}"]`) || q(`[data-album-day="${anchorKey.day}"]`)))
-      || (anchorKey.month && (q(`[data-album-month="${anchorKey.month}"]`) || q(`[data-timeline="${anchorKey.month}"]`)))
+      || (anchorKey.month && (q(`[data-album-month="${anchorKey.month}"]`) || q(`[data-timeline="${anchorKey.month}"]`) || q(`[data-timeline^="${anchorKey.month.slice(0, 4)}"]`)))
       || null;
   };
-  const live = (value: number) => {
+
+  /* ---------- 换档 ---------- */
+
+  let busy = false;
+  /**
+   * 换到 `next`。`day`：落到日档的这一天（年档热图 / 履历日历上点了某天）——锚点就是那一天，换完滚到它。
+   * 返回是否真的换了。
+   */
+  const go = async (next: AlbumZoom, target?: { day?: string; anchor?: HTMLElement | null }): Promise<boolean> => {
+    if (busy || next === zoom.value || !options.zoomable()) return false;
     const el = body();
-    if (!el) return;
-    el.style.transform = value === 1 ? '' : `scale(${value.toFixed(4)})`;
-  };
-  const settle = () => {
-    idle = 0;
-    const el = body();
-    const from = stretchAtEdge(scale, density.value);
-    scale = 1;
-    anchor = null;
-    if (!el || from === 1) { live(1); return; }
-    el.style.transform = '';
-    if (!lessMotion()) el.animate([{ transform: `scale(${from})` }, { transform: 'scale(1)' }], { duration: 320, easing: 'cubic-bezier(.32,.72,.24,1)' })
-      .finished.then(() => el.style.removeProperty('transform-origin'), () => undefined);
-  };
-  const commit = async (step: -1 | 1) => {
-    const el = body();
-    if (!el) return;
-    swapping = true;
-    const next = (density.value + step) as AlbumDensity;
+    busy = true;
     try {
-      await zoomSwap(el, anchor, async () => { density.value = next; await nextTick(); }, find, body);
+      await options.prepare(next);
+      if (target?.day && next === 'day') await options.ensureDay?.(target.day);
+      let anchor = target?.anchor ?? null;
+      if (!anchor) { const center = viewCenter(); anchor = pick(center.x, center.y); }
+      anchorKey = target?.day ? { day: target.day, month: target.day.slice(0, 7) } : keyOf(anchor);
+      const swap = async () => { zoom.value = next; await nextTick(); };
+      if (el) await zoomSwap(el, anchor, swap, find, body);
+      else await swap();
+      if (target?.day) {
+        const landed = find();
+        const box = main();
+        if (landed && box) box.scrollTop += landed.getBoundingClientRect().top - (headLine() + Math.max(24, box.clientHeight / 4));
+      }
+      return true;
     } finally {
-      swapping = false;
+      busy = false;
       scale = 1;
-      anchor = null;
       holdUntilIdle();
     }
   };
 
-  /* 年 / 月卡上捏合：跟手一点点缩放（原点在视口正中），够一档就换层（走和点卡、点胶囊一样的展开 / 收回）。 */
-  const periodUnder = (x: number, y: number): HTMLElement | null => {
-    const hit = document.elementFromPoint(x, y)?.closest<HTMLElement>('[data-period]');
-    if (hit && stage.value?.contains(hit)) return hit;
-    let best: HTMLElement | null = null;
-    let distance = Infinity;
-    stage.value?.querySelectorAll<HTMLElement>('[data-period]').forEach((el) => {
-      const box = el.getBoundingClientRect();
-      if (box.bottom < headLine() || box.top > window.innerHeight) return;
-      const d = Math.hypot(box.left + box.width / 2 - x, box.top + box.height / 2 - y);
-      if (d < distance) { distance = d; best = el; }
-    });
-    return best;
+  /* ---------- 捏合 ---------- */
+
+  let scale = 1;
+  /** 换过一档以后锁住，等手停下来才放开（一次手势只走一档）。 */
+  let locked = false;
+  let unlock = 0;
+  const holdUntilIdle = () => { locked = true; window.clearTimeout(unlock); unlock = window.setTimeout(() => { locked = false; }, 180); };
+  let gesture = false;
+  let idle = 0;
+
+  const live = (value: number) => {
+    const el = body();
+    if (el) el.style.transform = value === 1 ? '' : `scale(${value.toFixed(4)})`;
   };
-  const changeLevel = (next: AlbumLevel, x: number, y: number) => {
-    window.clearTimeout(idle);
+  const settle = () => {
+    idle = 0;
+    gesture = false;
+    const el = body();
+    const from = stretchAtEdge(scale, zoomIndex(zoom.value));
     scale = 1;
-    live(1);
-    holdUntilIdle();
-    if (levelDepth(next) > levelDepth(level.value)) {
-      const card = periodUnder(x, y);
-      const key = card?.dataset.period;
-      if (card && key) { void go(next, { key, card }); return; }
-    }
-    void go(next);
+    if (!el || from === 1) { live(1); return; }
+    el.style.transform = '';
+    el.animate([{ transform: `scale(${from})` }, { transform: 'scale(1)' }], { duration: 320, easing: 'cubic-bezier(.32,.72,.24,1)' })
+      .finished.then(() => el.style.removeProperty('transform-origin'), () => undefined);
   };
   const onWheel = (event: WheelEvent) => {
     if (!event.ctrlKey) return;
-    // 页面本身不缩放：列表页上 Ctrl + 滚轮 / 捏合只给相册用。
+    // 页面本身不缩放：列表页上 Ctrl + 滚轮 / 捏合只给列表用。
     event.preventDefault();
     if (locked) { holdUntilIdle(); return; }
-    if (swapping || busy || !options.zoomable() || !stage.value) return;
+    if (busy || !options.zoomable() || !stage.value) return;
     const el = body();
     if (!el) return;
-    if (!anchor) {
+    const index = zoomIndex(zoom.value);
+    if (!gesture) {
+      gesture = true;
       const center = viewCenter();
-      anchor = pick(center.x, center.y);
-      anchorKey = keyOf(anchor);
       const box = el.getBoundingClientRect();
       el.style.transformOrigin = `${box.width / 2}px ${center.y - box.top}px`;
     }
     scale *= wheelFactor(event.deltaY, event.deltaMode);
     window.clearTimeout(idle);
-    if (level.value !== 'day') {
-      if (scale >= ZOOM_STEP_IN) { changeLevel(level.value === 'year' ? 'month' : 'day', event.clientX, event.clientY); return; }
-      if (scale <= ZOOM_STEP_OUT && level.value === 'month') { changeLevel('year', event.clientX, event.clientY); return; }
-      // 年卡已经最浅：只给一点橡皮筋。
-      if (level.value === 'year' && scale < 1) scale = Math.max(scale, 0.85);
-      live(Math.min(1.04, Math.max(0.96, scale)));
-      idle = window.setTimeout(settle, 160);
+    const step = zoomStep(scale, index);
+    if (step) {
+      idle = 0;
+      gesture = false;
+      void go(ZOOMS[index + step]!);
       return;
     }
-    // 全年热图再往里捏：收成月卡。
-    if (density.value === 2 && scale <= ZOOM_STEP_OUT) { changeLevel('month', event.clientX, event.clientY); return; }
-    const step = zoomStep(scale, density.value);
-    if (step) { idle = 0; void commit(step); return; }
-    // 到头了（最疏还在放大 / 最密还在缩小）只给一点橡皮筋，累计也别越攒越多。
-    if ((density.value === 0 && scale > 1.6) || (density.value === 2 && scale < 0.6)) scale = density.value === 0 ? 1.6 : 0.6;
-    live(stretchAtEdge(scale, density.value));
+    // 到头了（最细还在放大 / 最粗还在缩小）只给一点橡皮筋，累计也别越攒越多。
+    if (index === 0 && scale > 1.6) scale = 1.6;
+    if (index === ZOOMS.length - 1 && scale < 0.6) scale = 0.6;
+    live(stretchAtEdge(scale, index));
     idle = window.setTimeout(settle, 160);
   };
 
   let bound = false;
   const bind = () => { if (!bound) { window.addEventListener('wheel', onWheel, { passive: false }); bound = true; } };
-  const unbind = () => { if (bound) { window.removeEventListener('wheel', onWheel); bound = false; } window.clearTimeout(idle); window.clearTimeout(unlock); locked = false; };
+  const unbind = () => { if (bound) { window.removeEventListener('wheel', onWheel); bound = false; } window.clearTimeout(idle); window.clearTimeout(unlock); locked = false; gesture = false; };
   onMounted(bind);
   onActivated(bind);
   onDeactivated(unbind);
   onBeforeUnmount(unbind);
 
-  return { go, openPeriod };
+  return { go, busy: () => busy };
 }

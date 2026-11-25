@@ -4,7 +4,7 @@ import type { Injury, PersonalRecords, Race, ShoeOverview } from '../types/logbo
 import type { AnnualRings } from '../types/rings';
 
 /**
- * 履历页首屏要读的五样（lib/pageQueries.ts 的 /journal 用它预读，useLogbook / useAnnualRings 读的也是同一把键）。
+ * 履历页首屏要读的五样（useLogbook / useAnnualRings 读的是同一把键）。
  *
  * 以前履历页挂上以后才去读：年轮、PB 墙、跑鞋这些大块内容正好在形变途中回来、整块重画，同步完库是冷的
  * （PB 大库现算要半秒多），用户看到的是「同步完第一次点开履历页，动画要卡很久才出来」（2026-10-28 反馈）。

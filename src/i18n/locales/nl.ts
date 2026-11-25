@@ -15,19 +15,32 @@ type Params = Record<string, unknown>;
 export default {
   modules: {
     'components/album/album': {
-      open: 'Bladeren per jaar, maand en dag',
-      close: 'Terug naar de lijst',
+      tray: 'Zoom- en paginabediening',
+      trayHandle: (zoom: string) => `Weergave per ${zoom.toLowerCase()}. Sleep omhoog of omlaag om het niveau te wijzigen en klik om te openen`,
       levels: 'Weergaveniveau kiezen',
       year: 'Jaar',
       month: 'Maand',
       day: 'Dag',
       workouts: (count: number) => count === 1 ? '1 training' : `${count} trainingen`,
       nights: (count: number) => count === 1 ? '1 nacht' : `${count} nachten`,
+      count: 'Trainingen',
       distance: 'Afstand',
       duration: 'Duur',
+      avgDuration: 'Gem. slaapduur',
+      avgScore: 'Gem. score',
       avgOnset: 'Gem. bedtijd',
-      hrZones: 'Hartslagzones',
-      openPeriod: (period: string) => `Open ${period}`,
+      nightsLabel: 'Nachten vastgelegd',
+      stageShare: 'Verdeling slaapfasen',
+      vsMonth: (month: string) => `t.o.v. ${month}`,
+      vsLastYear: 't.o.v. vorig jaar',
+      yearNights: (count: number) =>
+        count === 1 ? '1 nacht vastgelegd' : `${count} nachten vastgelegd`,
+      onsetSpread: 'Regelmaat van bedtijd',
+      spread: (minutes: string) => `±${minutes}`,
+      bestMonth: 'Beste maand',
+      worstMonth: 'Slechtste maand',
+      scoreOf: (score: number) => `${score} punten`,
+      scoreLabel: (score: number) => `Score ${score}`,
     },
     'components/anatomy/anatomy': {
       front: 'Voorzijde',
@@ -757,8 +770,9 @@ export default {
       recentAria: 'Recente activiteiten',
       recentTitle: 'Recente activiteiten',
       recentSub: 'Slaap, hardlopen en krachttraining',
+      workoutsLink: 'Trainingen',
+      linksAria: 'Naar de slaap- of trainingslijst',
       newest: 'Nieuwste',
-      seeAll: 'Alles zien',
       recentEmpty:
         'Nog niets vastgelegd. Synchroniseer een keer om gegevens te tonen.',
       sleepRecordTitle: 'Slaap',
@@ -859,26 +873,47 @@ export default {
       weekTitle: 'Afgelopen 7 dagen',
     },
     'components/overview/suggest': {
-      aria: 'Suggesties voor jou',
-      workoutEyebrow: 'Net getraind',
-      workoutLine: (what: string, amount: string, count: number) => {
-        if (!count) return `Vandaag: ${what}, ${amount}. Kijk eens terug.`;
-        if (count === 1) return `Vandaag: ${what}, ${amount}. Vergelijk met je laatste soortgelijke training.`;
-        return `Vandaag: ${what}, ${amount}. Vergelijk met je laatste ${count} soortgelijke trainingen.`;
+      aria: 'Vraag van de dag',
+      refresh: 'Andere vraag',
+      expand: 'Deze vraag openen',
+      collapse: 'Inklappen',
+      dismiss: 'Vandaag niet meer tonen',
+      title: {
+        plan_tomorrow: 'Morgen plannen',
+        sleep_review: 'Hoe heb ik afgelopen nacht geslapen?',
+        same_route: 'Hoe gaat het op mijn vaste route?',
+        recovery_nights: 'Waarom herstel ik de laatste nachten zo slecht?',
       },
-      sleepEyebrow: 'Slecht geslapen',
-      sleepShort: (duration: string, gap: string) =>
-        `Je sliep vannacht ${duration}, ${gap} minder dan normaal in de afgelopen vier weken.`,
-      sleepDeep: (deep: string, gap: string) =>
-        `Je diepe slaap was ${deep}, ${gap} minder dan normaal in de afgelopen vier weken.`,
-      idleEyebrow: (days: number) => `${days} ${days === 1 ? 'dag' : 'dagen'} niet gesport`,
-      idleLine: (date: string, what: string) => `Je laatste training was ${what} op ${date}.`,
-      tomorrowSub: 'Met herstel en trainingen van de afgelopen 7 dagen',
-      sleepReview: 'Hoe heb ik afgelopen nacht geslapen?',
-      sleepReviewSub: 'Met slaap en herstel van de afgelopen nachten',
+      reviewToday: (amount: string, what: string) =>
+        `Vandaag terugkijken op ${what} en ${amount}`,
+      reviewOn: (date: string, amount: string, what: string) =>
+        `Terugkijken op ${date} met ${what} en ${amount}`,
+      raceTitle: (date: string, what: string) =>
+        `Wedstrijd van ${date} terugkijken (${what})`,
+      bestTitle: (bucket: string) => `Word ik sneller op de ${bucket}?`,
+      comebackTitle: (days: number) =>
+        `${days} dagen niet getraind. Hoe pak ik het weer op?`,
+      sub: {
+        plan_tomorrow: 'Herstel en trainingen van de afgelopen 7 dagen',
+        sleep_review: 'Slaap en herstel van de afgelopen nachten',
+        review_workout: 'Deze training + recente vergelijkbare trainingen',
+        race_review: 'De wedstrijd + vier weken training en slaap',
+        distance_best: 'Alle hardloopsessies op deze afstand + de PR-reeks',
+        same_route: 'Alle hardloopsessies op deze route',
+        recovery_nights: 'Afwijkende nachten + trainingen van de dag ervoor',
+        comeback: 'Laatste trainingen vóór de pauze + twee weken herstel',
+      },
+      swap: 'Wissel enkele kaarten',
+      swapDone: 'Klaar met wisselen',
+      refine: 'Verder verfijnen via ‘Naar AI sturen’',
+      sendTo: (name: string) => `Kopiëren naar ${name}`,
+      sending: 'Voorbereiden…',
+      sent: (name: string) =>
+        `Gekopieerd. Plak het in het gesprek met ${name}`,
+      sendFailed:
+        'Niet overgedragen. Open ‘Naar AI sturen’ om te zien waar het vastliep',
+      desktopOnly: 'Gegevens aan een AI doorgeven kan alleen in de desktopapp',
       sleepReviewQuestion: 'Bijgevoegd zijn mijn slaap- en herstelmetingen van afgelopen nacht en de paar nachten ervoor, plus mijn trainingen van de afgelopen dagen. Vertel me hoe ik afgelopen nacht heb geslapen, wat er verschilde van de nachten ervoor, wat dat mogelijk verklaart en of ik mijn training van vandaag daarom moet aanpassen.',
-      dismiss: 'Deze suggestie sluiten',
-      failed: 'Kaarten delen lukt nu niet. Probeer het later opnieuw.',
     },
     'components/shell/AppTopBar': {
       today: 'Vandaag',
@@ -2321,37 +2356,6 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
       entrySparse: 'Afgelopen 90 dagen',
       focusLabel: 'Mijn focus',
     },
-    'views/RecentRecords': {
-      title: 'Recente activiteiten',
-      loadingLabel: 'Recente activiteiten laden',
-      loadFailedTitle: 'De recente activiteiten konden niet worden geladen',
-      desktopOnly:
-        'Deze browserpreview leest geen accountgegevens — open de desktop-app.',
-      retry: 'Opnieuw proberen',
-      partialUnavailable: 'Deels nu niet beschikbaar',
-      filterAll: 'Alles',
-      noSleep: 'Nog geen slaapgegevens',
-      noWorkouts: 'Niets om hier te tonen.',
-      noWorkoutsOfType: 'Niets om te tonen voor dit trainingstype.',
-      hiddenIncomplete: (count: number) =>
-        plural(count, {
-          one: `${count} onvolledig item verborgen`,
-          other: `${count} onvolledige items verborgen`,
-        }),
-      notProvided: 'Niet verstrekt',
-      today: 'Vandaag',
-      yesterday: 'Gisteren',
-      introTimeline:
-        'Recent gesynchroniseerde slaap en trainingen op tijdvolgorde — nieuwste bovenaan.',
-      filterSleep: (count: number) => `Slaap ${count}`,
-      filterWorkouts: (count: number) => `Trainingen ${count}`,
-      noRecords: 'In deze periode is nog geen slaap of training vastgelegd.',
-      sleepTitle: 'Slaap',
-      sleepScore: (score: number) => `Slaapscore ${score}`,
-      workoutTypeAria: 'Trainingstype',
-      avgHr: (bpm: number) => `Gem. hartslag ${bpm}`,
-      showMore: (count: number) => `Nog ${count} tonen`,
-    },
     'lib/deviceName': {
       undetermined: 'Apparaat onbepaald',
       fused: 'Gecombineerde bronnen',
@@ -2404,15 +2408,12 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
     },
     'views/SleepList': {
       title: 'Slaap',
-      intro:
-        'Slaapgegevens gesynchroniseerd naar deze machine. Zonder tijdlijn wordt alleen de samenvatting getoond.',
       loadFailedTitle: 'De slaapgegevens konden niet worden gelezen',
       loadFailed: 'Slaaplijst nu niet beschikbaar',
       retry: 'Opnieuw proberen',
       emptyTitle: 'Nog geen slaapgegevens',
       emptyMessage:
         'Verschijnt hier na een synchronisatie. Zonder echte stadia wordt niets verzonnen.',
-      scoreLabel: 'Score',
       footnote: (count: number, from: string) =>
         plural(count, {
           one: `${count} nacht · sinds ${from}`,
@@ -2749,7 +2750,6 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
     },
     'views/WorkoutList': {
       title: 'Trainingen',
-      intro: 'Trainingen gesynchroniseerd naar deze machine. Geen track, geen kaart.',
       loadFailedTitle: 'De trainingen konden niet worden gelezen',
       loadFailed: 'Trainingslijst nu niet beschikbaar',
       retry: 'Opnieuw proberen',
@@ -3312,8 +3312,6 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
       boxPour: 'Toevoegen aan deze taak',
     },
     'components/cards/hands': {
-      dealByQuestion: 'Deel per vraag',
-      dealByQuestionAria: 'Delen op basis van een vraag: kies een vraag. De bijpassende trainingen en nachten worden automatisch geselecteerd',
       kind: {
         distance_best: 'Zelfde afstand · PR’s',
         same_route: 'Zelfde route',
@@ -3330,13 +3328,6 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
         race_review: 'De wedstrijd + training en slaap in de vier weken ervoor',
         recovery_nights: 'Nachten met HRV, rusthartslag of slaap buiten je norm',
       },
-      empty: {
-        no_routes: 'Je hebt nog geen route drie keer of vaker gelopen',
-        no_distance: 'Er zijn nog geen twee runs in dezelfde afstandsklasse (5K / 10K / halve marathon / marathon)',
-        no_race: 'Geen wedstrijd gemarkeerd en geen run duidelijk sneller dan normaal',
-        no_outliers: 'Je herstelmetingen vielen de afgelopen twee maanden binnen je normale bereik',
-        no_data: 'Onvoldoende recente gegevens',
-      },
       bucket: { '5k': '5K', '10k': '10K', half: 'Halve marathon', full: 'Marathon' },
       role: {
         anchor: 'Deze training', pr: 'PR', race: 'Wedstrijd', build: 'Opbouw', same: 'Vergelijkbaar', recent: 'Recent', outlier: 'Afwijkend', day_before: 'Dag ervoor', night: 'Nacht',
@@ -3345,14 +3336,10 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
       hrvNote: (value: number) => `HRV ${value}`,
       bench: 'Reserve',
       benchEmpty: 'Geen reservekaarten meer',
-      tableTip: 'Sleep een kaart omlaag naar de reserve om die uit de hand te halen. Sleep een reservekaart omhoog om die in te wisselen. Tikken kan ook. De AI krijgt de kaarten in deze hand.',
-      useHand: 'Deze hand gebruiken',
       handEmpty: 'Alle kaarten zijn eruit. Wissel er een in vanuit de reserve.',
       cardCount: (count: number) => plural(count, { one: `${count} kaart`, other: `${count} kaarten` }),
       drawOutAria: (label: string) => `${label}. Tik om naar de reserve te verplaatsen`,
       swapInAria: (label: string) => `${label}. Tik om die in deze hand te wisselen`,
-      dealing: 'Kaarten delen…',
-      failed: 'De gegevens konden niet worden gelezen. Er worden geen kaarten gedeeld.',
       question: {
         distance_best: (bucket: string) => `Dit zijn mijn eerdere PR’s en recente runs in de afstandsklasse ${bucket}. Vergelijk de veranderingen in tempo, hartslag en trainingsbelasting: waar komt de vooruitgang vooral vandaan, wat ontbreekt er nog voor een nieuw PR en waarop moet ik me de komende vier weken voor deze afstand richten?`,
         same_route: (km: string) => `Dit zijn enkele runs die ik op dezelfde route (ongeveer ${km}) heb gedaan. Vergelijk tempo, hartslag en hartslagdrift in de tweede helft: ben ik op dezelfde route sneller geworden, kost het me minder moeite of ga ik achteruit? Noem mogelijke oorzaken.`,
@@ -3630,9 +3617,9 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
       restoreDevice: 'Weer tonen',
     },
     'views/settings/sections/SuggestCardsRow': {
-      title: 'Suggestiekaarten op het Overzicht',
-      on: 'Na een training, een slechte nacht of een lange pauze toont het Overzicht een kaart met de juiste gegevens om in één tik met je AI te delen.',
-      off: 'Geen suggestiekaarten op het Overzicht',
+      title: 'Vraag van de dag',
+      on: 'Elke dag kiest het Overzicht een vraag op basis van hoe het met je gaat. Open de kaart om de bijbehorende gegevens klaar te zetten voor je AI, of kies een andere vraag.',
+      off: 'Geen vraag van de dag in het Overzicht',
     },
     'views/settings/sections/sync': {
       cardTitle: 'Synchronisatie',

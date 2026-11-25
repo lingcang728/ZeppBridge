@@ -115,7 +115,7 @@ const RPE_MARKS = [1, 5, 10] as const;
         </div>
         <p v-else-if="feel.shoe_mode === 'auto' && assignedName" class="note">{{ t.autoNow(assignedName, t.how[feel.assigned?.how ?? 'unknown']) }}</p>
       </template>
-      <p v-else class="note">{{ t.noShoes }} <RouterLink to="/journal">{{ t.register }} →</RouterLink></p>
+      <p v-else class="note">{{ t.noShoes }} <RouterLink to="/workouts?zoom=year">{{ t.register }} →</RouterLink></p>
     </div>
     <p v-if="error" class="note bad" role="alert">{{ error }}</p>
   </section>

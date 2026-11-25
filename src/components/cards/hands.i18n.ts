@@ -6,8 +6,6 @@ import { defineMessages, useMessages } from '../../i18n';
  */
 const messages = defineMessages(
   {
-    dealByQuestion: '按问题发牌',
-    dealByQuestionAria: '按问题发牌：选一个问题，自动挑出相关的几次运动和几晚',
     kind: {
       distance_best: '同距离 · 刷 PR',
       same_route: '同一条路线',
@@ -24,13 +22,6 @@ const messages = defineMessages(
       race_review: '比赛那次 + 赛前四周训练和睡眠',
       recovery_nights: 'HRV、静息心率或睡眠偏离常态的几晚',
     },
-    empty: {
-      no_routes: '还没有跑过三次以上的同一条路线',
-      no_distance: '还没有两次落在同一距离段（5K / 10K / 半马 / 全马）的跑步',
-      no_race: '没有标记的比赛，也没有明显快于平常的一次',
-      no_outliers: '最近两个月的恢复读数都在你的常态里',
-      no_data: '最近没有够用的数据',
-    },
     bucket: { '5k': '5K', '10k': '10K', half: '半马', full: '全马' },
     role: {
       anchor: '这次', pr: 'PR', race: '比赛', build: '赛前', same: '同类', recent: '最近', outlier: '异常', day_before: '前一天', night: '那一晚',
@@ -39,14 +30,10 @@ const messages = defineMessages(
     hrvNote: (value: number) => `HRV ${value}`,
     bench: '候补',
     benchEmpty: '没有候补了',
-    tableTip: '把牌往下拖进候补就是抽掉，把候补里的牌拖上来就是换上（点一下也行）。交给 AI 的内容跟着这手牌走。',
-    useHand: '就用这手牌',
     handEmpty: '牌都抽走了，从候补换一张进来',
     cardCount: (count: number) => `${count} 张`,
     drawOutAria: (label: string) => `${label}，按一下抽到候补`,
     swapInAria: (label: string) => `${label}，按一下换进这手牌`,
-    dealing: '正在发牌…',
-    failed: '读不到数据，发不出牌',
     question: {
       distance_best: (bucket: string) => `这是我 ${bucket} 距离段的历次 PR 和最近几次跑步。请对比配速、心率和训练负荷的变化：进步主要来自哪里、离下一个 PR 还差什么，再给我接下来 4 周针对这个距离的训练重点。`,
       same_route: (km: string) => `这是我在同一条路线（约 ${km}）上跑的几次。请对比每次的配速、心率和后半程的心率漂移：同样的路线我是更快了、更省力了，还是退步了？说说可能的原因。`,
@@ -59,8 +46,6 @@ const messages = defineMessages(
     },
   },
   {
-    dealByQuestion: 'Deal by question',
-    dealByQuestionAria: 'Deal by question: pick a question and the matching workouts and nights are dealt for you',
     kind: {
       distance_best: 'Same distance · PRs',
       same_route: 'Same route',
@@ -77,13 +62,6 @@ const messages = defineMessages(
       race_review: 'The race + four weeks of training and sleep before it',
       recovery_nights: 'Nights when HRV, resting HR or sleep was off',
     },
-    empty: {
-      no_routes: 'No route run three or more times yet',
-      no_distance: 'No two runs in the same distance band (5K / 10K / half / full) yet',
-      no_race: 'No marked race and no run clearly faster than usual',
-      no_outliers: 'Recovery readings stayed within your norm for the last two months',
-      no_data: 'Not enough recent data',
-    },
     bucket: { '5k': '5K', '10k': '10K', half: 'Half', full: 'Marathon' },
     role: {
       anchor: 'This one', pr: 'PR', race: 'Race', build: 'Build-up', same: 'Similar', recent: 'Recent', outlier: 'Off', day_before: 'Day before', night: 'Night',
@@ -92,14 +70,10 @@ const messages = defineMessages(
     hrvNote: (value: number) => `HRV ${value}`,
     bench: 'Bench',
     benchEmpty: 'Bench is empty',
-    tableTip: 'Drag a card down to the bench to take it out, or drag a bench card up to swap it in (a tap works too). The AI gets whatever is in this hand.',
-    useHand: 'Use this hand',
     handEmpty: 'All cards drawn out. Swap one in from the bench',
     cardCount: (count: number) => (count === 1 ? '1 card' : `${count} cards`),
     drawOutAria: (label: string) => `${label}. Press to move it to the bench`,
     swapInAria: (label: string) => `${label}. Press to swap it into the hand`,
-    dealing: 'Dealing…',
-    failed: 'Could not read the data, so no cards were dealt',
     question: {
       distance_best: (bucket: string) => `These are my past PRs and most recent runs at ${bucket}. Compare pace, heart rate and training load across them: where did the progress come from, what is missing for the next PR, and what should the next 4 weeks focus on for this distance?`,
       same_route: (km: string) => `These are my runs on the same route (about ${km}). Compare pace, heart rate and second-half heart-rate drift: on the same route, am I faster, more efficient, or slipping? Tell me the likely reasons.`,
@@ -112,8 +86,6 @@ const messages = defineMessages(
     },
   },
   {
-    dealByQuestion: 'Repartir por pregunta',
-    dealByQuestionAria: 'Repartir por pregunta: elige una pregunta y seleccionaremos los entrenamientos y las noches más relevantes',
     kind: {
       distance_best: 'Misma distancia · marcas',
       same_route: 'Misma ruta',
@@ -130,13 +102,6 @@ const messages = defineMessages(
       race_review: 'La carrera + las 4 semanas previas de entrenamiento y sueño',
       recovery_nights: 'Noches con HRV, FC en reposo o sueño fuera de lo habitual',
     },
-    empty: {
-      no_routes: 'Aún no has recorrido la misma ruta al menos 3 veces',
-      no_distance: 'Aún no hay dos carreras en la misma categoría de distancia (5K / 10K / medio maratón / maratón)',
-      no_race: 'No hay una carrera marcada ni un esfuerzo claramente más rápido de lo habitual',
-      no_outliers: 'En los últimos 2 meses, tus valores de recuperación se mantuvieron dentro de lo habitual',
-      no_data: 'Aún no hay suficientes datos recientes',
-    },
     bucket: { '5k': '5K', '10k': '10K', half: 'medio maratón', full: 'maratón' },
     role: {
       anchor: 'Esta sesión', pr: 'PR', race: 'Carrera', build: 'Preparación', same: 'Similar', recent: 'Reciente', outlier: 'Anómalo', day_before: 'Día anterior', night: 'Noche',
@@ -145,14 +110,10 @@ const messages = defineMessages(
     hrvNote: (value: number) => `HRV ${value}`,
     bench: 'Reserva',
     benchEmpty: 'No hay cartas en reserva',
-    tableTip: 'Arrastra una carta hacia abajo, a la reserva, para quitarla, o sube una de la reserva para meterla en la mano (también basta con tocarla). La IA recibirá las cartas que queden en esta mano.',
-    useHand: 'Usar esta mano',
     handEmpty: 'No quedan cartas en la mano. Intercambia una de la reserva.',
     cardCount: (count: number) => (count === 1 ? '1 carta' : `${count} cartas`),
     drawOutAria: (label: string) => `${label}. Pulsa para mover a la reserva`,
     swapInAria: (label: string) => `${label}. Pulsa para intercambiarla por una de la mano`,
-    dealing: 'Repartiendo cartas…',
-    failed: 'No se pudieron leer los datos y no se repartieron las cartas',
     question: {
       distance_best: (bucket: string) => `Estas son mis marcas personales y mis carreras recientes en la distancia de ${bucket}. Compara los cambios en el ritmo, la frecuencia cardíaca y la carga de entrenamiento: ¿de dónde viene mi progreso, qué me falta para el próximo récord personal y en qué debería enfocarme durante las próximas 4 semanas para esta distancia?`,
       same_route: (km: string) => `Estas son varias carreras por la misma ruta (aprox. ${km}). Compara el ritmo, la frecuencia cardíaca y cuánto se eleva esta en la segunda mitad: ¿cada vez voy más rápido, hago menos esfuerzo o estoy perdiendo rendimiento? Explícame las posibles causas.`,

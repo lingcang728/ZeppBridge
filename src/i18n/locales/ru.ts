@@ -997,8 +997,9 @@ export default {
     },
 
     'components/album/album': {
-      open: 'Просмотр по годам, месяцам и дням',
-      close: 'Назад к списку',
+      tray: 'Масштаб и действия на странице',
+      trayHandle: (zoom: string) =>
+        `Просмотр по ${zoom === 'Дни' ? 'дням' : zoom === 'Месяцы' ? 'месяцам' : zoom === 'Годы' ? 'годам' : zoom.toLowerCase()}. Перетащите вверх или вниз, чтобы сменить масштаб. Нажмите, чтобы открыть.`,
       levels: 'Масштаб просмотра',
       year: 'Годы',
       month: 'Месяцы',
@@ -1007,11 +1008,25 @@ export default {
         plural(count, { one: `${count} тренировка`, few: `${count} тренировки`, many: `${count} тренировок`, other: `${count} тренировки` }),
       nights: (count: number) =>
         plural(count, { one: `${count} ночь`, few: `${count} ночи`, many: `${count} ночей`, other: `${count} ночи` }),
+      count: 'Количество тренировок',
       distance: 'Дистанция',
       duration: 'Время',
+      avgDuration: 'Средняя длительность сна',
+      avgScore: 'Средняя оценка',
       avgOnset: 'Среднее время засыпания',
-      hrZones: 'Пульсовые зоны',
-      openPeriod: (period: string) => `Открыть ${period}`,
+      nightsLabel: 'Записано',
+      stageShare: 'Распределение по фазам сна',
+      vsMonth: (month: string) => `По сравнению с предыдущим месяцем (${month})`,
+      vsLastYear: 'По сравнению с прошлым годом',
+      yearNights: (count: number) =>
+        `Записано ${count} ${plural(count, { one: 'ночь', few: 'ночи', many: 'ночей', other: 'ночи' })}`,
+      onsetSpread: 'Регулярность времени отхода ко сну',
+      spread: (minutes: string) => `±${minutes}`,
+      bestMonth: 'Месяц с лучшим сном',
+      worstMonth: 'Месяц с худшим сном',
+      scoreOf: (score: number) =>
+        `${score} ${plural(score, { one: 'балл', few: 'балла', many: 'баллов', other: 'балла' })}`,
+      scoreLabel: (score: number) => `Оценка ${score}`,
     },
 
     'components/HistoryArchivePanel': {
@@ -1233,7 +1248,8 @@ export default {
       recentAria: 'Недавние записи',
       recentTitle: 'Недавние записи',
       recentSub: 'Сон и тренировки',
-      seeAll: 'Показать все',
+      workoutsLink: 'Тренировки',
+      linksAria: 'Открыть список сна или тренировок',
       recentEmpty: 'Записей пока нет. Они появятся здесь после первой синхронизации.',
       sleepRecordTitle: 'Сон',
       sleepScore: (score: number) => `Оценка сна ${score}`,
@@ -1336,31 +1352,42 @@ export default {
     },
 
     'components/overview/suggest': {
-      aria: 'Рекомендации для вас',
-      workoutEyebrow: 'Только что',
-      workoutLine: (what: string, amount: string, count: number) =>
-        count
-          ? `Тренировка сегодня: ${what} — ${amount}. Сравнить с последними ${count} похожими тренировками?`
-          : `Тренировка сегодня: ${what} — ${amount}. Разобрать её?`,
-      sleepEyebrow: 'Плохая ночь',
-      sleepShort: (duration: string, gap: string) =>
-        `За ночь вы спали ${duration} — на ${gap} меньше вашей нормы за последние 4 недели.`,
-      sleepDeep: (deep: string, gap: string) =>
-        `Глубокого сна было ${deep} — на ${gap} меньше вашей нормы за последние 4 недели.`,
-      idleEyebrow: (days: number) =>
-        plural(days, {
-          one: `${days} день без тренировок`,
-          few: `${days} дня без тренировок`,
-          many: `${days} дней без тренировок`,
-          other: `${days} дня без тренировок`,
-        }),
-      idleLine: (date: string, what: string) => `Последняя тренировка: ${what} · ${date}`,
-      tomorrowSub: 'С учётом восстановления и тренировок за последние 7 дней',
-      sleepReview: 'Каким был мой сон прошлой ночью?',
-      sleepReviewSub: 'Сон и восстановление за несколько ночей',
+      aria: 'Вопрос дня',
+      refresh: 'Другой вопрос',
+      expand: 'Развернуть этот вопрос',
+      collapse: 'Свернуть',
+      dismiss: 'Скрыть на сегодня',
+      title: {
+        plan_tomorrow: 'План на завтра',
+        sleep_review: 'Каким был мой сон прошлой ночью?',
+        same_route: 'Как идут мои пробежки по привычному маршруту?',
+        recovery_nights: 'Почему восстановление ухудшилось в последние ночи?',
+      },
+      reviewToday: (amount: string, what: string) => `Тренировка за сегодня — ${what}, ${amount}`,
+      reviewOn: (date: string, amount: string, what: string) => `Тренировка за ${date} — ${what}, ${amount}`,
+      raceTitle: (date: string, what: string) => `Разбор старта ${date} (${what})`,
+      bestTitle: (bucket: string) => `Становлюсь ли я быстрее на дистанции ${bucket}?`,
+      comebackTitle: (days: number) =>
+        `${plural(days, { one: `${days} день`, few: `${days} дня`, many: `${days} дней`, other: `${days} дня` })} без тренировок. Как вернуться?`,
+      sub: {
+        plan_tomorrow: 'Восстановление и тренировки за последние 7 дней',
+        sleep_review: 'Сон и восстановление за последние несколько ночей',
+        review_workout: 'Эта и недавние похожие тренировки',
+        race_review: 'Соревнование + тренировки и сон за четыре недели до него',
+        distance_best: 'Все пробежки на этой дистанции + история личных рекордов',
+        same_route: 'Все пробежки по этому маршруту',
+        recovery_nights: 'Ночи с отклонениями + тренировки накануне',
+        comeback: 'Последние тренировки перед перерывом + восстановление за последние две недели',
+      },
+      swap: 'Заменить несколько карточек',
+      swapDone: 'Готово',
+      refine: 'Уточнить на странице «Передать ИИ»',
+      sendTo: (name: string) => `Скопировать для ${name}`,
+      sending: 'Подготовка…',
+      sent: (name: string) => `Скопировано. Вставьте текст в чат ${name}`,
+      sendFailed: 'Не удалось передать данные. Откройте страницу «Передать ИИ», чтобы узнать, на каком шаге возникла проблема.',
+      desktopOnly: 'Передать данные ИИ можно только из настольного приложения',
       sleepReviewQuestion: 'Прикладываю данные о сне и восстановлении за прошлую ночь и несколько ночей до неё, а также записи моих тренировок за последние дни. Оцени мой сон прошлой ночью. Чем он отличался от сна в предыдущие ночи, что могло на это повлиять и стоит ли изменить сегодняшнюю тренировку?',
-      dismiss: 'Скрыть эту рекомендацию',
-      failed: 'Не удалось подобрать карты. Попробуйте позже.',
     },
 
     'components/shell/AppTopBar': {
@@ -2382,38 +2409,6 @@ export default {
       focusLabel: 'Мои интересы',
     },
 
-    'views/RecentRecords': {
-      title: 'Недавние записи',
-      loadingLabel: 'Загружаются недавние записи',
-      loadFailedTitle: 'Не удалось загрузить недавние записи',
-      desktopOnly: 'Откройте настольное приложение — в браузере данные аккаунта недоступны.',
-      retry: 'Повторить',
-      partialUnavailable: 'Часть данных пока недоступна',
-      filterAll: 'Все',
-      noSleep: 'Записей сна пока нет',
-      noWorkouts: 'Здесь пока нет тренировок.',
-      noWorkoutsOfType: 'Для этого вида спорта записей нет.',
-      hiddenIncomplete: (count: number) =>
-        plural(count, {
-          one: `Скрыта ${count} неполная запись`,
-          few: `Скрыты ${count} неполные записи`,
-          many: `Скрыто ${count} неполных записей`,
-          other: `Скрыты ${count} неполные записи`,
-        }),
-      notProvided: 'Нет данных',
-      today: 'Сегодня',
-      yesterday: 'Вчера',
-      introTimeline: 'Сон и тренировки на единой шкале времени: самые свежие сверху.',
-      filterSleep: (count: number) => `Сон ${count}`,
-      filterWorkouts: (count: number) => `Тренировки ${count}`,
-      workoutTypeAria: 'Тип тренировки',
-      sleepTitle: 'Сон',
-      sleepScore: (score: number) => `Оценка сна ${score}`,
-      avgHr: (bpm: number) => `средний пульс ${bpm}`,
-      showMore: (count: number) => `Показать ещё ${count}`,
-      noRecords: 'За этот период записей сна и тренировок нет.',
-    },
-
     'lib/deviceName': {
       undetermined: 'Устройство не определено',
       fused: 'Объединённые источники',
@@ -2465,13 +2460,11 @@ export default {
 
     'views/SleepList': {
       title: 'Сон',
-      intro: 'Синхронизированные записи сна из локальной базы данных.',
       loadFailedTitle: 'Не удалось прочитать записи сна',
       loadFailed: 'Список записей сна пока недоступен',
       retry: 'Повторить',
       emptyTitle: 'Записей сна пока нет',
       emptyMessage: 'Они появятся здесь после первой синхронизации. Фазы никогда не выдумываются.',
-      scoreLabel: 'Оценка',
       footnote: (count: number, from: string) =>
         `${plural(count, { one: `${count} запись`, few: `${count} записи`, many: `${count} записей`, other: `${count} записи` })} · с ${from}`,
       shown: (shown: number, total: number) => `Показано ${shown} из ${total}`,
@@ -3121,7 +3114,6 @@ export default {
     },
     'views/WorkoutList': {
       title: 'Тренировки',
-      intro: 'Синхронизированные тренировки из локальной базы данных.',
       loadFailedTitle: 'Не удалось прочитать тренировки',
       loadFailed: 'Список тренировок пока недоступен',
       retry: 'Повторить',
@@ -3463,8 +3455,6 @@ export default {
       monthAria: (month: string, label: string, days: number) => `${label}, выбрано ${plural(days, { one: `${days} день`, few: `${days} дня`, many: `${days} дней`, other: `${days} дней` })} за ${month}. Нажмите для просмотра по неделям`,
     },
     'components/cards/hands': {
-      dealByQuestion: 'Подбор по вопросу',
-      dealByQuestionAria: 'Подобрать карты по вопросу: выберите вопрос, и мы отберём подходящие тренировки и ночи',
       kind: {
         distance_best: 'PR на одной дистанции',
         same_route: 'Один маршрут',
@@ -3480,13 +3470,6 @@ export default {
         same_route: 'Несколько пробежек по одному маршруту',
         race_review: 'Старт, тренировки и сон за 4 недели до него',
         recovery_nights: 'Ночи, когда ВСР, пульс покоя или сон отклонялись от нормы',
-      },
-      empty: {
-        no_routes: 'Пока нет маршрутов с тремя и более пробежками',
-        no_distance: 'Пока нет двух пробежек в одном диапазоне (5K / 10K / полумарафон / марафон)',
-        no_race: 'Нет отмеченных соревнований и пробежек явно быстрее обычного',
-        no_outliers: 'За последние два месяца показатели восстановления оставались в пределах нормы',
-        no_data: 'Недостаточно свежих данных',
       },
       bucket: { '5k': '5K', '10k': '10K', half: 'Полумарафон', full: 'Марафон' },
       role: {
@@ -3504,16 +3487,11 @@ export default {
       hrvNote: (value: number) => `ВСР ${value}`,
       bench: 'Резерв',
       benchEmpty: 'В резерве нет карт',
-      tableTip:
-        'Перетащите карту вниз, в резерв, чтобы убрать её из набора. Перетащите карту из резерва вверх, чтобы заменить ею карту в наборе. Можно также просто нажать на карту. ИИ получит карты из этого набора.',
-      useHand: 'Использовать этот набор',
       handEmpty: 'Все карты убраны. Добавьте карту из резерва.',
       cardCount: (count: number) =>
         plural(count, { one: `${count} карта`, few: `${count} карты`, many: `${count} карт`, other: `${count} карты` }),
       drawOutAria: (label: string) => `${label}. Нажмите, чтобы убрать карту в резерв`,
       swapInAria: (label: string) => `${label}. Нажмите, чтобы заменить ею карту в наборе`,
-      dealing: 'Раздаём карты…',
-      failed: 'Не удалось прочитать данные и раздать карты.',
       question: {
         distance_best: (bucket: string) =>
           `Это мои прежние PR и последние пробежки на дистанции ${bucket}. Сравни динамику темпа, пульса и тренировочной нагрузки: за счёт чего я прогрессирую, чего не хватает до следующего PR и на чём сосредоточиться в тренировках на эту дистанцию в ближайшие 4 недели?`,
@@ -4361,9 +4339,9 @@ export default {
     },
 
     'views/settings/sections/SuggestCardsRow': {
-      title: 'Советы на главной',
-      on: 'После тренировки, плохого сна или долгого перерыва на главной появится карточка с нужными данными для ИИ, которые можно передать одним нажатием.',
-      off: 'На главной нет карточек с советами',
+      title: 'Вопрос дня на главной',
+      on: 'На главной каждый день появляется вопрос по вашим недавним данным. Откройте его, чтобы подготовить нужные данные для ИИ, или выберите другой вопрос.',
+      off: 'На главной не будет вопроса дня',
     },
 
     'views/settings/sections/archive': {

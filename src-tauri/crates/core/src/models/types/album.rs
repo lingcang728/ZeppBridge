@@ -37,6 +37,15 @@ pub struct SleepMonth {
     /// Average falling-asleep time as minutes after local noon (so a night
     /// that starts before and one that starts after midnight average sanely).
     pub avg_onset_min: f64,
+    /// How many nights the onset average is over, and the spread (population
+    /// standard deviation, minutes) of those onsets: yearly regularity is
+    /// pooled from these. `None` when no night has a start clock.
+    pub onset_nights: i64,
+    pub onset_sd_min: Option<f64>,
+    /// Average sleep score over the nights that report one. `None` when no
+    /// night in the month has a score (never 0).
+    pub avg_score: Option<f64>,
+    pub score_nights: i64,
     /// Stage minutes summed over the nights that report each stage.
     pub deep_min: f64,
     pub light_min: f64,

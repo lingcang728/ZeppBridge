@@ -1,6 +1,7 @@
 <script setup lang="ts">
 defineOptions({ name: 'WorkoutList' });
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { useRoute } from 'vue-router';
 import { useSectionTour } from '../composables/useTour';
 import { useFirstLoad } from '../composables/useFirstLoad';
 import WorkoutTools from '../components/WorkoutTools.vue';
@@ -26,22 +27,18 @@ import WorkoutImport from '../components/workout/WorkoutImport.vue';
 import { workoutImportMessages } from '../components/workout/workoutImport.i18n';
 import type { ImportSourceKey } from '../types/imports';
 import GlyphTile from '../components/GlyphTile.vue';
-import ShareBar, { type ShareSegment } from '../components/workout/ShareBar.vue';
-import AlbumCapsule from '../components/album/AlbumCapsule.vue';
-import AlbumPeriods from '../components/album/AlbumPeriods.vue';
+import AlbumTray from '../components/album/AlbumTray.vue';
 import AlbumGrid from '../components/album/AlbumGrid.vue';
+import AlbumMonthHead from '../components/album/AlbumMonthHead.vue';
 import RouteGlyph from '../components/album/RouteGlyph.vue';
-import { albumMessages } from '../components/album/album.i18n';
+import JournalBody from '../components/journal/JournalBody.vue';
 import { useRecordAlbum } from '../composables/useRecordAlbum';
 import { useAlbumNav } from '../composables/useAlbumNav';
-import { localDay, type AlbumTile } from '../lib/album/album';
-import { nextSlot } from '../lib/motion/budget';
-import { hrZoneColor } from '../lib/metricTone';
+import { isAlbumZoom, localDay, type AlbumTile, type AlbumZoom } from '../lib/album/album';
 
 const messages = defineMessages(
   {
     title: '运动',
-    intro: '本机已同步的运动记录。没有轨迹时不画地图。',
     loadFailedTitle: '无法读取运动记录',
     loadFailed: '运动列表暂不可用',
     retry: '重试',
@@ -56,7 +53,6 @@ const messages = defineMessages(
   },
   {
     title: 'Workouts',
-    intro: 'Workouts synced to this machine. No track, no map.',
     loadFailedTitle: 'Could not load workouts',
     loadFailed: 'Workout list unavailable right now',
     retry: 'Retry',
@@ -71,7 +67,6 @@ const messages = defineMessages(
   },
   {
     title: 'Entrenamientos',
-    intro: 'Entrenamientos sincronizados en este equipo. Sin recorrido, no hay mapa.',
     loadFailedTitle: 'No se pudieron leer los entrenamientos',
     loadFailed: 'Lista de entrenamientos no disponible ahora',
     retry: 'Reintentar',
@@ -224,16 +219,15 @@ const clearSelected = () => { selected.value = new Set(); };
 const onChanged = () => { selected.value = new Set(); void loadList(); void loadHiddenCount(); };
 onBeforeUnmount(endDrag);
 
-/* 相册（lib/album）：胶囊切年 / 月 / 日，「日」这一层 Ctrl + 滚轮 / 捏合在列表行、方块、日历热图之间换。
-   选择中、看已隐藏时一律是原来的列表。 */
-const albumText = useMessages(albumMessages);
+/* 三档缩放（lib/album）：Ctrl + 滚轮 / 捏合和左下托盘走同一个 go()。
+   日 = 逐条列表，月 = 按月小格 + 月度组头，年 = 整页履历（JournalBody）。选择中、看已隐藏时一律是日档的列表。 */
+const route = useRoute();
+const queryZoom = () => (isAlbumZoom(route.query.zoom) ? route.query.zoom : null);
 const albumIds = computed(() => displayableList.value.map((w) => w.workout_id));
-const album = useRecordAlbum('workouts', albumIds);
-const { level, density, periods, shapes } = album;
+const album = useRecordAlbum('workouts', albumIds, queryZoom());
+const { zoom, periods, shapes } = album;
 const albumLocked = computed(() => selecting.value || hiddenView.value);
-const shownLevel = computed(() => (albumLocked.value ? 'day' : level.value));
-const shownDensity = computed(() => (albumLocked.value ? 0 : density.value));
-const shownPeriods = computed(() => (shownLevel.value === 'year' ? periods.value.year : periods.value.month));
+const shownZoom = computed<AlbumZoom>(() => (albumLocked.value ? 'day' : zoom.value));
 const stage = ref<HTMLElement | null>(null);
 const ensureMonth = async (month: string) => {
   for (let guard = 0; guard < 40 && hasMore.value; guard += 1) {
@@ -243,13 +237,16 @@ const ensureMonth = async (month: string) => {
     else await loadMore();
   }
 };
-const { go: goLevel, openPeriod } = useAlbumNav({
-  stage, level, density, ensureMonth, zoomable: () => !albumLocked.value, loadPeriods: () => album.loadMonths(),
+const { go } = useAlbumNav({
+  stage, zoom, zoomable: () => !albumLocked.value,
+  prepare: async (next: AlbumZoom) => { if (next === 'month') await album.loadMonths(); },
+  ensureDay: (day) => ensureMonth(day.slice(0, 7)),
 });
-/* 日历热图一屏能看好几个月：页读回来就接着在空闲时往下读（最多两千条），不用一直滚到底。 */
-watch([shownDensity, () => workouts.value.length], () => {
-  if (shownDensity.value === 2 && shownLevel.value === 'day' && hasMore.value && workouts.value.length < 2000) nextSlot(() => { void loadMore(); });
-});
+const goZoom = (next: AlbumZoom) => { void go(next); };
+/* 履历最上面的全年日历点了某一天：放大回日档、滚到那天。 */
+const openDay = (day: string) => { void go('day', { day }); };
+/* 从 /journal 旧链接、概览的履历卡、生活事件「管理」进来（?zoom=year）：页面在缓存里时也跟着换档。 */
+watch(() => route.query.zoom, () => { const want = queryZoom(); if (want && route.name === 'WorkoutList' && want !== zoom.value) void go(want); });
 const workoutById = computed(() => new Map(displayableList.value.map((w) => [w.workout_id, w])));
 /* 轨迹缩略图只给真走了一段路的：不到 1 公里（原地跑、室内、GPS 刚搜到星就停）画出来只是一团乱线。 */
 const ROUTE_MIN_M = 1000;
@@ -265,7 +262,7 @@ const tileReading = (workout: Workout) => {
   const minutes = workoutDurationMinutes(workout);
   return minutes ? formatDuration(minutes) : workoutDisplayLabel(workout);
 };
-const tiles = computed<AlbumTile[]>(() => (shownDensity.value === 0 ? [] : displayableList.value.map((workout) => {
+const tiles = computed<AlbumTile[]>(() => (shownZoom.value !== 'month' ? [] : displayableList.value.map((workout) => {
   const minutes = workoutDurationMinutes(workout) ?? 0;
   const reading = tileReading(workout);
   return {
@@ -280,16 +277,8 @@ const tiles = computed<AlbumTile[]>(() => (shownDensity.value === 0 ? [] : displ
     weight: minutes,
   };
 })));
-/* 每一行末尾的心率区间细条：有逐区间秒数才画（列表一次批量读，见 storage/queries.rs）。 */
-const zoneBars = computed(() => {
-  const bars = new Map<string, ShareSegment[]>();
-  for (const workout of displayableList.value) {
-    const zones = [...(workout.hr_zones ?? [])].sort((a, b) => a.index - b.index);
-    if (!zones.some((zone) => zone.seconds > 0)) continue;
-    bars.set(workout.workout_id, zones.map((zone) => ({ key: `z${zone.index}`, label: `Z${zone.index}`, seconds: zone.seconds, color: hrZoneColor(zone.index) })));
-  }
-  return bars;
-});
+/* 托盘：进了选择模式，把手换成「结束选择」。 */
+const trayMode = computed(() => (selecting.value ? { label: tools.value.done, icon: 'circle-check' as const } : null));
 
 /* 一行要能和同一天的其他几条区分开：时长、均心率，再加距离或消耗。
    只列有值的项，一项都没有才写「未提供」。 */
@@ -315,20 +304,13 @@ useSectionTour('workouts');
 
 <template>
   <section class="page list-page" aria-labelledby="workout-list-title">
-    <PageHeader title-id="workout-list-title" :title="t.title" :intro="t.intro" />
+    <PageHeader title-id="workout-list-title" :title="t.title" />
     <OfficialOnlyNote topic="workouts" />
-    <div class="list-bar">
-      <SegmentTrack v-if="viewItems.length > 1" v-model="view" :items="viewItems" :aria-label="t.title" no-wrap />
-      <span v-else />
-      <div class="list-bar-actions" role="group">
-        <button :class="['bar-action', { 'is-on': selecting }]" type="button" :aria-pressed="selecting" @click="toggleSelecting">
-          <Icon name="circle-check" :size="15" />{{ selecting ? tools.done : tools.select }}
-        </button>
-        <button :class="['bar-action', { 'is-on': importing }]" type="button" :aria-expanded="importing" aria-controls="workout-import" @click="importing = !importing">
-          <Icon name="download" :size="15" />{{ importing ? importText.close : importText.open }}
-        </button>
+    <FoldTransition>
+      <div v-if="viewItems.length > 1" class="list-bar">
+        <SegmentTrack v-model="view" :items="viewItems" :aria-label="t.title" no-wrap />
       </div>
-    </div>
+    </FoldTransition>
     <FoldTransition><WorkoutImport v-if="importing" id="workout-import" /></FoldTransition>
     <FoldTransition><p v-if="hiddenView" class="footnote hidden-hint">{{ tools.localHint }}</p></FoldTransition>
 
@@ -343,8 +325,9 @@ useSectionTour('workouts');
     </EmptyState>
     <EmptyState v-else-if="!displayableList.length" :key="`empty-${shownHidden}`" icon="steps" :title="t.emptyTitle" :message="t.emptyMessage" />
     <div v-else ref="stage" :key="`list-${shownHidden}`" class="album-stage">
-    <AlbumPeriods v-if="shownLevel !== 'day'" data-album-body kind="workouts" :level="shownLevel" :periods="shownPeriods" @open="openPeriod" />
-    <AlbumGrid v-else-if="shownDensity" data-album-body kind="workouts" :tiles="tiles" :density="shownDensity">
+    <JournalBody v-if="shownZoom === 'year'" data-album-body @day="openDay" />
+    <AlbumGrid v-else-if="shownZoom === 'month'" data-album-body kind="workouts" view="month" :tiles="tiles">
+      <template #head="{ month }"><AlbumMonthHead kind="workouts" :month="month" :periods="periods" /></template>
       <template #tile="{ tile }">
         <GlyphTile :name="workoutIcon(workoutById.get(tile.id)!)" :size="24" tone="activity" />
         <RouteGlyph v-if="routeOf(tile.id)" class="tile-route" :shape="routeOf(tile.id)!" />
@@ -368,23 +351,27 @@ useSectionTour('workouts');
         :fact="workoutFact(workout)"
       >
         <template v-if="routeOf(workout.workout_id)" #aside><RouteGlyph class="row-route" :shape="routeOf(workout.workout_id)!" /></template>
-        <template v-if="zoneBars.get(workout.workout_id)" #foot>
-          <ShareBar class="row-zones" compact passive pop-end :title="albumText.hrZones" :segments="zoneBars.get(workout.workout_id)!" />
-        </template>
       </RecordRow>
       </div>
     </div>
     </div>
     </Transition>
-    <AlbumCapsule v-if="!albumLocked && displayableList.length && !error" :level="level" @update:level="goLevel" />
+    <AlbumTray v-if="displayableList.length && !error" :zoom="shownZoom" :disabled="albumLocked" :mode="trayMode" @zoom="goZoom" @exit-mode="toggleSelecting">
+      <template #actions="{ close }">
+        <button class="tray-action" type="button" @click="close(); toggleSelecting()"><Icon name="circle-check" :size="16" />{{ tools.select }}</button>
+        <button class="tray-action" type="button" :aria-expanded="importing" aria-controls="workout-import" @click="close(); importing = !importing">
+          <Icon name="download" :size="16" />{{ importing ? importText.close : importText.open }}
+        </button>
+      </template>
+    </AlbumTray>
     <WorkoutTools class="list-tools" :ids="selectedIds" :hidden="shownHidden" :selecting="selecting" @select-all="selectLoaded" @clear="clearSelected" @changed="onChanged" />
     <p v-if="staleError" class="stale-note" role="status">{{ staleError }}</p>
-    <div v-if="hasMore && shownLevel === 'day'" :ref="sentinelRef" class="load-more">
+    <div v-if="hasMore && shownZoom === 'day'" :ref="sentinelRef" class="load-more">
       <button class="button button-secondary" type="button" :disabled="loadingMore" @click="loadMore">
         {{ loadingMore ? t.loadingMore : t.loadMore }}
       </button>
     </div>
-    <p v-if="displayableList.length && shownLevel === 'day'" class="footnote">
+    <p v-if="displayableList.length && shownZoom === 'day'" class="footnote">
       {{ t.shown(workouts.length, total) }} · {{ t.footnote(displayableList.length) }}
     </p>
   </section>
@@ -392,20 +379,8 @@ useSectionTour('workouts');
 
 <style scoped>
 .list-page { width: 100%; }
-/* 上面一行：左边「运动 / 已隐藏」分段胶囊（切过去滑块滑过去，列表交叉淡入），右边两枚胶囊按钮。 */
-.list-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 12px; margin-block: 14px 12px; }
-/* 右边两枚动作和左边的「运动记录 / 已隐藏」是同一种凹槽胶囊：平时字是淡的、没有底，
-   打开的那一枚浮起成凸起的滑块（和分段胶囊选中那块同一种材质），图标换成品牌色。 */
-.list-bar-actions { display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 3px; border-radius: 999px; background: var(--cap-track); box-shadow: var(--cap-track-shadow); }
-.bar-action { display: inline-flex; min-height: 34px; align-items: center; gap: 7px; padding: 0 15px; border: 0; border-radius: 999px; background: transparent;
-  color: var(--muted); font: inherit; font-size: var(--fs-sm); font-weight: 600; white-space: nowrap; cursor: pointer;
-  transition: background-color var(--dur-base) ease, box-shadow var(--dur-base) ease, color var(--dur-fast) ease, scale var(--dur-fast) var(--ease-out); }
-.bar-action:hover { color: var(--ink); }
-.bar-action:active { scale: .96; }
-.bar-action svg { color: var(--subtle); transition: color var(--dur-fast) ease; }
-.bar-action.is-on { background: var(--cap-thumb); box-shadow: var(--cap-thumb-rim); color: var(--ink); }
-.bar-action.is-on svg, .bar-action:hover svg { color: var(--accent); }
-.bar-action:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+/* 上面一行只在有已隐藏记录时出：「运动 / 已隐藏」分段胶囊（切过去滑块滑过去，列表交叉淡入）。选择、导入在左下托盘里。 */
+.list-bar { display: flex; align-items: center; margin-block: 14px 12px; }
 .hidden-hint { margin: 0 0 12px; }
 
 .selectable-record { display: flex; align-items: center; border-radius: var(--radius-md); transition: background 200ms ease; }
@@ -442,10 +417,9 @@ useSectionTour('workouts');
 .list-swap-enter-from { opacity: 0; transform: translateY(8px); }
 .list-swap-leave-to { opacity: 0; }
 .list-tools { margin-top: 12px; }
-/* 相册：幽灵板（lib/album/albumMotion.ts）绝对定位在这一层里。 */
+/* 换档时的幽灵板（lib/album/albumMotion.ts）绝对定位在这一层里。 */
 .album-stage { position: relative; }
 .row-route { width: 56px; height: 40px; color: var(--activity); }
-.row-zones { --share-height: 3px; margin-top: 4px; padding-block: 3px; }
 .tile-route { width: 100%; height: 100%; min-height: 0; color: var(--activity); }
 .tile-reading { overflow: hidden; color: var(--ink); font-size: var(--fs-sm); font-weight: 650; font-variant-numeric: tabular-nums; text-overflow: ellipsis; white-space: nowrap; }
 @media (prefers-reduced-motion: reduce) {

@@ -156,8 +156,8 @@ export default {
 
   // Source: src/components/album/album.i18n.ts
   "components/album/album": {
-    open: 'Przeglądaj lata, miesiące i dni',
-    close: 'Wróć do listy',
+    tray: 'Panel zmiany widoku i działań',
+    trayHandle: (zoom: string) => `Poziom widoku „${zoom.toLowerCase()}”. Przeciągnij w górę lub w dół, aby zmienić poziom. Kliknij, aby otworzyć`,
     levels: 'Poziom widoku',
     year: 'Lata',
     month: 'Miesiące',
@@ -176,11 +176,29 @@ export default {
         many: `${count} nocy`,
         other: `${count} nocy`,
       }),
+    count: 'Treningi',
     distance: 'Dystans',
     duration: 'Czas',
+    avgDuration: 'Śr. czas snu',
+    avgScore: 'Śr. ocena',
     avgOnset: 'Śr. pora zaśnięcia',
-    hrZones: 'Strefy tętna',
-    openPeriod: (period: string) => `Otwórz ${period}`,
+    nightsLabel: 'Zarejestrowane',
+    stageShare: 'Udział faz',
+    vsMonth: (month: string) => `vs. ${month}`,
+    vsLastYear: 'względem poprzedniego roku',
+    yearNights: (count: number) =>
+      plural(count, {
+        one: `${count} zarejestrowana noc`,
+        few: `${count} zarejestrowane noce`,
+        many: `${count} zarejestrowanych nocy`,
+        other: `${count} zarejestrowanej nocy`,
+      }),
+    onsetSpread: 'Regularność pory zasypiania',
+    spread: (minutes: string) => `±${minutes}`,
+    bestMonth: 'Najlepszy miesiąc',
+    worstMonth: 'Najsłabszy miesiąc',
+    scoreOf: (score: number) => `${score} pkt`,
+    scoreLabel: (score: number) => `Ocena ${score}`,
   },
 
   // Source: src/components/ai/AiTaskHeader.vue
@@ -769,28 +787,46 @@ export default {
 
   // Source: src/components/overview/suggest.i18n.ts
   "components/overview/suggest": {
-    aria: 'Sugestie dla Ciebie',
-    workoutEyebrow: 'Po treningu',
-    workoutLine: (what: string, amount: string, count: number) => (count
-      ? `Dziś: ${what}, ${amount}. Porównaj z ${count === 1 ? 'ostatnim podobnym treningiem' : `${count} ostatnimi podobnymi treningami`}`
-      : `Dziś: ${what}, ${amount}. Warto wrócić do tego treningu.`),
-    sleepEyebrow: 'Gorsza noc',
-    sleepShort: (duration: string, gap: string) => `Sen trwał ${duration} — o ${gap} krócej niż zwykle w ostatnich 4 tygodniach`,
-    sleepDeep: (deep: string, gap: string) => `Głęboki sen trwał ${deep} — o ${gap} krócej niż zwykle w ostatnich 4 tygodniach`,
-    idleEyebrow: (days: number) => `Bez treningu od ${plural(days, { one: `${days} dnia`, few: `${days} dni`, many: `${days} dni`, other: `${days} dnia` })}`,
-    idleLine: (date: string, what: string) => `Ostatni trening: ${what} (${date})`,
-    tomorrowSub: 'Uwzględnia treningi i regenerację z ostatnich 7 dni',
-    sleepReview: 'Jak wyglądał mój sen ostatniej nocy?',
-    sleepReviewSub: 'Sen i regeneracja z kilku ostatnich nocy',
+    aria: 'Pytanie dnia',
+    refresh: 'Kolejne pytanie',
+    expand: 'Otwórz to pytanie',
+    collapse: 'Zwiń',
+    dismiss: 'Ukryj na dziś',
+    title: {
+      plan_tomorrow: 'Zaplanuj jutro',
+      sleep_review: 'Jak wyglądał mój sen ostatniej nocy?',
+      same_route: 'Jak mi idzie na mojej stałej trasie?',
+      recovery_nights: 'Co stoi za słabą regeneracją ostatnich nocy?',
+    },
+    reviewToday: (amount: string, what: string) => `Podsumowanie dzisiejszego treningu (${what}, ${amount})`,
+    reviewOn: (date: string, amount: string, what: string) => `Podsumowanie treningu z ${date} (${what}, ${amount})`,
+    raceTitle: (date: string, what: string) => `Przeanalizuj start z ${date} (${what})`,
+    bestTitle: (bucket: string) => `Czy biegam coraz szybciej na tym dystansie? (${bucket})`,
+    comebackTitle: (days: number) =>
+      `Po ${plural(days, { one: `${days} dniu`, few: `${days} dniach`, many: `${days} dniach`, other: `${days} dnia` })} przerwy — jak wrócić do treningów?`,
+    sub: {
+      plan_tomorrow: 'Regeneracja i treningi z ostatnich 7 dni',
+      sleep_review: 'Sen i regeneracja z ostatnich kilku nocy',
+      review_workout: 'Ten trening + ostatnie podobne treningi',
+      race_review: 'Start oraz treningi i sen z 4 tygodni przed zawodami',
+      distance_best: 'Wszystkie biegi na tym dystansie + historia PR-ów',
+      same_route: 'Wszystkie biegi na tej trasie',
+      recovery_nights: 'Noce odbiegające od normy + treningi z poprzedniego dnia',
+      comeback: 'Ostatnie treningi przed przerwą + regeneracja z ostatnich 2 tygodni',
+    },
+    swap: 'Wymień kilka kart',
+    swapDone: 'Zakończ wymianę',
+    refine: 'Dopracuj w „Wyślij do AI”',
+    sendTo: (name: string) => `Skopiuj do ${name}`,
+    sending: 'Przygotowywanie…',
+    sent: (name: string) => `Skopiowano. Wklej do ${name}`,
+    sendFailed: 'Nie udało się przekazać. Otwórz „Wyślij do AI”, aby sprawdzić, na którym kroku wystąpił problem',
+    desktopOnly: 'Aby przekazać dane AI, użyj aplikacji desktopowej',
     sleepReviewQuestion: 'Załączam dane o śnie i regeneracji z ostatniej nocy oraz kilku poprzednich, a także moje treningi z ostatnich dni. Oceń mój sen z ostatniej nocy. Czym różnił się od snu w poprzednie noce, co mogło na to wpłynąć i czy warto w związku z tym zmienić dzisiejszy trening?',
-    dismiss: 'Zamknij tę sugestię',
-    failed: 'Nie udało się teraz rozdać kart. Spróbuj ponownie później.',
   },
 
   // Source: src/components/cards/hands.i18n.ts
   "components/cards/hands": {
-    dealByQuestion: 'Rozdaj według pytania',
-    dealByQuestionAria: 'Rozdaj karty według pytania: wybierz pytanie, a aplikacja dobierze powiązane treningi i noce',
     kind: {
       distance_best: 'Ten sam dystans · PR',
       same_route: 'Ta sama trasa',
@@ -807,13 +843,6 @@ export default {
       race_review: 'Start w zawodach i cztery tygodnie wcześniejszych treningów oraz snu',
       recovery_nights: 'Noce, gdy HRV, tętno spoczynkowe lub sen odbiegały od normy',
     },
-    empty: {
-      no_routes: 'Brak trasy przebiegniętej co najmniej 3 razy',
-      no_distance: 'Brak dwóch biegów w tym samym przedziale dystansu (5K / 10K / półmaraton / maraton)',
-      no_race: 'Brak oznaczonych zawodów i biegu wyraźnie szybszego niż zwykle',
-      no_outliers: 'Odczyty regeneracji z ostatnich dwóch miesięcy mieszczą się w Twojej normie',
-      no_data: 'Za mało danych z ostatniego okresu',
-    },
     bucket: { '5k': '5K', '10k': '10K', half: 'Półmaraton', full: 'Maraton' },
     role: {
       anchor: 'Ten trening', pr: 'PR', race: 'Zawody', build: 'Przed startem', same: 'Podobny', recent: 'Ostatni', outlier: 'Poza normą', day_before: 'Dzień wcześniej', night: 'Noc',
@@ -822,14 +851,10 @@ export default {
     hrvNote: (value: number) => `HRV ${value}`,
     bench: 'Rezerwa',
     benchEmpty: 'Rezerwa jest pusta',
-    tableTip: 'Przeciągnij kartę w dół do rezerwy, aby ją odłożyć, lub przeciągnij kartę z rezerwy w górę, aby włączyć ją do zestawu. Możesz też kliknąć kartę. AI otrzyma karty z aktualnego zestawu.',
-    useHand: 'Użyj tego zestawu',
     handEmpty: 'Nie ma już kart w zestawie. Dodaj kartę z rezerwy.',
     cardCount: (count: number) => plural(count, { one: `${count} karta`, few: `${count} karty`, many: `${count} kart`, other: `${count} karty` }),
     drawOutAria: (label: string) => `${label}. Naciśnij, aby przenieść tę kartę do rezerwy`,
     swapInAria: (label: string) => `${label}. Naciśnij, aby dodać ją do zestawu`,
-    dealing: 'Rozdawanie kart…',
-    failed: 'Nie udało się odczytać danych, więc karty nie zostały rozdane',
     question: {
       distance_best: (bucket: string) => `To moje dotychczasowe rekordy (PR-y) z kategorii „${bucket}” i ostatnie biegi na tym dystansie. Porównaj tempo, tętno i obciążenie treningowe: co najbardziej przyczyniło się do postępów, czego brakuje do kolejnego PR-u i na czym skupić trening w najbliższych 4 tygodniach na tym dystansie?`,
       same_route: (km: string) => `To moje biegi tą samą trasą (około ${km}). Porównaj tempo, tętno i dryf tętna w drugiej połowie biegu: czy biegnę szybciej, bardziej ekonomicznie, czy moja forma się pogarsza? Podaj prawdopodobne przyczyny.`,
@@ -1361,7 +1386,8 @@ export default {
     recentAria: 'Ostatnie wpisy',
     recentTitle: 'Ostatnie wpisy',
     recentSub: 'Sen, bieganie i trening siłowy',
-    seeAll: 'Zobacz wszystkie',
+    workoutsLink: 'Treningi',
+    linksAria: 'Otwórz listę snu lub treningów',
     newest: 'Najnowszy',
     recentEmpty: 'Brak zapisanych danych. Zsynchronizuj aplikację, a pojawią się tutaj.',
     sleepRecordTitle: 'Sen',
@@ -3770,39 +3796,6 @@ Kontynuować?`,
     collapseModules: 'Zwiń',
   },
 
-  // Source: src/views/RecentRecords.i18n.ts
-  "views/RecentRecords": {
-    title: 'Ostatnie wpisy',
-    introTimeline: 'Niedawno zsynchronizowany sen i treningi na jednej osi czasu, najnowsze na górze.',
-    loadingLabel: 'Ładowanie ostatnich wpisów',
-    loadFailedTitle: 'Nie udało się wczytać ostatnich wpisów',
-    desktopOnly: 'Użyj aplikacji desktopowej. Ten podgląd w przeglądarce nie odczytuje danych konta.',
-    retry: 'Ponów',
-    partialUnavailable: 'Niektóre dane są obecnie niedostępne',
-    filterAll: 'Wszystko',
-    filterSleep: (count: number) => `Sen ${count}`,
-    filterWorkouts: (count: number) => `Treningi ${count}`,
-    workoutTypeAria: 'Typ treningu',
-    sleepTitle: 'Sen',
-    sleepScore: (score: number) => `Ocena ${score}`,
-    avgHr: (bpm: number) => `Śr. tętno ${bpm}`,
-    showMore: (count: number) => `Pokaż jeszcze ${count}`,
-    noRecords: 'Brak zapisów snu i treningów w tym okresie.',
-    noSleep: 'Brak zapisów snu',
-    noWorkouts: 'Brak elementów do wyświetlenia.',
-    noWorkoutsOfType: 'Brak wpisów dla tego typu treningu.',
-    hiddenIncomplete: (count: number) =>
-      plural(count, {
-        one: `Ukryto ${count} niekompletny rekord`,
-        few: `Ukryto ${count} niekompletne rekordy`,
-        many: `Ukryto ${count} niekompletnych rekordów`,
-        other: `Ukryto ${count} niekompletnego rekordu`,
-      }),
-    notProvided: 'Nie podano',
-    today: 'Dzisiaj',
-    yesterday: 'Wczoraj',
-  },
-
   // Source: src/views/Settings.i18n.ts
   "views/Settings": {
     // ── Header ──
@@ -4700,9 +4693,9 @@ Zasady:
 
   // Source: src/views/settings/sections/SuggestCardsRow.vue
   "views/settings/sections/SuggestCardsRow": {
-    title: 'Karty sugestii na stronie głównej',
-    on: 'Po treningu, gorszej nocy lub dłuższej przerwie pojawi się karta, która jednym kliknięciem przekaże właściwe dane do AI',
-    off: 'Bez kart sugestii na stronie głównej',
+    title: 'Pytanie dnia',
+    on: 'Każdego dnia strona główna wybiera pytanie na podstawie Twojej ostatniej aktywności. Otwórz kartę, by dobrać dane dla AI, albo zmień pytanie.',
+    off: 'Pytanie dnia nie pojawia się na stronie głównej',
   },
 
   // Source: src/views/SleepDetail.i18n.ts
@@ -4756,13 +4749,11 @@ Zasady:
   // Source: src/views/SleepList.vue
   "views/SleepList": {
     title: 'Sen',
-    intro: 'Zapisy snu zsynchronizowane z tym komputerem. Bez pełnej osi czasu wyświetlane jest tylko podsumowanie.',
     loadFailedTitle: 'Nie udało się wczytać zapisów snu',
     loadFailed: 'Lista snu jest obecnie niedostępna',
     retry: 'Ponów',
     emptyTitle: 'Brak zapisów snu',
     emptyMessage: 'Pojawią się w tym miejscu po zsynchronizowaniu. Fazy snu nigdy nie są zmyślane.',
-    scoreLabel: 'Wynik',
     footnote: (count: number, from: string) =>
       `${plural(count, { one: `${count} zapis`, few: `${count} zapisy`, many: `${count} zapisów`, other: `${count} zapisów` })} · od ${from}`,
     shown: (shown: number, total: number) => `Wyświetlono ${shown} z ${total}`,
@@ -4972,7 +4963,6 @@ Zasady:
   // Source: src/views/WorkoutList.vue
   "views/WorkoutList": {
     title: 'Treningi',
-    intro: 'Treningi zsynchronizowane z tym komputerem. Bez śladu i bez mapy.',
     loadFailedTitle: 'Nie udało się wczytać treningów',
     loadFailed: 'Lista treningów jest obecnie niedostępna',
     retry: 'Ponów',

@@ -2,7 +2,7 @@
 
 [English](architecture.md)
 
-本文描述 v3.3.0-beta.3 的产品边界与当前实现。使用入口见项目 [README](../../README.zh-CN.md)，工程门禁见 [开发文档](../development/development.zh-CN.md)，各项能力的状态见 [能力成熟度](capability-maturity.zh-CN.md)。
+本文描述 v3.3.0-beta.4 的产品边界与当前实现。使用入口见项目 [README](../../README.zh-CN.md)，工程门禁见 [开发文档](../development/development.zh-CN.md)，各项能力的状态见 [能力成熟度](capability-maturity.zh-CN.md)。
 
 ## 产品边界
 
@@ -106,7 +106,7 @@ Zepp 官方授权 ──► 中转站（zeppbridge.com）──► api-open.zepp
   - **后端不按语言产出文案。** 四个出口（界面、CLI、MCP、导出）对同一个问题必须给出同样的回答，所以后端发稳定的码（`recordsUnitCode`、`HealthAction.code`、`SyncProgress.code`、`InsightFact.reason_code`、`err.*`、`ui.*` …），同时保留给 CLI 用的中文原文。界面按码渲染自己的文案，认不出码时才回落原文。导出 JSON 里的 `note` / `detail_note` / `reason` 字段永不翻译：它们是外部脚本读的契约。
   - i18n 检查怎么工作见[开发文档](../development/development.zh-CN.md)。
 - 概览先放你固定的指标，再放首次启动时选的关注领域（心率、步数、睡眠、身体、训练）对应的模块，其余折起。同步时间和心率样本时间分开显示。
-- 二级页从概览的卡片进入：`/recent`、`/heart`、`/activity`、`/sleep` 与 `/sleep/:sleepId`、`/workouts` 与 `/workouts/:workoutId`、身体状态 `/body`、训练状态 `/training`、`/rings`、`/devices/:deviceKey`、`/health-check`。日志（`/journal`：跑鞋、比赛、伤病、纪元与生活事件）、信匣（`/letters`）和 AI 相关页（`/ai/plan`、`/ai/memory`、任务记录）各有入口。这些页面都只渲染本机库里已有的数据，如实写「N 天里有 M 天有记录」；没有数据的日子曲线断开，不插值。
+- 二级页从概览的卡片进入：`/heart`、`/activity`、`/sleep` 与 `/sleep/:sleepId`、`/workouts` 与 `/workouts/:workoutId`、身体状态 `/body`、训练状态 `/training`、`/rings`、`/devices/:deviceKey`、`/health-check`。履历（跑鞋、比赛、伤病、纪元与生活事件）就是运动列表缩到年档（`/workouts?zoom=year`，旧的 `/journal` 跳到这里）；信匣（`/letters`）和 AI 相关页（`/ai/plan`、`/ai/memory`、任务记录）各有入口。这些页面都只渲染本机库里已有的数据，如实写「N 天里有 M 天有记录」；没有数据的日子曲线断开，不插值。
 - 睡眠详情显示真实总时长、评分和分期占比；运动详情显示距离、热量、心率、训练负荷、分段，解出了路线就显示路线；距离和时长都有效时才算配速。
 - 交给 AI（`/ai`）按分析任务打一份脱敏包，交给白名单里的 AI 网站。导出：`zeppbridge-cli export` 出 JSON / CSV / GPX / FIT，运动详情页也能出 FIT，设置里「带走全部」出一个 JSON，Beta 实验室出 unstrap 格式 zip，MCP 有 `export_data`。
 - 设置是一叠十张卡：账号与设备、同步、归档与存储、数据内容、交给 AI 工具、显示与语言、Beta 实验室、新手引导、隐私与安全、高级与维护。

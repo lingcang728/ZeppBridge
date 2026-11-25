@@ -13,6 +13,18 @@ describe('首页建议卡：关过的不再出', () => {
     expect(prefs.visible('workout_done', 'workout_done:a', '2026-11-21')).toBe(false);
   });
 
+  it('手动换到的那一问只记当天；× 只关今天', () => {
+    const prefs = useSuggestCards();
+    expect(prefs.picked('2026-11-23')).toBeNull();
+    prefs.pick('same_route', '2026-11-23');
+    expect(prefs.picked('2026-11-23')).toBe('same_route');
+    expect(prefs.picked('2026-11-24')).toBeNull();
+    expect(prefs.showToday('2026-11-23')).toBe(true);
+    prefs.quietToday('2026-11-23');
+    expect(prefs.showToday('2026-11-23')).toBe(false);
+    expect(prefs.showToday('2026-11-24')).toBe(true);
+  });
+
   it('设置里关掉：一张都不出', () => {
     const prefs = useSuggestCards();
     prefs.setEnabled(false);

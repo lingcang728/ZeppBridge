@@ -1,21 +1,21 @@
 <script setup lang="ts">
 /**
- * 发牌桌（「建议 → 发牌 → 交给 AI」）：按一个问题挑好的一手牌，从来处抽出来扇开；底下一排小牌是候补。
+ * 发牌桌（「建议 → 发牌 → 交给 AI」）：首页「今日一问」卡里原地展开的一块。按一个问题挑好的一手牌从卡面那叠小牌里
+ * 抽出来排开；按「换几张牌」（`showBench`）才露出底下一排候补小牌。
  *
- * 牌桌只做预览和替换，不再让人一张张挑：
+ * 牌桌只做预览和替换，不再让人一张张挑（候补收着时牌不能抽，免得点一下牌就不见了）：
  * - 拖：按住主牌里的一张往下拖进候补就是抽掉；按住候补里的一张往上拖进这手牌就是换上。牌跟着手走、微微歪向拖的方向，
  *   拖到位时那一排亮起来；松手没到位就弹回原处。点一下也照旧：点主牌抽到候补，点候补换进来。
  *   换位都是「从此刻的样子起」的 FLIP（拖着松手就从手指那里起），只动 transform，约 500ms。
  * - 每次换牌都马上告诉外面（`change`），交给 AI 的任务包跟着这手牌变。
- * - 收牌（×、Esc、「就用这手牌」）：先理成一叠，再整叠放回来处，背景同起同止淡掉；`close` 带上是不是「就用这手牌」。
- *   点空白不收牌：误触一下整桌牌就没了，比多点一次 × 糟得多。发牌途中按 Esc 也是从此刻理牌放回，不会半路消失。
+ * - 收牌（卡面再点一下、Esc）：先理成一叠，再整叠放回卡面那叠小牌，底下按钮一起淡掉；`close` 带上是不是用了这手牌。
+ *   发牌途中按 Esc 也是从此刻理牌放回，不会半路消失。底下那一排按钮由外面放（`foot` 插槽）。
  * 减少动效时一律淡入淡出（lib/motion/cards）。
  */
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef } from 'vue';
-import Icon from '../Icon.vue';
+import FoldTransition from '../FoldTransition.vue';
 import PlayingCard from './PlayingCard.vue';
 import { useHandsText } from './hands.i18n';
-import { useCardsText } from './cards.i18n';
 import { handFace } from './handFace';
 import { drawOut, swapIn, type Hand, type HandCard } from '../../lib/cards/hands';
 import type { HandLines } from '../../types/hands';
@@ -30,26 +30,23 @@ import { fadeSourceIn, holdSource, sourceInFrames } from '../../lib/motion/sourc
 const props = withDefaults(defineProps<{
   hand: Hand;
   title: string;
-  subtitle?: string | null;
   lines?: Record<string, HandLines>;
   origin?: DOMRect | null;
   anchor?: Element | null;
-}>(), { subtitle: null, lines: () => ({}), origin: null, anchor: null });
+  /** 露出候补（「换几张牌」）。收着时牌不能抽也不能拖。 */
+  showBench?: boolean;
+}>(), { lines: () => ({}), origin: null, anchor: null, showBench: false });
 const emit = defineEmits<{ change: [hand: Hand]; close: [used: boolean] }>();
 const t = useHandsText();
-const tc = useCardsText();
-const titleId = `hand-table-${Math.random().toString(36).slice(2, 8)}`;
 /** 换牌：一张牌从主牌飞进候补（或反过来）的时长，≈500ms。 */
 const MOVE_MS = paced(380);
 const GAP = 16;
 
 const hand = shallowRef<Hand>(props.hand);
 const stage = ref<HTMLElement | null>(null);
-const backdrop = ref<HTMLElement | null>(null);
-const head = ref<HTMLElement | null>(null);
 const foot = ref<HTMLElement | null>(null);
 const benchHead = ref<HTMLElement | null>(null);
-const stageBox = ref({ width: 1000, height: 560 });
+const stageBox = ref({ width: 640 });
 const closing = ref(false);
 const seq = relay();
 let returnFocus: HTMLElement | null = null;
@@ -63,9 +60,8 @@ const face = (card: HandCard) => faces.value.get(card.id)!;
 /* ---------- 版式：主牌一道微拱的扇面，候补一排小牌 ---------- */
 const mainW = computed(() => {
   const n = Math.max(1, hand.value.cards.length);
-  const { width, height } = stageBox.value;
-  const fit = (width - GAP * (n - 1)) / n;
-  return Math.max(84, Math.floor(Math.min(196, fit, height * 0.5 * (5 / 7))));
+  const fit = (stageBox.value.width - GAP * (n - 1)) / n;
+  return Math.max(72, Math.floor(Math.min(140, fit)));
 });
 const benchW = computed(() => {
   const n = Math.max(1, hand.value.bench.length);
@@ -143,7 +139,7 @@ const move = async (next: Hand, moved: string, release?: () => void) => {
   }
   if (moved) stage.value?.querySelector<HTMLElement>(`[data-card-id="${CSS.escape(moved)}"]`)?.focus({ preventScroll: true });
 };
-const tapMain = (card: HandCard) => { if (!swallowClick()) void move(drawOut(hand.value, card.id), card.id); };
+const tapMain = (card: HandCard) => { if (!swallowClick() && props.showBench) void move(drawOut(hand.value, card.id), card.id); };
 const tapBench = (card: HandCard) => { if (!swallowClick()) void move(swapIn(hand.value, card.id), card.id); };
 
 /* ---------- 拖：主牌往下拖进候补、候补往上拖进这手牌 ---------- */
@@ -171,7 +167,7 @@ const place = (el: HTMLElement, dx: number, dy: number) => {
 };
 const unplace = (el: HTMLElement) => { el.style.translate = ''; el.style.rotate = ''; el.style.scale = ''; el.classList.remove('is-dragging'); };
 const onCardDown = (event: PointerEvent, card: HandCard, from: 'hand' | 'bench') => {
-  if (closing.value || event.button !== 0) return;
+  if (closing.value || event.button !== 0 || !props.showBench) return;
   const el = event.currentTarget as HTMLElement;
   drag = { card, el, from, x: event.clientX, y: event.clientY, dx: 0, dy: 0, live: false, id: event.pointerId };
   window.addEventListener('pointermove', onCardMove);
@@ -233,7 +229,7 @@ const onCardCancel = () => {
 };
 
 /* ---------- 收牌：理成一叠，整叠放回来处 ---------- */
-const fadeChrome = (to: number, duration: number) => [backdrop.value, head.value, benchHead.value, foot.value]
+const fadeChrome = (to: number, duration: number) => [benchHead.value, foot.value]
   .filter((el): el is HTMLElement => !!el)
   .map((el) => animateFromNow(el, { opacity: to }, { duration, easing: to ? OPEN_EASE : CLOSE_EASE, fill: 'forwards' }, ['opacity']));
 const close = async (used = false) => {
@@ -261,7 +257,7 @@ let releaseEscape: (() => void) | null = null;
 let resize: ResizeObserver | null = null;
 const measure = () => {
   const el = stage.value;
-  if (el) stageBox.value = { width: el.clientWidth - 24, height: el.clientHeight - 24 };
+  if (el) stageBox.value = { width: el.clientWidth - 16 };
 };
 onMounted(() => {
   returnFocus = document.activeElement as HTMLElement | null;
@@ -269,8 +265,7 @@ onMounted(() => {
   measure();
   resize = new ResizeObserver(measure);
   if (stage.value) resize.observe(stage.value);
-  backdrop.value?.animate([{ opacity: 0 }, { opacity: 1 }], { duration: reducedMotion() ? 140 : 420, easing: OPEN_EASE, fill: 'backwards' });
-  [head.value, benchHead.value, foot.value].forEach((el, i) => el?.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 360, delay: 60 + i * 80, easing: OPEN_EASE, fill: 'backwards' }));
+  foot.value?.animate([{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }], { duration: 360, delay: 160, easing: OPEN_EASE, fill: 'backwards' });
   void deal(seq.next());
 });
 onBeforeUnmount(() => {
@@ -283,27 +278,18 @@ defineExpose({ close: () => close(false), isClosing: () => closing.value });
 </script>
 
 <template>
-  <Teleport to="body">
-    <div :class="['hand-table', { closing }]" role="dialog" aria-modal="true" :aria-labelledby="titleId" :aria-describedby="`${titleId}-tip`">
-      <div ref="backdrop" class="hand-backdrop" aria-hidden="true"></div>
-      <header ref="head" class="hand-head">
-        <span class="hand-mark" aria-hidden="true"><Icon name="cards" :size="18" /></span>
-        <div class="hand-titles">
-          <h2 :id="titleId">{{ title }}</h2>
-          <p>{{ subtitle ? `${subtitle} · ` : '' }}{{ t.cardCount(hand.cards.length) }}</p>
-        </div>
-        <button type="button" class="hand-icon" :aria-label="tc.close" @click="close(false)"><Icon name="x" :size="17" /></button>
-      </header>
-      <div ref="stage" :class="['hand-stage', target && `drop-${target}`]">
-        <div class="hand-row" :style="{ '--card-w': `${mainW}px` }">
-          <span v-for="(card, i) in hand.cards" :key="card.id" class="hslot" :style="fanStyle(i)">
-            <PlayingCard kind="day" :data-card-id="card.id" :top="face(card).top" :title="face(card).title" :value="face(card).value" :note="face(card).aside"
-              :sketch="face(card).sketch" :icon="face(card).icon" :tint="face(card).tint" :corner="card.date.slice(8).replace(/^0/, '')"
-              :aria-label="t.drawOutAria(face(card).label)" @pointerdown="onCardDown($event, card, 'hand')" @click="tapMain(card)" />
-          </span>
-          <p v-if="!hand.cards.length" class="hand-empty">{{ t.handEmpty }}</p>
-        </div>
-        <section ref="benchEl" class="bench" :aria-label="t.bench">
+  <div :class="['hand-table', { closing, swapping: showBench }]" role="group" :aria-label="title">
+    <div ref="stage" :class="['hand-stage', target && `drop-${target}`]">
+      <div class="hand-row" :style="{ '--card-w': `${mainW}px` }">
+        <span v-for="(card, i) in hand.cards" :key="card.id" class="hslot" :style="fanStyle(i)">
+          <PlayingCard kind="day" :data-card-id="card.id" :top="face(card).top" :title="face(card).title" :value="face(card).value" :note="face(card).aside"
+            :sketch="face(card).sketch" :icon="face(card).icon" :tint="face(card).tint" :corner="card.date.slice(8).replace(/^0/, '')"
+            :aria-label="showBench ? t.drawOutAria(face(card).label) : face(card).label" @pointerdown="onCardDown($event, card, 'hand')" @click="tapMain(card)" />
+        </span>
+        <p v-if="!hand.cards.length" class="hand-empty">{{ t.handEmpty }}</p>
+      </div>
+      <FoldTransition>
+        <section v-if="showBench" ref="benchEl" class="bench" :aria-label="t.bench">
           <h3 ref="benchHead">{{ t.bench }}</h3>
           <div class="bench-row" :style="{ '--card-w': `${benchW}px` }">
             <span v-for="card in hand.bench" :key="card.id" class="hslot">
@@ -313,13 +299,12 @@ defineExpose({ close: () => close(false), isClosing: () => closing.value });
             <p v-if="!hand.bench.length" class="bench-empty">{{ t.benchEmpty }}</p>
           </div>
         </section>
-      </div>
-      <footer ref="foot" class="hand-foot">
-        <p :id="`${titleId}-tip`">{{ t.tableTip }}</p>
-        <button type="button" class="hand-use" :disabled="!hand.cards.length" @click="close(true)"><Icon name="check" :size="16" /><span>{{ t.useHand }}</span></button>
-      </footer>
+      </FoldTransition>
     </div>
-  </Teleport>
+    <footer ref="foot" class="hand-foot">
+      <slot name="foot" :hand="hand" />
+    </footer>
+  </div>
 </template>
 
 <style scoped src="./HandTable.css"></style>

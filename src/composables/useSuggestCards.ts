@@ -1,8 +1,10 @@
 /**
- * 首页建议卡的开关和「关过 / 今天出过」：记在这台电脑的浏览器存储里（不进数据库、不加迁移）。
+ * 首页「今日一问」的开关、手动换到的那一问和「用过 / 今天关过」：记在这台电脑的浏览器存储里（不进数据库、不加迁移）。
  *
- * - 开关：设置 → AI 里一行，关了首页一张建议卡都不出；
- * - 关掉一张（×）或点了它：这一次（`key`，如 `workout_done:<运动 id>`）再也不出；这一类（触发码）今天也不再出别的；
+ * - 开关：设置 → AI 里一行，关了首页不出这张卡；
+ * - 用了某个后端触发的那一问（刚练完、昨晚睡得差、很久没动）：这一次（`key`，如 `workout_done:<运动 id>`）再也不出，
+ *   这一类（触发码）今天也不再出别的；
+ * - 卡上的刷新键换到的那一问记到当天，第二天重新按推荐来；卡上的 ×：今天不再出这张卡；
  * - 记不住（隐私模式、存储被清）就当没关过，下次照样提示，不报错。
  * 旧记录只留 30 天。
  */
@@ -18,6 +20,10 @@ interface Stored {
   closed: Record<string, string>;
   /** 触发码 → 今天关过 / 点过（一天只出一次）。 */
   codes: Partial<Record<SuggestionCode | 'plan_tomorrow', string>>;
+  /** 今天手动换到的那一问（模板名）和哪一天。 */
+  pick: { day: string; template: string } | null;
+  /** 哪一天按了卡上的 ×（那天不再出）。 */
+  quiet: string | null;
 }
 
 const localDay = (date = new Date()) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
@@ -31,12 +37,14 @@ const read = (): Stored => {
         enabled: value.enabled !== false,
         closed: value.closed && typeof value.closed === 'object' ? value.closed : {},
         codes: value.codes && typeof value.codes === 'object' ? value.codes : {},
+        pick: value.pick && typeof value.pick === 'object' && typeof value.pick.day === 'string' && typeof value.pick.template === 'string' ? value.pick : null,
+        quiet: typeof value.quiet === 'string' ? value.quiet : null,
       };
     }
   } catch {
     // 读不到就当第一次。
   }
-  return { enabled: true, closed: {}, codes: {} };
+  return { enabled: true, closed: {}, codes: {}, pick: null, quiet: null };
 };
 
 const state = ref<Stored>(read());
@@ -57,5 +65,11 @@ export const useSuggestCards = () => ({
   /** 关掉（或点了）这一张。 */
   close: (code: SuggestionCode | 'plan_tomorrow', key: string, today = localDay()) =>
     write({ ...state.value, closed: { ...state.value.closed, [key]: today }, codes: { ...state.value.codes, [code]: today } }),
+  /** 今天手动换到的那一问；不是今天换的就是 null（按推荐来）。 */
+  picked: (today = localDay()) => (state.value.pick?.day === today ? state.value.pick.template : null),
+  pick: (template: string, today = localDay()) => write({ ...state.value, pick: { day: today, template } }),
+  /** 今天这张卡出不出：开着、今天没按过 ×。 */
+  showToday: (today = localDay()) => state.value.enabled && state.value.quiet !== today,
+  quietToday: (today = localDay()) => write({ ...state.value, quiet: today }),
   state,
 });

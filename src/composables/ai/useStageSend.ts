@@ -145,6 +145,24 @@ export const useStageSend = () => {
         if (handoff.prepareResult.value?.status === 'ready') face.value = 'receipt';
       });
     },
+    /**
+     * 不放舞台动画、一口气交出去（首页「今日一问」的主按钮）：保存 → 准备 .md → 复制 → 打开所选 AI。
+     * 草稿刚换过、预览还没算到它，所以不带预览（预算按免费版）；回执那一面照样落好，进交给 AI 页看得到。
+     */
+    sendNow: async (): Promise<boolean> => {
+      if (disabled.value || busy.value) return false;
+      const target = provider.value;
+      const direction = derived.direction.value;
+      let sent = false;
+      await handoff.start(() => ctl.saveDraft(derived.title.value), async () => {
+        const task = exportTask();
+        const result = await handoff.runPrepare(task, direction, optionsFor(task, null, direction, target.id));
+        if (result?.status !== 'ready') return;
+        face.value = 'receipt';
+        if (await handoff.runCopy()) sent = await handoff.runOpen(target);
+      });
+      return sent;
+    },
     /** 汇聚途中 Esc / 再点锁。 */
     recall: () => { recall?.(); },
     pick: (id: AiProviderId) => { const next = AI_PROVIDERS.find((p) => p.id === id); if (next) provider.value = next; },

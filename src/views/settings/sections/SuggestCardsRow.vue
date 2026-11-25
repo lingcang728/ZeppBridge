@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * 首页建议卡（刚练完、昨晚睡得差、很久没动、帮我排明天）一键关掉。默认开；记在这台电脑的浏览器存储里（useSuggestCards）。
+ * 首页「今日一问」一键关掉。默认开；记在这台电脑的浏览器存储里（useSuggestCards）。
  */
 import { computed } from 'vue';
 import GlassSwitch from '../../../components/GlassSwitch.vue';
@@ -9,19 +9,19 @@ import { defineMessages, useMessages } from '../../../i18n';
 
 const messages = defineMessages(
   {
-    title: '首页建议卡',
-    on: '刚练完、昨晚睡得差、很久没动时，首页给一张建议卡，点一下就发好牌交给 AI',
-    off: '首页不出建议卡',
+    title: '首页「今日一问」',
+    on: '首页每天按你最近的情况挑一个问题，点开就发好牌交给 AI，不想问这个可以换',
+    off: '首页不出「今日一问」',
   },
   {
-    title: 'Home suggestion cards',
-    on: 'After a workout, a rough night or a long break, the home page offers a card that deals the right data to your AI in one tap',
-    off: 'No suggestion cards on the home page',
+    title: 'Question of the day',
+    on: 'Each day the home page picks a question from how you have been doing; open it and the right data is dealt for your AI, or switch to another question',
+    off: 'No question of the day on the home page',
   },
   {
-    title: 'Sugerencias de la página principal',
-    on: 'Después de entrenar, dormir mal o pasar tiempo sin entrenar, la página principal te ofrece una tarjeta con los datos adecuados para la IA en un solo toque',
-    off: 'Sin sugerencias en la página principal',
+    title: 'La pregunta del día',
+    on: 'Cada día la página principal elige una pregunta según cómo te ha ido; ábrela y se reparten los datos adecuados para tu IA, o cámbiala por otra',
+    off: 'Sin pregunta del día en la página principal',
   },
   'views/settings/sections/SuggestCardsRow',
 );

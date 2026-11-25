@@ -17,6 +17,8 @@ import { useYearView } from './useYearView';
 import { useYearText } from './year.i18n';
 import { useJournalText } from '../journal.i18n';
 
+/** 全年日历上点了某一天（运动列表的年档据此回到日档）。 */
+const emit = defineEmits<{ day: [day: string] }>();
 const y = useYearText();
 const j = useJournalText();
 /* 全应用一份（composables/useAnnualRings.ts）：返回履历页时直接用上次的数据画，形变量到的卡位置才对。 */
@@ -65,7 +67,7 @@ const detail = shallowRef<{ kind: HighlightKind; origin: HTMLElement } | null>(n
           <CapsuleWheel v-else class="year-track" :items="yearItems" :model-value="year.year" :span="132" :aria-label="y.activity" @update:model-value="pick" />
         </template>
       </header>
-      <YearCalendar :year="year" :today="data.today" />
+      <YearCalendar :year="year" :today="data.today" @day="(day) => emit('day', day)" />
     </section>
     <!-- 还没读到：占着日历的位置，不说「还没有」（以前第一次点进来先闪一下「还没有」再出日历）。 -->
     <div v-else-if="!loaded" class="calendar-card placeholder" aria-hidden="true" />

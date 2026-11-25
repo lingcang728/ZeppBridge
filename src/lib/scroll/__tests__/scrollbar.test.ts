@@ -35,9 +35,10 @@ describe('时间刻度', () => {
     { key: '2023-06', top: 3600 },
   ];
 
-  it('每年第一行标年份，顶上那一年不标，挨得太近的只留前一个', () => {
+  it('每年第一行标年份，顶上那一年也标，挨得太近的只留前一个', () => {
     const place = (top: number) => top / 5;
     expect(yearMarks(rows, place)).toEqual([
+      { year: '2026', at: 20 },
       { year: '2025', at: 200 },
       { year: '2023', at: 720 },
     ]);

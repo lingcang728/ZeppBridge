@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /* 概览的「最近记录」卡：一条横着的时间线。
  *
- * 最近五条睡眠和运动从左到右由新到旧（最左是最新的一条，和最近记录页同一方向），每条是线上的一个节点
+ * 最近五条睡眠和运动从左到右由新到旧（最左是最新的一条），每条是线上的一个节点
  * 加一枚小卡：什么时候、是什么、多长 / 多远。以前是两列贴片，看不出先后，也看不出
  * 它们在时间上隔了多久；现在一眼就是「这几天做了什么」。 */
 import { computed } from 'vue';
@@ -24,7 +24,8 @@ const messages = defineMessages(
     recentAria: '最近记录',
     recentTitle: '最近记录',
     recentSub: '睡眠、跑步与力量训练',
-    seeAll: '查看全部',
+    workoutsLink: '运动',
+    linksAria: '去睡眠或运动列表',
     newest: '最新',
     recentEmpty: '暂无记录，同步一次后展示。',
     sleepRecordTitle: '睡眠',
@@ -36,7 +37,8 @@ const messages = defineMessages(
     recentAria: 'Recent records',
     recentTitle: 'Recent records',
     recentSub: 'Sleep, runs and strength work',
-    seeAll: 'See all',
+    workoutsLink: 'Workouts',
+    linksAria: 'Open the sleep or workout list',
     newest: 'Latest',
     recentEmpty: 'Nothing recorded yet. Run a sync and it shows up here.',
     sleepRecordTitle: 'Sleep',
@@ -48,7 +50,8 @@ const messages = defineMessages(
     recentAria: 'Registros recientes',
     recentTitle: 'Registros recientes',
     recentSub: 'Sueño, carreras y fuerza',
-    seeAll: 'Ver todo',
+    workoutsLink: 'Entrenamientos',
+    linksAria: 'Abrir la lista de sueño o de entrenamientos',
     newest: 'Más reciente',
     recentEmpty: 'Sin registros aún; aparecen tras sincronizar.',
     sleepRecordTitle: 'Sueño',
@@ -115,7 +118,10 @@ const recentItems = computed<RecentItem[]>(() => {
 
 <template>
   <section class="metric-panel recent-panel" :aria-label="t.recentAria">
-    <div class="panel-head"><span class="panel-title"><GlyphTile name="document" :size="38" /><span><strong>{{ t.recentTitle }}</strong><small>{{ t.recentSub }}</small></span></span><RouterLink class="pill-button" to="/recent">{{ t.seeAll }}<Icon name="chevron-right" :size="14" /></RouterLink></div>
+    <div class="panel-head"><span class="panel-title"><GlyphTile name="document" :size="38" /><span><strong>{{ t.recentTitle }}</strong><small>{{ t.recentSub }}</small></span></span><nav class="recent-links" :aria-label="t.linksAria">
+      <RouterLink class="pill-button" to="/sleep" data-morph-card>{{ t.sleepRecordTitle }}<Icon name="chevron-right" :size="14" /></RouterLink>
+      <RouterLink class="pill-button" to="/workouts" data-morph-card>{{ t.workoutsLink }}<Icon name="chevron-right" :size="14" /></RouterLink>
+    </nav></div>
     <ol v-if="recentItems.length" v-wheel-pan class="timeline">
       <li v-for="(item, index) in recentItems" :key="item.key" :class="['tl-item', `tone-${item.category}`, { newest: index === 0 }]">
         <RouterLink :to="item.to" class="tl-link" data-morph-card>
@@ -132,6 +138,8 @@ const recentItems = computed<RecentItem[]>(() => {
 
 <style scoped>
 .recent-panel { padding: 18px 20px 20px; }
+/* 「睡眠 ›」「运动 ›」两枚胶囊：各自是形变的来处，点哪枚从哪枚长成列表页。 */
+.recent-links { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; min-width: 0; }
 
 /* 横着的时间线：一根从右到左渐亮的细线（最新在左）穿过每个节点，节点上方是时间，下方是内容。 */
 .timeline { position: relative; display: grid; grid-auto-columns: minmax(150px, 1fr); grid-auto-flow: column; gap: 8px; margin: 16px 0 0; padding: 0 0 4px; overflow-x: auto; list-style: none; }

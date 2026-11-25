@@ -212,10 +212,8 @@ watch(tabFade.holdEdge, (held) => {
    内存，而它们从本机库重读只要几十毫秒。列表页缓存是为了返回时保住滚动位置。 */
 const CACHED_PAGES = [
   'Overview',
-  'RecentRecords',
   'SleepList',
   'WorkoutList',
-  'Journal',
   // Keep the selected year and open workout card when returning from a workout.
   'Rings',
 ];

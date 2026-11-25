@@ -1,10 +1,10 @@
 /**
  * 「建议 → 发牌 → 交给 AI」的那一段胶水：取事实、发牌、把一手牌写进交给 AI 的任务。
  *
- * - 事实（`card_hand_facts`）一天取一次、全局共用：按问题发牌的四个入口要先知道哪几个发得出牌，点进去又要发，不该取两遍。
+ * - 事实（`card_hand_facts`）一天取一次、全局共用：首页要先知道今天哪几问发得出牌，展开时又要用，不该取两遍。
  * - 牌面小图（`card_hand_lines`）只取这手牌（含候补）里还没取过的那几次；同一条路线发完先按起终点粗配，小图到了再按轨迹细筛。
  * - 写进任务：`handPicks` 算出交哪几类、哪几天、哪几次运动，走 `applyPicks`；换一张牌就再写一次（进撤销栈）。
- * - 首页建议卡点进来：先发好牌、写进任务，`queueHandDeal` 记下这一手，再跳到交给 AI 主面板，由那边摆上发牌桌（`takeHandDeal`）。
+ * - 首页「今日一问」：排序在 lib/cards/hands/rank.ts，摊牌、换牌、交出去都在首页那张卡里（SuggestCards）。
  */
 import { ref, shallowRef } from 'vue';
 import { backend } from '../lib/bridge';
@@ -21,20 +21,6 @@ import type { useHandsText } from '../components/cards/hands.i18n';
 
 type HandsText = ReturnType<typeof useHandsText>['value'];
 export type HandKind = QuestionHandKind | SuggestHandKind;
-
-/** 首页建议卡交过来的、已经发好并写进任务的一手牌：交给 AI 主面板落地后把它摆上发牌桌。 */
-export interface PendingDeal {
-  hand: Hand;
-  suggestion: Suggestion | null;
-}
-
-const pending = shallowRef<PendingDeal | null>(null);
-export const queueHandDeal = (deal: PendingDeal) => { pending.value = deal; };
-export const takeHandDeal = (): PendingDeal | null => {
-  const deal = pending.value;
-  pending.value = null;
-  return deal;
-};
 
 const facts = shallowRef<HandFacts | null>(null);
 const lines = ref<Record<string, HandLines>>({});

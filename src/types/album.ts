@@ -27,6 +27,12 @@ export interface SleepMonth {
   avg_duration_min: number;
   /** 平均入睡时刻：当地中午之后的分钟数。 */
   avg_onset_min: number;
+  /** 入睡时刻算了几晚、这几晚入睡时刻的标准差（分钟）；年度「入睡规律」按晚合并。没有就是 null。 */
+  onset_nights: number;
+  onset_sd_min: number | null;
+  /** 有评分的那几晚的平均评分；一晚都没有就是 null（不是 0）。 */
+  avg_score: number | null;
+  score_nights: number;
   deep_min: number;
   light_min: number;
   rem_min: number;

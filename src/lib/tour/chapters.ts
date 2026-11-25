@@ -87,10 +87,10 @@ export const TOUR_STEPS: Record<TourChapterId, TourStep[]> = {
     { route: '/ai/plan', target: '.ai-plan-week [data-tour="plan-history"]' },
   ],
   journal: [
-    { route: '/journal', target: '.journal-page .year-dashboard' },
-    { route: '/journal', target: '.journal-page .record-wall' },
-    { route: '/journal', target: '.journal-page .tone-race' },
-    { route: '/journal', target: '.journal-page .tone-shoe' },
+    { route: '/workouts?zoom=year', target: '.journal-body .year-dashboard' },
+    { route: '/workouts?zoom=year', target: '.journal-body .record-wall' },
+    { route: '/workouts?zoom=year', target: '.journal-body .tone-race' },
+    { route: '/workouts?zoom=year', target: '.journal-body .tone-shoe' },
     { route: '/rings', target: '.rings-page .tree-rings' },
   ],
   letters: [

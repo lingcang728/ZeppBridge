@@ -247,7 +247,7 @@ export async function runReel(view: Window, id: string, clock: PlaybackClock, st
     for (const char of text) { field.value += char; field.dispatchEvent(new EventType('input', { bubbles: true })); await clock.wait(35); }
     stage.beat('custom-question'); await wait(2500);
   } else if (id === 'events') {
-    await go('/journal'); await tap('#life-events .jc-actions .pill-button:last-child', 1000);
+    await go('/workouts?zoom=year'); await tap('#life-events .jc-actions .pill-button:last-child', 1000);
     const dialog = await find('[data-modal-dialog]'); stage.beat('context');
     const items = dialog.querySelectorAll('.segment-item');
     for (const index of [0, 1]) if (items[index]) await tap(items[index]!, 1500);
@@ -324,10 +324,10 @@ export async function runReel(view: Window, id: string, clock: PlaybackClock, st
     const help = await find('[data-tour="metric-info"]'); await tap(help, 300);
     stage.beat('metric-note'); await wait(2400); api.escape(); await wait(700); await focus(null);
   } else if (id === 'rings') {
-    await go('/journal'); const card = await find('a.rings-card'); await focus(card, 1.3); await wait(900);
+    await go('/workouts?zoom=year'); const card = await find('a.rings-card'); await focus(card, 1.3); await wait(900);
     await focus(null); await tap(card, 1200); await find('.tree-rings'); stage.beat('growing'); await wait(3800);
   } else if (id === 'journal') {
-    await go('/journal');
+    await go('/workouts?zoom=year');
     for (const selector of ['.pb-card', '.countdown', '.medal', '.shoe']) {
       const el = await find(selector); await scrollTo(el); await focus(el, 1.3); stage.beat(selector.slice(1)); await wait(1700);
     }

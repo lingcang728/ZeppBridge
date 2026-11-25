@@ -22,9 +22,13 @@ from playwright.async_api import async_playwright
 LOCALES = ['zh', 'zh-TW', 'en', 'es', 'nl', 'pt-BR', 'pt-PT', 'de', 'ru', 'hi-IN', 'fr', 'it', 'pl', 'ko']
 # 计划模块（2026-10-12 第 3 批）：周视图和明天的单天页（演示库的计划从今天排起）。
 PATHS = ['/', '/body', '/training', '/heart', '/activity', '/ai', '/ai/exchanges', '/ai/check', '/ai/plan',
-         f'/ai/plan/{(date.today() + timedelta(days=1)).isoformat()}', '/settings']
+         f'/ai/plan/{(date.today() + timedelta(days=1)).isoformat()}', '/settings',
+         # 记录列表：日档、运动年档（整页履历）。
+         '/sleep', '/workouts', '/workouts?zoom=year']
 # 点开以后才出现的整屏层（第三轮 A8：牌桌展开后头部、范围胶囊、提示条不能和牌压在一起）。
-OVERLAYS = {'/body': ('.pick-days', '牌桌'), '/ai': ('.face-switch .segment-item >> nth=1', '计划面')}
+OVERLAYS = {'/body': ('.pick-days', '牌桌'), '/ai': ('.face-switch .segment-item >> nth=1', '计划面'),
+            # 首页「今日一问」展开、列表左下托盘点开。
+            '/': ('.ask-main', '今日一问'), '/sleep': ('.tray-handle', '托盘'), '/workouts': ('.tray-handle', '托盘')}
 
 PROBE = """() => {
   const boxes = [];

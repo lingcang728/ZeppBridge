@@ -16,24 +16,25 @@ import { usePagedRecords } from '../composables/usePagedRecords';
 import { formatDate, formatDuration, formatTime, isFiniteNumber } from '../lib/format';
 import type { SleepSession } from '../types';
 import { defineMessages, useMessages } from '../i18n';
-import AlbumCapsule from '../components/album/AlbumCapsule.vue';
-import AlbumPeriods from '../components/album/AlbumPeriods.vue';
+import AlbumTray from '../components/album/AlbumTray.vue';
 import AlbumGrid from '../components/album/AlbumGrid.vue';
-import SleepStripBar from '../components/album/SleepStripBar.vue';
+import AlbumMonthHead from '../components/album/AlbumMonthHead.vue';
+import SleepYearCard from '../components/album/SleepYearCard.vue';
+import SleepNightMark from '../components/album/SleepNightMark.vue';
+import { albumMessages } from '../components/album/album.i18n';
 import { useRecordAlbum } from '../composables/useRecordAlbum';
 import { useAlbumNav } from '../composables/useAlbumNav';
-import { localDay, type AlbumTile } from '../lib/album/album';
+import { localDay, sleepYearAnalysis, type AlbumTile, type AlbumZoom } from '../lib/album/album';
+import type { SleepMonth } from '../types/album';
 
 const messages = defineMessages(
   {
     title: '睡眠',
-    intro: '本机已同步的睡眠记录。没有完整时间轴时，只展示汇总。',
     loadFailedTitle: '无法读取睡眠记录',
     loadFailed: '睡眠列表暂不可用',
     retry: '重试',
     emptyTitle: '还没有睡眠记录',
     emptyMessage: '同步后显示在这里。没有真实阶段就不编造。',
-    scoreLabel: '评分',
     footnote: (count: number, from: string) => `${count} 条记录 · ${from} 起`,
     shown: (shown: number, total: number) => `已显示 ${shown} / 共 ${total} 条`,
     loadMore: '加载更多',
@@ -41,13 +42,11 @@ const messages = defineMessages(
   },
   {
     title: 'Sleep',
-    intro: 'Sleep records synced to this machine. Without a full timeline, only the summary is shown.',
     loadFailedTitle: 'Could not load sleep records',
     loadFailed: 'Sleep list unavailable right now',
     retry: 'Retry',
     emptyTitle: 'No sleep records yet',
     emptyMessage: 'They show up here after a sync. Stages are never invented.',
-    scoreLabel: 'Score',
     footnote: (count: number, from: string) => `${count} records · since ${from}`,
     shown: (shown: number, total: number) => `Showing ${shown} of ${total}`,
     loadMore: 'Load more',
@@ -55,13 +54,11 @@ const messages = defineMessages(
   },
   {
     title: 'Sueño',
-    intro: 'Registros de sueño sincronizados en este equipo. Sin una línea de tiempo completa, solo se muestra el resumen.',
     loadFailedTitle: 'No se pudieron leer los registros de sueño',
     loadFailed: 'Lista de sueño no disponible ahora',
     retry: 'Reintentar',
     emptyTitle: 'Aún no hay registros de sueño',
     emptyMessage: 'Aparecen aquí tras sincronizar. Sin fases reales no se inventan.',
-    scoreLabel: 'Puntuación',
     footnote: (count: number, from: string) => `${count} registros · desde ${from}`,
     shown: (shown: number, total: number) => `Mostrando ${shown} de ${total}`,
     loadMore: 'Cargar más',
@@ -70,6 +67,7 @@ const messages = defineMessages(
   'views/SleepList',
 );
 const t = useMessages(messages);
+const albumText = useMessages(albumMessages);
 
 /* 分页、请求代次和去重见 composables/usePagedRecords.ts。 */
 const {
@@ -117,11 +115,12 @@ onBeforeUnmount(stopFilling);
 
 // 第一帧用的是先前读好的首页：重读等形变放完再做（lib/motion/budget.ts）。
 onMounted(() => { if (preloaded) afterMotion(() => { void loadList(); }); else void loadList(); });
-/* 相册（lib/album）：胶囊切年 / 月 / 日，「日」这一层 Ctrl + 滚轮 / 捏合在列表行、方块、日历热图之间换。 */
-const albumIds = computed(() => rendered.value.map((s) => s.sleep_id));
+
+/* 三档缩放（lib/album）：Ctrl + 滚轮 / 捏合和左下托盘走同一个 go()。
+   日 = 逐晚列表，月 = 按月小格 + 月度组头，年 = 每年一块热图 + 年度分析。 */
+const albumIds = computed(() => sessions.value.map((s) => s.sleep_id));
 const album = useRecordAlbum('sleep', albumIds);
-const { level, density, periods, strips } = album;
-const shownPeriods = computed(() => (level.value === 'year' ? periods.value.year : periods.value.month));
+const { zoom, periods, months } = album;
 const stage = ref<HTMLElement | null>(null);
 const ensureMonth = async (month: string) => {
   for (let guard = 0; guard < 40 && hasMore.value; guard += 1) {
@@ -133,13 +132,18 @@ const ensureMonth = async (month: string) => {
   // 要落到的那个月得先画出来（平时是分批补行的）。
   renderLimit.value = null;
 };
-const { go: goLevel, openPeriod } = useAlbumNav({
-  stage, level, density, ensureMonth, zoomable: () => true, loadPeriods: () => album.loadMonths(),
+const { go } = useAlbumNav({
+  stage, zoom, zoomable: () => true,
+  prepare: async (next: AlbumZoom) => { if (next !== 'day') { await album.loadMonths(); renderLimit.value = null; } },
+  ensureDay: (day) => ensureMonth(day.slice(0, 7)),
 });
-/* 方块和热图一次画全部（格子轻）；热图还接着在空闲时往下读，一屏能看好几个月。 */
-watch([density, () => sessions.value.length], () => {
-  if (density.value > 0 && level.value === 'day') renderLimit.value = null;
-  if (density.value === 2 && level.value === 'day' && hasMore.value && sessions.value.length < 2000) nextSlot(() => { void loadMore(); });
+const goZoom = (next: AlbumZoom) => { void go(next); };
+/* 年档热图上点某一天：放大回日档、滚到那一晚。 */
+const openDay = (day: string, cell: HTMLElement) => { void go('day', { day, anchor: cell }); };
+/* 小格和热图一次画全部（格子轻）；热图还接着在空闲时往下读，一屏能看好几个月。 */
+watch([zoom, () => sessions.value.length], () => {
+  if (zoom.value !== 'day') renderLimit.value = null;
+  if (zoom.value === 'year' && hasMore.value && sessions.value.length < 2000) nextSlot(() => { void loadMore(); });
 });
 
 /** 当地中午之后的分钟数（一晚不会被午夜劈成两半）。 */
@@ -152,9 +156,10 @@ const nightOf = (session: SleepSession) => {
   const length = Math.max(0, (Date.parse(session.end_time) - Date.parse(session.start_time)) / 60_000);
   return { from, to: from + length };
 };
-/* 列表里每一行的分期条共用一条时间轴（入睡、醒来上下对得齐）：取大多数晚上落在的那一段，偶尔的午睡不把轴撑开。 */
+/* 每一行的入睡 / 醒来点共用一条时间轴（上下对得齐）：取大多数晚上落在的那一段，偶尔的午睡不把轴撑开。
+   按全部已读进来的晚上算一次，不随分批挂载的行每批重算。 */
 const axis = computed(() => {
-  const nights = rendered.value.map(nightOf);
+  const nights = sessions.value.map(nightOf);
   if (!nights.length) return null;
   const froms = nights.map((n) => n.from).sort((a, b) => a - b);
   const tos = nights.map((n) => n.to).sort((a, b) => a - b);
@@ -163,7 +168,7 @@ const axis = computed(() => {
   const to = Math.ceil(pick(tos, 0.95) / 60) * 60;
   return to - from >= 120 ? { from, to } : null;
 });
-const tiles = computed<AlbumTile[]>(() => (density.value === 0 || level.value !== 'day' ? [] : sessions.value.map((session) => {
+const tiles = computed<AlbumTile[]>(() => (zoom.value === 'day' ? [] : sessions.value.map((session) => {
   const minutes = session.duration_minutes ?? 0;
   const reading = formatDuration(session.duration_minutes);
   return {
@@ -179,6 +184,11 @@ const tiles = computed<AlbumTile[]>(() => (density.value === 0 || level.value !=
   };
 })));
 const sessionById = computed(() => new Map(sessions.value.map((s) => [s.sleep_id, s])));
+const scoreOf = (id: string): number | null => {
+  const score = sessionById.value.get(id)?.score;
+  return isFiniteNumber(score) && score > 0 ? Math.round(score) : null;
+};
+const yearAnalysis = (year: number) => sleepYearAnalysis((months.value ?? []) as SleepMonth[], String(year));
 
 useRevisionReload(() => { void loadList(); album.invalidate(); });
 /* 新手引导：这个板块第一次打开时就地讲一遍（lib/tour/chapters.ts）。 */
@@ -187,7 +197,7 @@ useSectionTour('sleep');
 
 <template>
   <section class="page list-page" aria-labelledby="sleep-list-title">
-    <PageHeader title-id="sleep-list-title" :title="t.title" :intro="t.intro" />
+    <PageHeader title-id="sleep-list-title" :title="t.title" />
 
     <div v-if="initialLoading" class="surface-card" aria-live="polite">
       <SkeletonBlock height="56px" />
@@ -199,43 +209,51 @@ useSectionTour('sleep');
     </EmptyState>
     <EmptyState v-else-if="!sessions.length" icon="moon" :title="t.emptyTitle" :message="t.emptyMessage" />
     <div v-else ref="stage" class="album-stage">
-    <AlbumPeriods v-if="level !== 'day'" data-album-body kind="sleep" :level="level" :periods="shownPeriods" @open="openPeriod" />
-    <AlbumGrid v-else-if="density" data-album-body kind="sleep" :tiles="tiles" :density="density">
-      <template #tile="{ tile }">
-        <b class="tile-reading">{{ tile.reading }}</b>
-        <SleepStripBar class="tile-strip" lanes v-bind="nightOf(sessionById.get(tile.id)!)" :spans="strips.get(tile.id)?.spans" />
-        <span class="tile-span">{{ formatTime(sessionById.get(tile.id)!.start_time) }} – {{ formatTime(sessionById.get(tile.id)!.end_time) }}</span>
-      </template>
-    </AlbumGrid>
-    <div v-else data-album-body class="record-list sleep-records">
-      <RecordRow
-        v-for="session in rendered"
-        :key="session.sleep_id"
-        data-album-item
-        :data-album-id="session.sleep_id"
-        :data-album-day="localDay(session.start_time)"
-        :data-timeline="timelineKey(session.start_time)"
-        :to="{ name: 'SleepDetail', params: { sleepId: session.sleep_id } }"
-        category="sleep"
-        design-icon="sleep"
-        :kicker="formatDate(session.start_time, 'auto')"
-        :time="formatTime(session.start_time)"
-        :title="formatDuration(session.duration_minutes)"
-        :fact="isFiniteNumber(session.score) ? String(Math.round(session.score)) : '—'"
-        :fact-label="t.scoreLabel"
-      >
-        <template #aside><SleepStripBar class="row-strip" lanes v-bind="nightOf(session)" :spans="strips.get(session.sleep_id)?.spans" :axis="axis" /></template>
-      </RecordRow>
+      <AlbumGrid v-if="zoom === 'year'" data-album-body kind="sleep" view="year" :tiles="tiles" @day="openDay">
+        <template #tile="{ tile }"><b>{{ tile.reading }}</b></template>
+        <template #year-head="{ year }">
+          <SleepYearCard v-if="yearAnalysis(year)" :analysis="yearAnalysis(year)!" />
+        </template>
+      </AlbumGrid>
+      <AlbumGrid v-else-if="zoom === 'month'" data-album-body kind="sleep" view="month" :tiles="tiles">
+        <template #head="{ month }"><AlbumMonthHead kind="sleep" :month="month" :periods="periods" /></template>
+        <template #tile="{ tile }">
+          <b class="tile-reading">{{ tile.reading }}</b>
+          <span />
+          <span v-if="scoreOf(tile.id) !== null" class="tile-score">{{ albumText.scoreLabel(scoreOf(tile.id)!) }}</span>
+        </template>
+      </AlbumGrid>
+      <div v-else data-album-body class="record-list sleep-records">
+        <RecordRow
+          v-for="session in rendered"
+          :key="session.sleep_id"
+          data-album-item
+          :data-album-id="session.sleep_id"
+          :data-album-day="localDay(session.start_time)"
+          :data-timeline="timelineKey(session.start_time)"
+          :to="{ name: 'SleepDetail', params: { sleepId: session.sleep_id } }"
+          category="sleep"
+          design-icon="sleep"
+          :kicker="formatDate(session.start_time, 'auto')"
+          :time="formatTime(session.start_time)"
+          :title="formatDuration(session.duration_minutes)"
+          :fact="`${formatTime(session.start_time)} – ${formatTime(session.end_time)}`"
+        >
+          <template #aside>
+            <SleepNightMark v-bind="nightOf(session)" :axis="axis" :score="session.score"
+              :score-label="scoreOf(session.sleep_id) !== null ? albumText.scoreLabel(scoreOf(session.sleep_id)!) : undefined" />
+          </template>
+        </RecordRow>
+      </div>
     </div>
-    </div>
-    <AlbumCapsule v-if="sessions.length && !error" :level="level" @update:level="goLevel" />
+    <AlbumTray v-if="sessions.length && !error" :zoom="zoom" @zoom="goZoom" />
     <p v-if="staleError" class="stale-note" role="status">{{ staleError }}</p>
-    <div v-if="hasMore && !rendering && level === 'day'" :ref="sentinelRef" class="load-more">
+    <div v-if="hasMore && !rendering && zoom === 'day'" :ref="sentinelRef" class="load-more">
       <button class="button button-secondary" type="button" :disabled="loadingMore" @click="loadMore">
         {{ loadingMore ? t.loadingMore : t.loadMore }}
       </button>
     </div>
-    <p v-if="sessions.length && !rendering && level === 'day'" class="footnote">
+    <p v-if="sessions.length && !rendering && zoom === 'day'" class="footnote">
       {{ t.shown(sessions.length, total) }} ·
       {{ t.footnote(sessions.length, formatDate(sessions[sessions.length - 1].start_time, 'auto')) }}
     </p>
@@ -251,13 +269,14 @@ useSectionTour('sleep');
   font-size: var(--fs-sm);
 }
 .load-more { display: flex; justify-content: center; margin-top: 12px; }
-/* 相册：幽灵板（lib/album/albumMotion.ts）绝对定位在这一层里。 */
+/* 换档时的幽灵板（lib/album/albumMotion.ts）绝对定位在这一层里。 */
 .album-stage { position: relative; }
-/* 分期图占这一行的大半：左边只有时长和评分，留着空就是一大块空白。 */
-.sleep-records { --record-main: max-content; --record-aside: minmax(96px, 1fr); }
-.row-strip { width: 100%; }
-/* 时长不折行（「7 小时 44 分」拆成两行就读不出来了）：放不下就缩一号字。 */
-.tile-reading { overflow: hidden; color: var(--ink); font-size: clamp(var(--fs-xs), 9cqi, var(--fs-md)); font-weight: 650; font-variant-numeric: tabular-nums; text-overflow: ellipsis; white-space: nowrap; }
-.tile-strip { width: 100%; align-self: center; }
-.tile-span { overflow: hidden; color: var(--muted); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; text-overflow: ellipsis; white-space: nowrap; }
+/* 左边大字时长 + 入睡–醒来，右边那根细线占这一行的大半。
+   行不在屏幕上就不排版不画：几百晚的列表，滚动和退出页面的形变都少画一大片。 */
+.sleep-records { --record-main: max-content; --record-aside: minmax(120px, 1fr); }
+.sleep-records > :deep(.record-row) { content-visibility: auto; contain-intrinsic-size: auto 52px; }
+.sleep-records :deep(.record-card strong) { font-size: var(--fs-lg, 1.15rem); font-variant-numeric: tabular-nums; }
+/* 小格：时长不折行（「7 小时 44 分」拆成两行就读不出来了），放不下就缩一号字；下面一枚评分小胶囊。 */
+.tile-reading { overflow: hidden; color: var(--ink); font-size: clamp(var(--fs-xs), 11cqi, var(--fs-lg, 1.15rem)); font-weight: 700; font-variant-numeric: tabular-nums; text-overflow: ellipsis; white-space: nowrap; }
+.tile-score { justify-self: start; max-width: 100%; overflow: hidden; padding: 2px 8px; border-radius: 999px; background: color-mix(in srgb, var(--sleep) 16%, transparent); color: var(--sleep); font-size: var(--fs-xs); font-weight: 650; font-variant-numeric: tabular-nums; text-overflow: ellipsis; white-space: nowrap; }
 </style>

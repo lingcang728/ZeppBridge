@@ -1101,19 +1101,31 @@ export default {
   },
 
   'components/album/album': {
-    open: 'Sfoglia per anno, mese e giorno',
-    close: 'Torna all’elenco',
+    tray: 'Zoom e azioni della pagina',
+    trayHandle: (zoom: string) => `Vista organizzata per ${zoom.toLowerCase()}. Trascina in alto o in basso per cambiare livello, fai clic per aprire`,
     levels: 'Livello',
     year: 'Anni',
     month: 'Mesi',
     day: 'Giorni',
     workouts: (count: number) => (count === 1 ? '1 allenamento' : `${count} allenamenti`),
     nights: (count: number) => (count === 1 ? '1 notte' : `${count} notti`),
+    count: 'Allenamenti',
     distance: 'Distanza',
     duration: 'Durata',
+    avgDuration: 'Durata media del sonno',
+    avgScore: 'Punteggio medio',
     avgOnset: 'Addormentamento medio',
-    hrZones: 'Zone FC',
-    openPeriod: (period: string) => `Apri ${period}`,
+    nightsLabel: 'Registrate',
+    stageShare: 'Distribuzione delle fasi',
+    vsMonth: (month: string) => `vs ${month}`,
+    vsLastYear: 'rispetto all’anno scorso',
+    yearNights: (count: number) => (count === 1 ? '1 notte registrata' : `${count} notti registrate`),
+    onsetSpread: 'Regolarità dell’orario di addormentamento',
+    spread: (minutes: string) => `±${minutes}`,
+    bestMonth: 'Mese con il sonno migliore',
+    worstMonth: 'Mese con il sonno peggiore',
+    scoreOf: (score: number) => `${score} pt`,
+    scoreLabel: (score: number) => `Punteggio ${score}`,
   },
 
   'components/cards/cards': {
@@ -1176,8 +1188,6 @@ export default {
   },
 
   'components/cards/hands': {
-    dealByQuestion: 'Distribuisci per domanda',
-    dealByQuestionAria: 'Scegli una domanda per distribuire automaticamente gli allenamenti e le notti più pertinenti',
     kind: {
       distance_best: 'Stessa distanza · PR',
       same_route: 'Stesso percorso',
@@ -1194,13 +1204,6 @@ export default {
       race_review: 'La gara e le quattro settimane precedenti di allenamento e sonno',
       recovery_nights: 'Notti in cui HRV, frequenza cardiaca a riposo o sonno si sono discostati dai tuoi valori abituali',
     },
-    empty: {
-      no_routes: 'Non hai ancora corso tre volte sullo stesso percorso',
-      no_distance: 'Non hai ancora due corse nella stessa fascia di distanza (5K / 10K / mezza maratona / maratona)',
-      no_race: 'Nessuna gara contrassegnata né corsa nettamente più veloce del solito',
-      no_outliers: 'Negli ultimi due mesi i dati sul recupero sono rimasti nella norma',
-      no_data: 'Dati recenti insufficienti',
-    },
     bucket: { '5k': '5K', '10k': '10K', half: 'Mezza maratona', full: 'Maratona' },
     role: {
       anchor: 'Attuale', pr: 'PR', race: 'Gara', build: 'Preparazione', same: 'Simile', recent: 'Recente', outlier: 'Fuori norma', day_before: 'Giorno prima', night: 'Notte',
@@ -1209,14 +1212,10 @@ export default {
     hrvNote: (value: number) => `HRV ${value}`,
     bench: 'Riserva',
     benchEmpty: 'Riserva vuota',
-    tableTip: 'Trascina una carta in basso, nella riserva, per rimuoverla, oppure trascina una carta dalla riserva in alto per sostituirla. Puoi anche toccare la carta. L’IA riceve le carte di questa mano.',
-    useHand: 'Usa questa mano',
     handEmpty: 'Hai spostato tutte le carte. Scegline una dalla riserva.',
     cardCount: (count: number) => (count === 1 ? '1 carta' : `${count} carte`),
     drawOutAria: (label: string) => `${label}. Premi per spostare in riserva.`,
     swapInAria: (label: string) => `${label}. Premi per aggiungerla a questa mano.`,
-    dealing: 'Distribuzione in corso…',
-    failed: 'Impossibile leggere i dati e distribuire le carte.',
     question: {
       distance_best: (bucket: string) => `Ecco le mie PR precedenti e le corse più recenti nella fascia di distanza ${bucket}. Confronta le variazioni di passo, frequenza cardiaca e carico di allenamento: da dove viene il miglioramento? Cosa mi manca per il prossimo PR? Indicami anche su cosa concentrarmi nelle prossime 4 settimane per questa distanza.`,
       same_route: (km: string) => `Queste sono alcune mie corse sullo stesso percorso (circa ${km}). Confronta passo, frequenza cardiaca e deriva cardiaca nella seconda metà: sullo stesso percorso sono più veloce, più efficiente o sto peggiorando? Spiega le possibili ragioni.`,
@@ -1324,9 +1323,10 @@ export default {
     recentSub: 'Sonno, corsa e forza',
     recentAria: 'Registrazioni recenti',
     recentEmpty: 'Nessun dato per ora — una sincronizzazione li mostrerà qui.',
-    seeAll: 'Mostra tutto',
     newest: 'Più recente',
     sleepRecordTitle: 'Sonno',
+    workoutsLink: 'Allenamenti',
+    linksAria: 'Apri l’elenco del sonno o degli allenamenti',
     sleepScore: (score: number) => `Punteggio del sonno ${score}`,
     avgHr: (value: number) => `FC media ${value}`,
     timeUnknown: 'Ora sconosciuta',
@@ -1377,22 +1377,41 @@ export default {
   },
 
   'components/overview/suggest': {
-    aria: 'Suggerimenti per te',
-    workoutEyebrow: 'Appena finito',
-    workoutLine: (what: string, amount: string, count: number) => (count
-      ? `Allenamento di oggi: ${what}, ${amount}. Confrontalo con i ${count} allenamenti più recenti dello stesso tipo.`
-      : `Allenamento di oggi: ${what}, ${amount}. Rivedi l’allenamento.`),
-    sleepEyebrow: 'Notte difficile',
-    sleepShort: (duration: string, gap: string) => `Hai dormito ${duration}, ${gap} in meno rispetto ai tuoi valori abituali delle ultime 4 settimane.`,
-    sleepDeep: (deep: string, gap: string) => `Sonno profondo: ${deep}, ${gap} sotto i tuoi valori abituali delle ultime 4 settimane.`,
-    idleEyebrow: (days: number) => (days === 1 ? '1 giorno senza allenarti' : `${days} giorni senza allenarti`),
-    idleLine: (date: string, what: string) => `Ultimo allenamento: ${what} · ${date}`,
-    tomorrowSub: 'Include gli ultimi 7 giorni di recupero e allenamenti',
-    sleepReview: 'Come ho dormito stanotte?',
-    sleepReviewSub: 'Sonno e recupero delle ultime notti',
+    aria: 'La domanda del giorno',
+    refresh: 'Un’altra domanda',
+    expand: 'Apri questa domanda',
+    collapse: 'Chiudi',
+    dismiss: 'Nascondi per oggi',
+    title: {
+      plan_tomorrow: 'Pianifica domani',
+      sleep_review: 'Come ho dormito stanotte?',
+      same_route: 'Come vado sul mio percorso abituale?',
+      recovery_nights: 'Cosa succede nelle notti con recupero scarso?',
+    },
+    reviewToday: (amount: string, what: string) => `Rivedi l’allenamento di oggi, ${what} (${amount})`,
+    reviewOn: (date: string, amount: string, what: string) => `Rivedi l’allenamento del ${date}, ${what} (${amount})`,
+    raceTitle: (date: string, what: string) => `Rivedi la gara del ${date} (${what})`,
+    bestTitle: (bucket: string) => `Sto migliorando sui ${bucket}?`,
+    comebackTitle: (days: number) => `${days} giorni di pausa. Come riprendo?`,
+    sub: {
+      plan_tomorrow: 'Recupero e allenamenti degli ultimi 7 giorni',
+      sleep_review: 'Sonno e recupero delle ultime notti',
+      review_workout: 'Questo allenamento e i più recenti simili',
+      race_review: 'La gara e quattro settimane di allenamenti e sonno',
+      distance_best: 'Tutte le corse su questa distanza e la serie dei record personali',
+      same_route: 'Tutte le corse su questo percorso',
+      recovery_nights: 'Notti fuori dalla norma e allenamento del giorno prima',
+      comeback: 'Ultimi allenamenti prima della pausa e due settimane di recupero',
+    },
+    swap: 'Scambia alcune carte',
+    swapDone: 'Sostituzioni completate',
+    refine: 'Affina in Passa all’IA',
+    sendTo: (name: string) => `Copia in ${name}`,
+    sending: 'Preparazione…',
+    sent: (name: string) => `Copiato. Incolla nella chat di ${name}`,
+    sendFailed: 'Passaggio non riuscito. Apri Passa all’IA per vedere dove si è bloccato.',
+    desktopOnly: 'Per passare i dati a un’IA serve l’app desktop',
     sleepReviewQuestion: 'Ho allegato i dati del sonno e del recupero della notte scorsa e di quelle precedenti, oltre ai miei allenamenti degli ultimi giorni. Aiutami a capire come ho dormito stanotte, che cosa è cambiato rispetto alle notti precedenti, quali potrebbero essere le cause e se dovrei modificare l’allenamento di oggi.',
-    dismiss: 'Nascondi questo suggerimento',
-    failed: 'Non è stato possibile distribuire le carte. Riprova più tardi.',
   },
 
   'components/plan/easySwap': {
@@ -3525,36 +3544,6 @@ export default {
     focusLabel: "I miei interessi",
   },
 
-'views/RecentRecords': {
-    title: 'Registrazioni recenti',
-    introTimeline: 'Sonno e allenamenti sincronizzati di recente su una linea temporale, con il più recente in alto.',
-    today: 'Oggi',
-    yesterday: 'Ieri',
-    filterAll: 'Tutti',
-    filterSleep: (count: number) => `Sonno ${count}`,
-    filterWorkouts: (count: number) => `Allenamenti ${count}`,
-    workoutTypeAria: 'Tipo di allenamento',
-    noSleep: 'Ancora nessuna registrazione del sonno',
-    noWorkouts: 'Nessun allenamento da mostrare.',
-    noWorkoutsOfType: 'Nessun elemento da mostrare per questo tipo di allenamento.',
-    noRecords: 'Ancora nessuna registrazione di sonno o allenamento in questo periodo.',
-    sleepTitle: 'Sonno',
-    sleepScore: (score: number) => `Punteggio sonno ${score}`,
-    avgHr: (bpm: number) => `FC media ${bpm}`,
-    showMore: (count: number) => `Mostra altri ${count}`,
-    hiddenIncomplete: (count: number) =>
-      plural(count, {
-        one: `${count} registrazione incompleta nascosta`,
-        other: `${count} registrazioni incomplete nascoste`,
-      }),
-    partialUnavailable: 'Alcuni dati non sono al momento disponibili',
-    notProvided: 'Non fornito',
-    loadingLabel: 'Caricamento delle registrazioni recenti',
-    loadFailedTitle: 'Impossibile caricare le registrazioni recenti',
-    retry: 'Riprova',
-    desktopOnly: 'L’anteprima del browser non legge i dati dell’account; apri l’applicazione desktop.',
-  },
-
   'views/Settings': {
     title: 'Impostazioni',
     retry: 'Riprova',
@@ -3932,8 +3921,6 @@ Se hai bisogno di ulteriori informazioni (quale client sto usando, dove si trova
 
   'views/SleepList': {
     title: 'Sonno',
-    intro: 'Registrazioni del sonno sincronizzate su questo computer. Senza una sequenza temporale completa, viene mostrato solo il riepilogo.',
-    scoreLabel: 'Punteggio',
     shown: (shown: number, total: number) => `${shown} visualizzati su ${total}`,
     footnote: (count: number, from: string) => `${count} registrazioni · a partire da ${from}`,
     loadMore: 'Carica altro',
@@ -4139,7 +4126,6 @@ Se hai bisogno di ulteriori informazioni (quale client sto usando, dove si trova
 
   'views/WorkoutList': {
     title: 'Allenamenti',
-    intro: 'Allenamenti sincronizzati su questo computer. Senza traccia, nessuna mappa.',
     avgHr: (bpm: number) => `FC media ${bpm}`,
     notProvided: 'Non fornito',
     shown: (loaded: number, total: number) => `${loaded} caricati su ${total}`,
@@ -4237,9 +4223,9 @@ Se hai bisogno di ulteriori informazioni (quale client sto usando, dove si trova
   },
 
   'views/settings/sections/SuggestCardsRow': {
-    title: 'Schede suggerite nella panoramica',
-    on: 'Dopo un allenamento, una notte difficile o una lunga pausa, la panoramica suggerisce una scheda che prepara con un tocco i dati pertinenti da inviare all’IA',
-    off: 'La panoramica non mostra schede suggerite',
+    title: 'La domanda del giorno',
+    on: 'Ogni giorno la panoramica sceglie una domanda in base a come stai andando. Aprila per preparare i dati da inviare all’IA oppure cambiala.',
+    off: 'La panoramica non mostra la domanda del giorno',
   },
 
   'views/settings/sections/account': {

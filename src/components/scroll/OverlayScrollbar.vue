@@ -2,7 +2,8 @@
 /**
  * 主滚动区的悬浮细条。全局把原生滚动条藏了（base.css），以前长列表滚到哪、还剩多少都看不出来。
  * 平时不显示；一滚动、或者指针摸到右缘，细条淡入，停下一秒后淡出。可以拖，点轨道空白处翻一页。
- * 按时间排的列表（行上带 data-timeline="YYYY-MM"）在轨道旁标年份，拖动时滑块旁冒出当前年月。
+ * 按时间排的列表（行上带 data-timeline="YYYY-MM"）在轨道旁标年份（最上面那年也标）：列表够长、跨了不止一年时
+ * 年份一直显示，不等滚动才出；拖动时滑块旁冒出「年 · 月」。
  * 只动 opacity / transform；几何换算在 lib/scroll/scrollbar.ts。读屏和键盘照旧走原生滚动，这条只给指针用。
  */
 import { computed, onMounted, onUnmounted, ref, shallowRef } from 'vue';
@@ -10,7 +11,7 @@ import { locale } from '../../i18n';
 import { displayDateTimeFormatter } from '../../lib/dateTime';
 import { lessMotion } from '../../lib/motion/lessMotion';
 import {
-  overflows, rowAt, scrollTopFor, thumbFor, timelineMonth, trackPointFor, yearMarks, type TimelineRow,
+  overflows, pinYears, rowAt, scrollTopFor, thumbFor, timelineMonth, trackPointFor, yearMarks, type TimelineRow,
 } from '../../lib/scroll/scrollbar';
 
 const props = defineProps<{ viewport: string }>();
@@ -40,12 +41,14 @@ const marks = computed(() => {
   return yearMarks(rows.value, (top) => trackPointFor(top, headHeight.value, geometry, track.value, size));
 });
 const shown = computed(() => scrollable.value && (recent.value || hover.value || dragging.value));
+/** 长的时间列表：年份刻度常显。 */
+const pinned = computed(() => scrollable.value && pinYears(rows.value, extent.value));
 const bubble = computed(() => {
   if (!dragging.value || !rows.value.length) return '';
   const row = rowAt(rows.value, scrollTop.value + headHeight.value + 1);
   const month = row && timelineMonth(row.key);
   void locale.value;
-  return month ? displayDateTimeFormatter({ year: 'numeric', month: 'long' }).format(month) : '';
+  return month ? `${displayDateTimeFormatter({ year: 'numeric' }).format(month)} · ${displayDateTimeFormatter({ month: 'long' }).format(month)}` : '';
 });
 
 let main: HTMLElement | null = null;
@@ -150,7 +153,7 @@ const trackDown = (event: PointerEvent) => {
 </script>
 
 <template>
-  <div v-if="scrollable" :class="['overlay-scroll', { shown, hover, dragging }]" :style="{ top: `${headHeight + INSET}px`, height: `${track}px` }"
+  <div v-if="scrollable" :class="['overlay-scroll', { shown, hover, dragging, pinned }]" :style="{ top: `${headHeight + INSET}px`, height: `${track}px` }"
     aria-hidden="true" @pointerenter="hover = true" @pointerleave="hover = false" @pointerdown="trackDown">
     <span v-for="mark in marks" :key="mark.year" class="year" :style="{ transform: `translateY(${mark.at}px)` }">{{ mark.year }}</span>
     <div class="thumb" :style="{ height: `${thumb.size}px`, transform: `translateY(${thumb.offset}px)` }"
@@ -160,12 +163,11 @@ const trackDown = (event: PointerEvent) => {
 </template>
 
 <style scoped>
-/* 右缘 14px 宽的感应带：平时透明，指针进来就亮。看得见的细条只有 4px，悬停 / 拖动时加宽到 8px。 */
-.overlay-scroll {
-  position: absolute; right: 0; z-index: 40; width: 14px; touch-action: none;
-  opacity: 0; transition: opacity 260ms ease 120ms;
-}
-.overlay-scroll.shown { opacity: 1; transition-delay: 0ms; transition-duration: 140ms; }
+/* 右缘 14px 宽的感应带：平时透明，指针进来就亮。看得见的细条只有 4px，悬停 / 拖动时加宽到 8px。
+   淡入淡出分开做：细条跟着滚动出没，年份刻度在长列表里常显（pinned）。 */
+.overlay-scroll { position: absolute; right: 0; z-index: 40; width: 14px; touch-action: none; }
+.thumb, .year { opacity: 0; transition: opacity 260ms ease 120ms; }
+.overlay-scroll.shown .thumb, .overlay-scroll.shown .year, .overlay-scroll.pinned .year { opacity: 1; transition-delay: 0ms; transition-duration: 140ms; }
 .thumb { position: absolute; top: 0; right: 0; width: 14px; cursor: default; }
 .thumb::before {
   content: ''; position: absolute; inset: 0 3px 0 auto; width: 8px; border-radius: 4px; background: var(--scroll-thumb);
@@ -175,13 +177,13 @@ const trackDown = (event: PointerEvent) => {
 /* 年份刻度：轨道左侧一枚小胶囊，中线对着那一年第一条记录滚到顶时滑块的中线。 */
 .year {
   position: absolute; top: -9px; right: 16px; padding: 0 6px; border-radius: 6px; pointer-events: none;
-  background: var(--scroll-label-bg); color: var(--muted); box-shadow: 0 0 0 1px var(--line);
-  font: 600 11px / 18px var(--font-sans); font-variant-numeric: tabular-nums; white-space: nowrap;
+  background: var(--scroll-label-bg); color: var(--muted); box-shadow: 0 0 0 1px var(--line-strong);
+  font: 650 11px / 18px var(--font-sans); font-variant-numeric: tabular-nums; white-space: nowrap;
 }
 .bubble {
   position: absolute; top: -16px; right: 22px; padding: 0 12px; border-radius: 10px; pointer-events: none;
   background: var(--surface-raised); color: var(--ink); box-shadow: 0 0 0 1px var(--line-strong), 0 6px 18px rgb(0 0 0 / .22);
   font: 600 var(--fs-sm) / 32px var(--font-sans); font-variant-numeric: tabular-nums; white-space: nowrap;
 }
-@media (prefers-reduced-motion: reduce) { .overlay-scroll, .thumb::before { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .thumb, .year, .thumb::before { transition: none; } }
 </style>

@@ -162,9 +162,10 @@ const undo = async () => {
 /* 底部导航挪到窗口底下时（窄窗，或顶栏放不下：shell.css 的 nav-at-bottom），操作栏浮在导航上面，不被它盖住。 */
 @media (max-width: 760px) { .workout-tools:not(.is-single) { bottom: calc(84px + env(safe-area-inset-bottom)); } }
 :root.nav-at-bottom .workout-tools:not(.is-single) { bottom: calc(84px + env(safe-area-inset-bottom)); }
-.tool-bar-enter-active { transition: transform 420ms cubic-bezier(.2, 1.3, .4, 1), opacity 240ms ease; }
-.tool-bar-leave-active { transition: transform 220ms ease-in, opacity 180ms ease-in; }
-.tool-bar-enter-from, .tool-bar-leave-to { transform: translateY(24px) scale(.94); opacity: 0; }
+/* 列表里的操作栏从左下托盘那里长出来、退出选择时原路缩回托盘（托盘在页面左下角，栏在底部居中）。只动 transform、opacity。 */
+.tool-bar-enter-active { transform-origin: 0% 100%; transition: transform 460ms cubic-bezier(.32, .72, .24, 1), opacity 220ms ease; }
+.tool-bar-leave-active { transform-origin: 0% 100%; transition: transform 300ms cubic-bezier(.4, 0, .6, 1), opacity 200ms ease 80ms; }
+.tool-bar-enter-from, .tool-bar-leave-to { transform: translate(-38%, 6px) scale(.25, .6); opacity: 0; }
 .tool-note-enter-active, .tool-note-leave-active { transition: transform 300ms var(--ease-out), opacity 220ms ease; }
 .tool-note-enter-from, .tool-note-leave-to { transform: translateY(8px); opacity: 0; }
 .count-bump-enter-active { transition: transform 260ms cubic-bezier(.2, 1.6, .4, 1), opacity 120ms ease; }

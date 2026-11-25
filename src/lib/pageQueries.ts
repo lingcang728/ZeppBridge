@@ -4,7 +4,6 @@ import { SERIES_FETCH_DAYS } from './metricSeries';
 import { cached, DEVICE_READ_PREFIXES, peek, type Query } from './readCache';
 import { useTrendRange } from '../composables/useTrendRange';
 import { deviceImageFor } from './deviceImages';
-import { journalPageQueries } from './journalQueries';
 import { METRICS as BODY_METRICS } from '../views/body/bodyCards';
 import type {
   DailyHeartRateExtreme, DataHealth, DeviceProfile, HeartRateZoneOptions, HeartRatePoint, HourlySteps, MetricSeries, Page, SleepSession, StressPoint, TrainingBalancePoint, Workout,
@@ -155,12 +154,6 @@ export const workoutPageQueries = (workoutId: string) => [
   pageQuery.workoutSeries(workoutId),
   pageQuery.workoutDevice(workoutId),
 ] as const;
-/** 「最近记录」各取最近 150 条（完整历史在分页的 /sleep 与 /workouts）。 */
-export const RECENT_RECORDS_LIMIT = 150;
-export const recentPageQueries = () => [
-  pageQuery.recentSleep(RECENT_RECORDS_LIMIT),
-  pageQuery.recentWorkouts(RECENT_RECORDS_LIMIT),
-] as const;
 /** 睡眠 / 运动列表一页的条数（composables/usePagedRecords.ts 的默认值）。 */
 export const LIST_PAGE_SIZE = 200;
 /** 数据健康检查默认看最近 90 天。 */
@@ -174,11 +167,9 @@ const ROUTES: Array<[RegExp, (match: RegExpMatchArray) => readonly Query<unknown
   [/^\/activity\/?$/, activityPageQueries],
   [/^\/sleep\/([^/?#]+)$/, (match) => sleepPageQueries(decodeURIComponent(match[1]))],
   [/^\/workouts\/([^/?#]+)$/, (match) => workoutPageQueries(decodeURIComponent(match[1]))],
-  [/^\/recent\/?$/, recentPageQueries],
   [/^\/sleep\/?$/, () => [pageQuery.sleepPage(LIST_PAGE_SIZE)]],
   [/^\/workouts\/?$/, () => [pageQuery.workoutPage(LIST_PAGE_SIZE)]],
   [/^\/health-check\/?$/, healthCheckQueries],
-  [/^\/journal\/?$/, journalPageQueries],
 ];
 
 /** 按路径找出那一页首屏的查询（没有登记的页返回空）。 */

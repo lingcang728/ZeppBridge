@@ -183,4 +183,7 @@ fn album_queries_read_months_shapes_strips_and_batch_zones() {
     let sleep_months = db.sleep_months().unwrap();
     assert_eq!(sleep_months.iter().map(|m| m.nights).sum::<i64>(), 1);
     assert_eq!(sleep_months[0].deep_min, 60.0);
+    assert_eq!(sleep_months[0].avg_score, Some(70.0));
+    assert_eq!(sleep_months[0].score_nights, 1);
+    assert_eq!(sleep_months[0].onset_sd_min, Some(0.0));
 }

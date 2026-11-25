@@ -41,7 +41,7 @@ const alert = computed(() => {
 </script>
 
 <template>
-  <RouterLink class="metric-panel journal-entry" data-morph-card to="/journal" :aria-label="t.entry">
+  <RouterLink class="metric-panel journal-entry" data-morph-card to="/workouts?zoom=year" :aria-label="t.entry">
     <GlyphTile name="outdoor-run" :size="38" />
     <span class="je-main">
       <span class="je-title">{{ t.entry }}</span>

@@ -1,31 +1,29 @@
 <script setup lang="ts">
 /**
- * 履历（/journal，批次 7 主观层「让数据留在 ZeppBridge」）。
+ * 履历的正文：运动列表缩到「年」这一档就是它（/journal 旧链接也落到这里）。
  *
- * 身体数据来自云端；这一页是用户自己写下的那一半：比赛（倒计时、奖牌墙）、PB 墙（从本地采样现算）、
+ * 身体数据来自云端；这里是用户自己写下的那一半：比赛（倒计时、奖牌墙）、PB 墙（从本地采样现算）、
  * 跑鞋（里程、退役提醒）、伤病（人形图）、纪元（给一段日子起名，所有趋势图垫底色）。
  * 全在本机，交给 AI 时一起带上（MCP 的 get_athlete_profile、交给 AI 的 .md）。
+ * 最上面的全年日历点某一天 → `day` 事件（运动列表放大回日档、滚到那天）。
  *
  * 编辑都是弹窗，同一时刻只开一个；关掉后各块按需重读（写入在 useLogbook 里）。
  */
 import { onActivated, onMounted, ref, shallowRef } from 'vue';
-import { useSectionTour } from '../composables/useTour';
-import YearDashboard from '../components/journal/year/YearDashboard.vue';
-import PageHeader from '../components/PageHeader.vue';
-import EpochSection from '../components/journal/EpochSection.vue';
-import InjuryEditor from '../components/journal/InjuryEditor.vue';
-import InjurySection from '../components/journal/InjurySection.vue';
-import RaceEditor from '../components/journal/RaceEditor.vue';
-import RaceSection from '../components/journal/RaceSection.vue';
-import RecordWall from '../components/journal/RecordWall.vue';
-import ShoeEditor from '../components/journal/ShoeEditor.vue';
-import ShoeSection from '../components/journal/ShoeSection.vue';
-import { useJournalText } from '../components/journal/journal.i18n';
-import { useLogbook } from '../composables/useLogbook';
-import type { InjuryInput, RaceInput, ShoeInput } from '../types/logbook';
+import { useSectionTour } from '../../composables/useTour';
+import YearDashboard from './year/YearDashboard.vue';
+import EpochSection from './EpochSection.vue';
+import InjuryEditor from './InjuryEditor.vue';
+import InjurySection from './InjurySection.vue';
+import RaceEditor from './RaceEditor.vue';
+import RaceSection from './RaceSection.vue';
+import RecordWall from './RecordWall.vue';
+import ShoeEditor from './ShoeEditor.vue';
+import ShoeSection from './ShoeSection.vue';
+import { useLogbook } from '../../composables/useLogbook';
+import type { InjuryInput, RaceInput, ShoeInput } from '../../types/logbook';
 
-defineOptions({ name: 'Journal' });
-const t = useJournalText();
+const emit = defineEmits<{ day: [day: string] }>();
 const logbook = useLogbook();
 let mountedOnce = false;
 onMounted(() => {
@@ -49,15 +47,14 @@ const openEdit = (next: NonNullable<Editing>) => {
   editing.value = next;
 };
 const close = () => { editing.value = null; logbook.error.value = null; };
-/* 新手引导：这个板块第一次打开时就地讲一遍（lib/tour/chapters.ts）。 */
+/* 新手引导：第一次缩到这一档时就地讲一遍（lib/tour/chapters.ts）。 */
 useSectionTour('journal');
 </script>
 
 <template>
-  <section class="page journal-page" aria-labelledby="journal-title">
-    <PageHeader title-id="journal-title" :title="t.title" />
+  <div class="journal-body">
     <div class="journal-grid">
-      <YearDashboard class="span-full" />
+      <YearDashboard class="span-full" @day="(day) => emit('day', day)" />
       <RecordWall class="span-full" />
       <EpochSection class="span-full" />
       <RaceSection class="span-half" @edit="(race, origin) => openEdit({ kind: 'race', value: race, origin })" />
@@ -67,11 +64,10 @@ useSectionTour('journal');
     <RaceEditor v-if="editing?.kind === 'race'" :key="`race-${editSession}`" :race="editing.value" :origin="editing.origin" @close="close" />
     <ShoeEditor v-if="editing?.kind === 'shoe'" :key="`shoe-${editSession}`" :shoe="editing.value" :origin="editing.origin" @close="close" />
     <InjuryEditor v-if="editing?.kind === 'injury'" :key="`injury-${editSession}`" :injury="editing.value" :origin="editing.origin" @close="close" />
-  </section>
+  </div>
 </template>
 
 <style scoped>
-.journal-page.page { display: grid; gap: var(--space-4); align-content: start; }
 .journal-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 16px; container: journal / inline-size; align-items: start; }
 .span-full { grid-column: 1 / -1; }
 .span-half { grid-column: span 6; }

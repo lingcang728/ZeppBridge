@@ -628,9 +628,9 @@ back to the tab root.
 
 Secondary pages stay out of the main navigation and are reached from
 Overview's entry cards and "view all" links: `/body` (body status),
-`/training` (training status), `/recent` (recent records), the `/sleep` and
-`/workouts` lists and their `/sleep/:sleepId`, `/workouts/:workoutId` detail
-pages, `/heart`, `/activity`, `/rings` (year rings), `/journal`,
+`/training` (training status), the `/sleep` and `/workouts` lists and their
+`/sleep/:sleepId`, `/workouts/:workoutId` detail pages, `/heart`,
+`/activity`, `/rings` (year rings),
 `/devices/:deviceKey`, `/letters` (the letter box), `/health-check` (data
 health), and under Send to AI `/ai/memory` (coach notes) and
 `/ai/plan/history`. Only pages with their own conventions are described
@@ -702,14 +702,21 @@ below; `src/router/index.ts` is the full list.
 - **Day view** (`views/ai/AiPlanDay.vue` + `components/plan/PlanWorkoutEditor.vue`): header with the title and three round buttons: previous day, next day, "⋯" (delete this day). The strip `PlanStrip.vue` is HTML, 60px high, ticks right under it, fixed font size: width by seconds, height on the same scale as the week shapes (`segmentLevel`), a target band for heart-rate steps, hatching for distance steps; clicking a bar selects that step, scrolls to it and expands it; hovering lights the bar and the step card together, with the readout in a glass tip. Step cards: colour bar, "Warm-up · 1 km", the target right after, ›; open in place to wheel fine-tuning and "Delete this step", with eased height (360 / 300ms). A repeat is one dashed group card with the "×N" capsule (swipe or − / +). At the bottom: "+Warm-up / +Step / +Intervals / +Cool-down" (`addStep` in `lib/trainingPlan/edit.ts`). **No drag-to-edit on the chart.**
 - **Consistent glass**: segments on one page share one variant; the lens attaches as soon as the pointer enters (`useGlassLens().prime()`), so a freshly mounted segment is glass on the first drag.
 
-### 3. Recent records and detail (`/recent`, `/sleep`, `/workouts`, `/sleep/:id`, `/workouts/:id`)
+### 3. Record lists and detail (`/sleep`, `/workouts`, `/sleep/:id`, `/workouts/:id`)
 
-- `/recent` is **one vertical timeline** grouped by day, sleep (placed on the
-  day you woke up) and workouts together, newest first. A capsule switches
-  all / sleep / workouts; with workouts a wheel filters by type; "all sleep"
-  and "all workouts" lead to the full lists. Incomplete records that were
-  filtered out must be announced explicitly — "N incomplete records hidden" —
-  never silently disappear.
+- The sleep and workout lists have **three zoom levels: day / month / year**.
+  Ctrl + wheel (or a touchpad pinch) moves one level per gesture; the tray in
+  the bottom-left corner shows the level, dragging it zooms, and clicking it
+  opens the page actions (select, import). Month groups open with a summary
+  row (sleep: average duration, score, bedtime, nights, change from the
+  previous month, stage ring; workouts: count, distance, duration, change).
+  The sleep year view leads with a year analysis card above the heat map; the
+  workout year view is the whole journal (shoes, races, injuries, eras and
+  life events), so the old `/journal` and `/recent` routes redirect here.
+- A sleep row shows duration, score and the bedtime / wake-up dots on a shared
+  clock axis. Long lists keep the scrollbar's year marks visible.
+- Incomplete records that were filtered out must be announced explicitly —
+  "N incomplete records hidden" — never silently disappear.
 - Workout detail: a top row with the workout name and page-wide buttons, and
   below it a **stage manager** (next section); the summary (the old hero:
   device, metric matrix) is one of its cards. Heart-rate / pace curves, the local SVG track (mapped onto the

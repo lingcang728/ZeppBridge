@@ -21,11 +21,11 @@ const router = useRouter();
 const today = () => localDateString(new Date());
 const rangeStart = () => { const date = new Date(); date.setDate(date.getDate() - Math.max(0, (props.days ?? 1) - 1)); return props.start || localDateString(date); };
 const related = computed(() => events.value.filter(e => overlapsEvent(e, rangeStart(), props.end || today())));
-/* 生活事件的家在履历页的「纪元与事件」卡里（以前在概览底部，生活事件就是履历）。 */
+/* 生活事件的家在履历（运动列表的「年」档）的「纪元与事件」卡里（以前在概览底部，生活事件就是履历）。 */
 async function manage(event: MouseEvent) {
   const button = event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
-  if (button) armPageMorph(button, '/journal', { anySize: true });
-  await router.push({ name: 'Journal' });
+  if (button) armPageMorph(button, '/workouts?zoom=year', { anySize: true });
+  await router.push({ path: '/workouts', query: { zoom: 'year' } });
   // 履历页是异步挂上来的（还要等换页动画），卡出现了再滚过去；等不到就算了。
   const until = performance.now() + 1500;
   const seek = () => {

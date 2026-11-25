@@ -18,6 +18,8 @@ import { useYearText } from './year.i18n';
 import type { RingStar, RingYear } from '../../../types/rings';
 
 const props = defineProps<{ year: RingYear; today: string }>();
+/** 点了有运动的那一天（YYYY-MM-DD）。 */
+const emit = defineEmits<{ day: [day: string] }>();
 const j = useJournalText();
 const y = useYearText();
 const PITCH = 12, CELL = 8.4, LEFT = 30, TOP = 18;
@@ -67,6 +69,11 @@ function move(event: PointerEvent) {
   if (!cell) { hover.value = null; return; }
   const host = box.value!.getBoundingClientRect();
   hover.value = { index, left: rect.left - host.left + (cell.x + CELL / 2) / scale, top: rect.top - host.top + (cell.y - 2) / scale };
+}
+/* 点一格：有运动的那天才算（空格子点了没反应）。 */
+function pickDay() {
+  const cell = hover.value ? grid.value.cells[hover.value.index] : null;
+  if (cell?.list.length) emit('day', cell.key);
 }
 const tip = computed(() => {
   const cell = hover.value ? grid.value.cells[hover.value.index] : null;
@@ -134,7 +141,7 @@ watch(grid, (now, before) => {
 
 <template>
   <div ref="box" class="year-calendar">
-    <svg ref="svg" :viewBox="`0 0 ${grid.width} ${grid.height}`" :style="{ maxWidth: `${grid.width * 1.4}px` }" aria-hidden="true" @pointermove="move" @pointerleave="hover = null">
+    <svg ref="svg" :viewBox="`0 0 ${grid.width} ${grid.height}`" :style="{ maxWidth: `${grid.width * 1.4}px` }" :class="{ pickable: !!hover && !!grid.cells[hover.index]?.list.length }" aria-hidden="true" @pointermove="move" @pointerleave="hover = null" @click="pickDay">
       <g v-for="ghost in ghosts" :key="ghost.id" class="ghost" :data-ghost="ghost.id">
         <g class="months" :style="{ opacity: ghost.months }"><text v-for="m in ghost.grid.months" :key="m.label" :x="m.x" y="9" class="label">{{ m.label }}</text></g>
         <g v-for="(col, c) in ghost.grid.columns" :key="c" class="col" :style="{ opacity: ghost.opacity[c] ?? 1, transform: ghost.transform[c] || undefined }">
@@ -165,6 +172,7 @@ watch(grid, (now, before) => {
 <style scoped>
 .year-calendar { position: relative; min-width: 0; }
 svg { display: block; width: 100%; height: auto; overflow: visible; }
+svg.pickable { cursor: pointer; }
 .label { font-size: 8px; fill: var(--muted); }
 .l0 { --cell: var(--cal-0); }
 .l1 { --cell: var(--cal-1); }

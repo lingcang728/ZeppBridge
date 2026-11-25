@@ -21,8 +21,8 @@ const routes = [
   },
   {
     path: '/recent',
-    name: 'RecentRecords',
-    component: () => import('../views/RecentRecords.vue'),
+    // 「最近记录」全页已并进睡眠 / 运动列表：旧链接回概览。
+    redirect: '/',
   },
   {
     path: '/ai',
@@ -46,8 +46,8 @@ const routes = [
   // 教练档案（批次 7，AI 记忆收件箱）：AI 经 MCP 提议、你确认的长期事实。
   { path: '/ai/memory', name: 'AiCoachNotes', component: () => import('../views/ai/AiCoachNotes.vue') },
   { path: '/ai/plan/:date', name: 'AiPlanDay', component: () => import('../views/ai/AiPlanDay.vue') },
-  // 履历（批次 7 主观层）：比赛与奖牌墙、PB 墙、跑鞋、伤病、纪元。
-  { path: '/journal', name: 'Journal', component: () => import('../views/Journal.vue') },
+  // 履历（比赛与奖牌墙、PB 墙、跑鞋、伤病、纪元）就是运动列表缩到「年」那一档：旧链接落到那里。
+  { path: '/journal', redirect: { path: '/workouts', query: { zoom: 'year' } } },
   // 年轮年度回顾（批次 7）：一年一圈年轮、一次运动一颗星。
   { path: '/rings', name: 'Rings', component: () => import('../views/Rings.vue') },
   {

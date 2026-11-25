@@ -42,7 +42,8 @@ const DETAIL_ROUTE: Record<string, string> = {
   'weekly.workout_count': '/workouts',
   'weekly.training_load': '/training?focus=training_load',
 };
-const detailRoute = (factId: string): string => DETAIL_ROUTE[factId] ?? '/recent';
+/** 没登记的事实按类型落到睡眠或运动列表。 */
+const detailRoute = (factId: string): string => DETAIL_ROUTE[factId] ?? (factId.includes('sleep') ? '/sleep' : '/workouts');
 
 /* 本地周报的共享数据（useWeeklyReport）：同步落地后自己重读。 */
 const { report, loading, error } = useWeeklyReport(() => t.value.loadFailed);
