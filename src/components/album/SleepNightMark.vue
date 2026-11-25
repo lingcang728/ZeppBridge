@@ -1,8 +1,11 @@
 <script setup lang="ts">
-/* 睡眠日档一行右边的小记号：一根细横线只标入睡、醒来两个点（所有行共用一条时间轴，上下对得齐），右边一枚评分小圆环。
+/* 睡眠日档一行右边的小记号：一根细横线只标入睡、醒来两个点（所有行共用一条时间轴，上下对得齐），
+   右边一枚分期环：整圈按深睡 / 浅睡 / REM / 清醒分四色（各行起点一致，上下一扫就能比结构），圈中写评分。
    以前每行是一整条分期色带（一晚几十到上百段），滚动和退出页面的形变都要整页重画，这里只有几个元素。
-   没有评分就不画环（不画一个 0 分的空环）。 */
+   没有分期就退回单色评分弧；分期、评分都没有就不画环。 */
 import { computed } from 'vue';
+import StageRing from './StageRing.vue';
+import type { SleepStages } from '../../lib/album/album';
 
 const props = defineProps<{
   /** 入睡、醒来：当地中午之后的分钟数（醒来可以超过 1440）。 */
@@ -12,6 +15,7 @@ const props = defineProps<{
   axis?: { from: number; to: number } | null;
   score?: number | null;
   scoreLabel?: string;
+  stages?: Partial<Record<keyof SleepStages, number | null | undefined>> | null;
 }>();
 
 const span = computed(() => {
@@ -22,16 +26,13 @@ const span = computed(() => {
   return { start: clamp(((props.from - from) / width) * 100), end: clamp(((props.to - from) / width) * 100) };
 });
 const ringScore = computed(() => (typeof props.score === 'number' && props.score > 0 ? Math.min(100, Math.round(props.score)) : null));
+const hasStages = computed(() => Object.values(props.stages ?? {}).some((v) => typeof v === 'number' && v > 0));
 </script>
 
 <template>
   <span class="night-mark">
     <span class="night-line" aria-hidden="true" :style="{ '--start': `${span.start}%`, '--end': `${span.end}%` }"><i class="dot onset" /><i class="dot wake" /></span>
-    <svg v-if="ringScore !== null" class="score-ring" viewBox="0 0 36 36" role="img" :aria-label="scoreLabel" focusable="false">
-      <circle class="ring-base" cx="18" cy="18" r="15.915" />
-      <circle class="ring-value" cx="18" cy="18" r="15.915" :stroke-dasharray="`${ringScore} ${100 - ringScore}`" stroke-dashoffset="25" />
-      <text x="18" y="18" dominant-baseline="central" text-anchor="middle">{{ ringScore }}</text>
-    </svg>
+    <StageRing v-if="ringScore !== null || hasStages" class="score-ring" :stages="stages" :value="ringScore" :stroke="4.6" :label="scoreLabel" />
   </span>
 </template>
 
@@ -45,9 +46,5 @@ const ringScore = computed(() => (typeof props.score === 'number' && props.score
 .dot { position: absolute; z-index: 1; top: 50%; width: 8px; height: 8px; border-radius: 50%; translate: -50% -50%; }
 .dot.onset { left: var(--start); background: var(--sleep); }
 .dot.wake { left: var(--end); background: var(--mat-card-solid); box-shadow: inset 0 0 0 2px var(--sleep); }
-.score-ring { flex: none; width: 34px; height: 34px; }
-.score-ring circle { fill: none; stroke-width: 3.2; }
-.ring-base { stroke: color-mix(in srgb, var(--ink) 8%, transparent); }
-.ring-value { stroke: var(--sleep); stroke-linecap: round; }
-.score-ring text { fill: var(--ink); font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.score-ring { width: 38px; height: 38px; }
 </style>

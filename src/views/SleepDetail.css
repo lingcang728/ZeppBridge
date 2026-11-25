@@ -32,7 +32,15 @@
   align-items: center;
   gap: 14px;
 }
-.score-copy { display: grid; gap: 2px; min-width: 0; }
+.score-copy { display: grid; gap: 4px; min-width: 0; }
+.hero-ring { width: 96px; height: 96px; }
+.hero-facts { display: grid; gap: 10px; margin: 4px 0 0; }
+.hero-facts div { display: grid; gap: 1px; }
+.hero-facts dt { color: var(--muted); font-size: var(--fs-xs); font-weight: 600; }
+.hero-facts dd { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin: 0; color: var(--ink); font-size: var(--fs-lg, 1.15rem); font-weight: 700; font-variant-numeric: tabular-nums; }
+.hero-delta { padding: 1px 8px; border-radius: 999px; font-size: var(--fs-xs); font-weight: 650; }
+.hero-delta.good { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); }
+.hero-delta.bad { background: color-mix(in srgb, var(--danger) 16%, transparent); color: var(--danger); }
 .score-num {
   margin: 0;
   color: var(--ink);

@@ -24,6 +24,7 @@ import SleepNightMark from '../components/album/SleepNightMark.vue';
 import BedtimeFactors from '../components/sleepJournal/BedtimeFactors.vue';
 import NightJournalMark from '../components/sleepJournal/NightJournalMark.vue';
 import { useSleepJournal } from '../composables/useSleepJournal';
+import StageRing from '../components/album/StageRing.vue';
 import { albumMessages } from '../components/album/album.i18n';
 import { useRecordAlbum } from '../composables/useRecordAlbum';
 import { useAlbumNav } from '../composables/useAlbumNav';
@@ -191,6 +192,7 @@ const scoreOf = (id: string): number | null => {
   const score = sessionById.value.get(id)?.score;
   return isFiniteNumber(score) && score > 0 ? Math.round(score) : null;
 };
+const stagesOf = (s: SleepSession) => ({ deep: s.deep_minutes, light: s.light_minutes, rem: s.rem_minutes, awake: s.awake_minutes });
 const yearAnalysis = (year: number) => sleepYearAnalysis((months.value ?? []) as SleepMonth[], String(year));
 
 useRevisionReload(() => { void loadList(); album.invalidate(); });
@@ -236,10 +238,13 @@ useSectionTour('sleep');
       </AlbumGrid>
       <AlbumGrid v-else-if="zoom === 'month'" data-album-body kind="sleep" view="month" :tiles="tiles">
         <template #head="{ month }"><AlbumMonthHead kind="sleep" :month="month" :periods="periods" /></template>
+        <!-- 时长在上，中间一枚分期环（和日档、详情页同一种画法），圈中是评分。 -->
         <template #tile="{ tile }">
           <b class="tile-reading">{{ tile.reading }}</b>
-          <span />
-          <span v-if="scoreOf(tile.id) !== null" class="tile-score">{{ albumText.scoreLabel(scoreOf(tile.id)!) }}</span>
+          <span class="tile-ring">
+            <StageRing v-if="sessionById.get(tile.id)" :stages="stagesOf(sessionById.get(tile.id)!)" :value="scoreOf(tile.id)" :stroke="4.6"
+              :label="scoreOf(tile.id) !== null ? albumText.scoreLabel(scoreOf(tile.id)!) : undefined" />
+          </span>
         </template>
       </AlbumGrid>
       <template v-else>
@@ -264,7 +269,7 @@ useSectionTour('sleep');
           <template #aside>
             <NightJournalMark v-if="isMainSleep(session)" :date="wakeDay(session)"
               :label="`${formatDate(session.start_time, 'auto')} · ${formatDuration(session.duration_minutes)}`" />
-            <SleepNightMark v-bind="nightOf(session)" :axis="axis" :score="session.score"
+            <SleepNightMark v-bind="nightOf(session)" :axis="axis" :score="session.score" :stages="stagesOf(session)"
               :score-label="scoreOf(session.sleep_id) !== null ? albumText.scoreLabel(scoreOf(session.sleep_id)!) : undefined" />
           </template>
         </RecordRow>
@@ -303,7 +308,8 @@ useSectionTour('sleep');
 .sleep-records { --record-main: max-content; --record-aside: minmax(120px, 1fr); }
 .sleep-records > :deep(.record-row) { content-visibility: auto; contain-intrinsic-size: auto 52px; }
 .sleep-records :deep(.record-card strong) { font-size: var(--fs-lg, 1.15rem); font-variant-numeric: tabular-nums; }
-/* 小格：时长不折行（「7 小时 44 分」拆成两行就读不出来了），放不下就缩一号字；下面一枚评分小胶囊。 */
+/* 小格：时长不折行（「7 小时 44 分」拆成两行就读不出来了），放不下就缩一号字；中间一枚分期环、圈中评分。 */
 .tile-reading { overflow: hidden; color: var(--ink); font-size: clamp(var(--fs-xs), 11cqi, var(--fs-lg, 1.15rem)); font-weight: 700; font-variant-numeric: tabular-nums; text-overflow: ellipsis; white-space: nowrap; }
-.tile-score { justify-self: start; max-width: 100%; overflow: hidden; padding: 2px 8px; border-radius: 999px; background: color-mix(in srgb, var(--sleep) 16%, transparent); color: var(--sleep); font-size: var(--fs-xs); font-weight: 650; font-variant-numeric: tabular-nums; text-overflow: ellipsis; white-space: nowrap; }
+.tile-ring { display: grid; place-items: center; min-height: 0; grid-row: 2 / span 2; }
+.tile-ring :deep(.stage-ring) { width: min(60px, 70cqi); height: auto; aspect-ratio: 1; }
 </style>

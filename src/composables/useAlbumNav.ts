@@ -1,6 +1,7 @@
 import { nextTick, onActivated, onBeforeUnmount, onDeactivated, onMounted, type Ref } from 'vue';
 import { stretchAtEdge, wheelFactor, zoomIndex, zoomStep, ZOOMS, type AlbumZoom } from '../lib/album/album';
 import { headLine, scroller, zoomSwap } from '../lib/album/albumMotion';
+import { isMac } from '../lib/platformKeys';
 
 /**
  * 列表三档缩放（运动、睡眠列表共用）。入口只有两条，走同一个 `go()`：
@@ -124,7 +125,8 @@ export function useAlbumNav(options: {
       .finished.then(() => el.style.removeProperty('transform-origin'), () => undefined);
   };
   const onWheel = (event: WheelEvent) => {
-    if (!event.ctrlKey) return;
+    // Mac 上托盘提示写的是 ⌘ + 滚轮（触控板捏合仍是带 ctrlKey 的 wheel）。
+    if (!event.ctrlKey && !(event.metaKey && isMac())) return;
     // 页面本身不缩放：列表页上 Ctrl + 滚轮 / 捏合只给列表用。
     event.preventDefault();
     if (locked) { holdUntilIdle(); return; }

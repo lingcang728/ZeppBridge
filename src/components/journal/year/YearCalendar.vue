@@ -47,6 +47,7 @@ const grid = computed(() => {
   const months = Array.from({ length: 12 }, (_, m) => ({
     x: LEFT + Math.floor((offset + dayOfYear(`${y}-${pad(m + 1)}-01`)) / 7) * PITCH,
     label: month.format(new Date(y, m, 1)),
+    key: `${y}-${pad(m + 1)}`,
   }));
   const weekday = displayDateTimeFormatter({ weekday: 'short' });
   // 2024-01-01 是周一。
@@ -148,7 +149,8 @@ watch(grid, (now, before) => {
           <rect v-for="cell in col" :key="cell.key" :x="cell.x" :y="cell.y" :width="CELL" :height="CELL" rx="1.8" :class="['day', `l${cell.level}`, { future: cell.future }]" />
         </g>
       </g>
-      <g ref="monthsLayer" class="months"><text v-for="m in grid.months" :key="m.label" :x="m.x" y="9" class="label">{{ m.label }}</text></g>
+      <!-- data-album-month：运动列表月档 ↔ 年档换档时的锚点（lib/album/albumMotion.ts 的 zoomSwap），那个月的小格缩成这一枚月份字。 -->
+      <g ref="monthsLayer" class="months"><text v-for="m in grid.months" :key="m.label" :x="m.x" y="9" class="label" :data-album-month="m.key">{{ m.label }}</text></g>
       <text v-for="w in grid.weekdays" :key="w.label" x="0" :y="w.y" dominant-baseline="central" class="label">{{ w.label }}</text>
       <g ref="live">
         <g v-for="(col, c) in grid.columns" :key="c" class="col">

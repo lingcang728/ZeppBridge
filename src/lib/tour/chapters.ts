@@ -57,7 +57,6 @@ export const TOUR_STEPS: Record<TourChapterId, TourStep[]> = {
     { route: '/', target: '.overview-page .dashboard-grid' },
     { route: '/', target: '.overview-page .feedback-card' },
     { route: '/', target: '.overview-page .coach-inbox' },
-    { route: '/', target: '.overview-page .journal-entry' },
   ],
   metric: [
     { route: '/heart', target: '.range-bar', interactive: true },

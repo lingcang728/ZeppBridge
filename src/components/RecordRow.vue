@@ -15,7 +15,8 @@ defineProps<{
   /** 日期下面的一行小字（开始时刻）：同一天有好几条时靠它区分。 */
   time?: string;
   title: string;
-  fact: string;
+  /** 标题下那行小字；运动行的读数挪进了右边的三栏，没有导入来源时这行就不出。 */
+  fact?: string;
   factLabel?: string;
 }>();
 </script>
@@ -26,7 +27,7 @@ defineProps<{
     <span class="record-node" aria-hidden="true"><GlyphTile :name="designIcon" :size="34" :tone="category" /></span>
     <span :class="['record-card', { 'has-aside': $slots.aside }]">
       <strong>{{ title }}</strong>
-      <span class="record-facts"><span v-if="factLabel">{{ factLabel }}</span><b>{{ fact }}</b></span>
+      <span v-if="fact || factLabel" class="record-facts"><span v-if="factLabel">{{ factLabel }}</span><b>{{ fact }}</b></span>
       <span v-if="$slots.aside" class="record-aside"><slot name="aside" /></span>
       <span v-if="$slots.foot" class="record-foot"><slot name="foot" /></span>
     </span>

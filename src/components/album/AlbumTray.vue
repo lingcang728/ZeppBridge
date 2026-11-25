@@ -4,8 +4,10 @@
  * - 收起时是一枚玻璃小把手（浮层，留毛玻璃）：左边一根竖着的三点刻度（上 = 年、中 = 月、下 = 日），右边写此刻是哪一档。
  * - 按住上下拖 = 在三档之间吸附切换，走和 Ctrl + 滚轮同一个 `go()`（父组件处理 `zoom` 事件）；
  *   ↑ / ↓ 键也一样。
- * - 单击展开一块小面板：最上面是日 / 月 / 年三档（看得到此刻在哪档、也能直接点），下面放本页操作（插槽）。
- *   面板从把手里长出来，Esc / 再点把手 / 点面板外原路缩回把手。
+ * - 单击展开一块小面板：一行日 / 月 / 年三档（看得到此刻在哪档、也能直接点）+ 本页操作的图标（插槽），宽度贴着内容；
+ *   下面一行键帽提示 Ctrl（Mac 上 ⌘）+ 滚轮也能换档。面板从把手里长出来，Esc / 再点把手 / 点面板外原路缩回把手。
+ * - `sheet`：本页从托盘打开的一块浮层（运动列表的「导入」）。也从把手里长出来、留毛玻璃，代替小面板；
+ *   Esc / 点浮层外 / 再点把手收回（`close-sheet`）。
  * - `mode`：本页进了某个模式（运动列表的「选择记录」）：把手换成「完成」，点一下退出，不展开面板、不能拖。 */
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import Icon, { type IconName } from '../Icon.vue';
@@ -13,10 +15,12 @@ import SegmentTrack from '../SegmentTrack.vue';
 import { useMessages } from '../../i18n';
 import { albumMessages } from './album.i18n';
 import { trayZoomAt, zoomIndex, ZOOMS, type AlbumZoom } from '../../lib/album/album';
+import { isMac } from '../../lib/platformKeys';
 
-const props = defineProps<{ zoom: AlbumZoom; disabled?: boolean; mode?: { label: string; icon: IconName } | null }>();
-const emit = defineEmits<{ zoom: [AlbumZoom]; 'exit-mode': [] }>();
-defineSlots<{ actions?(props: { close: () => void }): unknown }>();
+const props = defineProps<{ zoom: AlbumZoom; disabled?: boolean; mode?: { label: string; icon: IconName } | null; sheet?: boolean }>();
+const emit = defineEmits<{ zoom: [AlbumZoom]; 'exit-mode': []; 'close-sheet': [] }>();
+defineSlots<{ actions?(props: { close: () => void }): unknown; sheet?(): unknown }>();
+const modKey = isMac() ? '⌘' : 'Ctrl';
 const t = useMessages(albumMessages);
 const open = ref(false);
 const root = ref<HTMLElement | null>(null);
@@ -31,18 +35,26 @@ const shownLabel = computed(() => labels.value[ZOOMS[shownIndex.value]!]);
 const model = computed({ get: () => props.zoom, set: (value: AlbumZoom) => emit('zoom', value) });
 
 const close = () => { open.value = false; };
+const dismiss = () => {
+  if (props.sheet) emit('close-sheet');
+  close();
+};
 const onKey = (event: KeyboardEvent) => {
   if (event.key !== 'Escape' || event.defaultPrevented) return;
   event.preventDefault();
-  close();
+  dismiss();
   handle.value?.focus();
 };
-const onOutside = (event: PointerEvent) => { if (root.value && !root.value.contains(event.target as Node)) close(); };
-watch(open, (value) => {
+/* 只认真的指针按在托盘外（浮层里点「选文件」弹出系统对话框不算）。 */
+const onOutside = (event: PointerEvent) => { if (root.value && !root.value.contains(event.target as Node)) dismiss(); };
+const shown = computed(() => open.value || !!props.sheet);
+watch(shown, (value) => {
   if (value) { window.addEventListener('keydown', onKey); window.addEventListener('pointerdown', onOutside, true); }
   else { window.removeEventListener('keydown', onKey); window.removeEventListener('pointerdown', onOutside, true); }
 });
-watch(() => props.mode, (mode) => { if (mode) close(); });
+watch(() => props.mode, (mode) => { if (mode) { close(); if (props.sheet) emit('close-sheet'); } });
+// 浮层打开时小面板让位：同一个把手里只长出一块。
+watch(() => props.sheet, (sheet) => { if (sheet) close(); });
 
 /* ---------- 把手：拖 = 换档，点 = 开合 ---------- */
 /** 每拖这么多像素走一档。 */
@@ -75,6 +87,7 @@ const onClick = (event: MouseEvent) => {
   if (props.mode) { emit('exit-mode'); return; }
   // pointerup 之后的 click：拖过就不算点。detail === 0 是键盘触发的。
   if (event.detail !== 0 && dragJustEnded) return;
+  if (props.sheet) { emit('close-sheet'); return; }
   open.value = !open.value;
 };
 let dragJustEnded = false;
@@ -96,15 +109,22 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKey); window.rem
 
 <template>
   <div ref="root" class="album-tray">
-    <Transition name="tray-panel">
-      <div v-if="open" class="tray-panel" role="group" :aria-label="t.tray">
+    <Transition name="tray-panel" mode="out-in">
+      <div v-if="sheet" key="sheet" class="tray-panel tray-sheet">
         <span class="panel-glass" aria-hidden="true" />
-        <SegmentTrack v-model="model" :items="items" :aria-label="t.levels" :disabled="disabled" variant="glass" no-wrap />
-        <div v-if="$slots.actions" class="tray-actions"><slot name="actions" :close="close" /></div>
+        <div class="sheet-body"><slot name="sheet" /></div>
+      </div>
+      <div v-else-if="open" key="panel" class="tray-panel" role="group" :aria-label="t.tray">
+        <span class="panel-glass" aria-hidden="true" />
+        <div class="tray-row">
+          <SegmentTrack v-model="model" :items="items" :aria-label="t.levels" :disabled="disabled" variant="glass" no-wrap />
+          <div v-if="$slots.actions" class="tray-actions"><slot name="actions" :close="close" /></div>
+        </div>
+        <p class="tray-hint" :title="t.wheelHint(modKey)"><kbd>{{ modKey }}</kbd><span aria-hidden="true">+</span><kbd class="wheel-key"><svg viewBox="0 0 12 16" width="10" height="13" aria-hidden="true"><rect x="1" y="1" width="10" height="14" rx="5" /><path d="M6 4v3" /></svg>{{ t.wheel }}</kbd><span class="sr-only">{{ t.wheelHint(modKey) }}</span></p>
       </div>
     </Transition>
     <button ref="handle" :class="['tray-handle', { open, 'is-mode': !!mode, dragging: preview !== null }]" type="button"
-      :aria-label="mode ? mode.label : t.trayHandle(shownLabel)" :title="mode ? mode.label : t.trayHandle(shownLabel)" :aria-expanded="mode ? undefined : open"
+      :aria-label="mode ? mode.label : t.trayHandle(shownLabel)" :title="mode ? mode.label : t.trayHandle(shownLabel)" :aria-expanded="mode ? undefined : shown"
       @pointerdown="onDown" @pointermove="onMove" @pointerup="onUpCapture" @pointercancel="onUpCapture" @click="onClick" @keydown="onArrow">
       <span class="handle-glass" aria-hidden="true" />
       <Transition name="handle-swap" mode="out-in">
@@ -155,20 +175,36 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKey); window.rem
   transform: translateY(calc((2 - var(--at)) * 8px)); transition: transform 300ms cubic-bezier(.32, .72, .24, 1);
 }
 .handle-label { min-width: 2ch; font-variant-numeric: tabular-nums; }
+/* 宽度贴着内容（一行三档 + 两枚图标），不再撑出一大截空白。浮在把手上方（不占文档流：导入浮层几百像素高，
+   在流里会把页面底部撑出同样高的一块空白）。 */
 .tray-panel {
-  display: grid; gap: 10px; min-width: 220px; max-width: min(92vw, 420px); margin-bottom: 10px; padding: 10px;
+  position: absolute; bottom: calc(100% + 10px); left: 0;
+  display: grid; gap: 8px; justify-items: start; width: max-content; max-width: min(92vw, 420px); padding: 8px;
   border-radius: 24px; box-shadow: var(--glass-outline, var(--glass-rim)), var(--glass-shadow);
   transform-origin: 23px calc(100% + 33px);
 }
-.tray-actions { display: grid; gap: 4px; }
+.tray-row { display: flex; align-items: center; gap: 6px; }
+.tray-actions { display: flex; align-items: center; gap: 2px; }
 .tray-actions :deep(.tray-action) {
-  display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 12px; border: 0; border-radius: 14px;
-  background: transparent; color: var(--ink); font: inherit; font-size: var(--fs-sm); font-weight: 600; text-align: start; cursor: pointer;
-  transition: background var(--dur-fast) ease;
+  display: grid; place-items: center; flex: none; width: 40px; height: 40px; padding: 0; border: 0; border-radius: 999px;
+  background: transparent; color: var(--accent); cursor: pointer; transition: background var(--dur-fast) ease, scale var(--dur-fast) var(--ease-out);
 }
-.tray-actions :deep(.tray-action svg) { flex: none; color: var(--accent); }
-.tray-actions :deep(.tray-action:hover) { background: var(--glass-press); }
+.tray-actions :deep(.tray-action:hover), .tray-actions :deep(.tray-action[aria-expanded="true"]) { background: var(--glass-press); }
+.tray-actions :deep(.tray-action:active) { scale: .92; }
 .tray-actions :deep(.tray-action:focus-visible) { outline: 2px solid var(--focus); outline-offset: 1px; }
+/* 键帽提示：Ctrl（Mac 上 ⌘）+ 滚轮也能换档。 */
+.tray-hint { display: flex; align-items: center; gap: 5px; margin: 0 0 2px 6px; color: var(--muted); font-size: var(--fs-2xs); white-space: nowrap; }
+.tray-hint kbd {
+  display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-width: 22px; height: 20px; padding: 0 6px; border-radius: 6px;
+  background: color-mix(in srgb, var(--ink) 7%, transparent); box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--ink) 16%, transparent);
+  color: var(--ink); font: inherit; font-weight: 650;
+}
+.wheel-key svg { fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linecap: round; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+/* 浮层（导入）：比小面板宽，内容自己滚；里面那张卡的底色和投影交给玻璃。 */
+.tray-sheet { width: min(92vw, 620px); max-width: none; padding: 6px; border-radius: 26px; }
+.sheet-body { width: 100%; max-height: min(68vh, 620px); overflow: auto; overscroll-behavior: contain; border-radius: 20px; }
+.sheet-body :deep(.surface-card) { margin: 0; background: none; box-shadow: none; }
 @media (prefers-reduced-transparency: reduce) {
   .handle-glass, .panel-glass { background: var(--mat-glass-strong); -webkit-backdrop-filter: none; backdrop-filter: none; }
 }

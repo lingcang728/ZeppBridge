@@ -134,11 +134,12 @@ const pickDay = (day: string, event: Event) => emit('day', day, event.currentTar
 </template>
 
 <style scoped>
-.album-tiles, .album-heat { display: grid; gap: 18px; padding: 18px 20px 22px; border-radius: var(--radius-lg); background: var(--mat-card); box-shadow: var(--mat-rim), var(--mat-shadow); }
+.album-tiles, .album-heat { display: grid; gap: 30px; padding: 20px 22px 24px; border-radius: var(--radius-lg); background: var(--mat-card); box-shadow: var(--mat-rim), var(--mat-shadow); }
 .month-title { margin: 0 0 8px; color: var(--muted); font-size: var(--fs-sm); font-weight: 650; font-variant-numeric: tabular-nums; }
 /* 屏幕外的月份 / 年份不排版也不画（几百格的列表捏密时这一下最省）。 */
 .tile-month { content-visibility: auto; contain-intrinsic-size: auto 220px; }
-.tiles { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); }
+/* 格子放宽、缝拉开：112px / 8px 时一屏十列挤成一片。 */
+.tiles { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(136px, 1fr)); }
 .tile {
   position: relative;
   display: grid;
@@ -146,7 +147,7 @@ const pickDay = (day: string, event: Event) => emit('day', day, event.currentTar
   gap: 4px;
   aspect-ratio: 1;
   min-width: 0;
-  padding: 10px;
+  padding: 12px;
   overflow: hidden;
   container-type: inline-size;
   border-radius: 16px;

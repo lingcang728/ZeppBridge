@@ -5,7 +5,7 @@ import { CHART_THEME, VChart, chartPalette } from '../lib/echartsSetup';
 import Icon from '../components/Icon.vue';
 import MetricInfoButton from '../components/MetricInfoButton.vue';
 import SectionGroup from '../components/SectionGroup.vue';
-import CircularProgress from '../components/CircularProgress.vue';
+import StageRing from '../components/album/StageRing.vue';
 import StageBar from '../components/StageBar.vue';
 import { sleepStageLabel, sleepStageLabels } from '../lib/sleepStages';
 import { useMessages } from '../i18n';
@@ -68,9 +68,30 @@ const stages = computed(() => session.value ? [
   { label: sleepStageLabel('awake'), minutes: session.value.awake_minutes, tone: 'awake' as const },
 ] : []);
 
+const ringStages = computed(() => (session.value
+  ? { deep: session.value.deep_minutes, light: session.value.light_minutes, rem: session.value.rem_minutes, awake: session.value.awake_minutes }
+  : null));
+const hasStages = computed(() => stages.value.some((stage) => isFiniteNumber(stage.minutes) && stage.minutes > 0));
+
 const score = computed(() => {
   const value = session.value?.score;
   return isFiniteNumber(value) ? value : null;
+});
+
+/* 评分旁边的两行：近 7 晚（不含这一晚）的平均评分和这一晚差多少，夜里醒来几次。没有的那行不出。 */
+const heroFacts = computed(() => {
+  const facts: { key: string; label: string; value: string; delta?: { text: string; good: boolean } | null }[] = [];
+  const others = weekSessions.value
+    .filter((s) => s.sleep_id !== sleepId.value && isFiniteNumber(s.score) && s.score > 0)
+    .map((s) => s.score as number);
+  if (others.length) {
+    const avg = Math.round(others.reduce((sum, v) => sum + v, 0) / others.length);
+    const diff = score.value === null ? 0 : Math.round(score.value - avg);
+    facts.push({ key: 'week', label: t.value.weekAvg, value: String(avg), delta: diff ? { text: `${diff > 0 ? '+' : '−'}${Math.abs(diff)}`, good: diff > 0 } : null });
+  }
+  const wakes = session.value?.wake_count;
+  if (isFiniteNumber(wakes) && wakes >= 0) facts.push({ key: 'wake', label: t.value.wokeUp, value: t.value.wakeTimes(Math.round(wakes)) });
+  return facts;
 });
 
 const syncTimeLabel = computed(() => {
@@ -284,20 +305,19 @@ const metaSummary = computed(() => [providerLabel.value, deviceLabel.value].filt
           <p class="value"><DurationText :minutes="session.duration_minutes" :empty="t.notProvided" /></p>
         </div>
         <div class="hero-score">
-          <CircularProgress
-            v-if="score !== null"
-            :value="score"
-            :size="88"
-            :stroke-width="7"
-            color="var(--sleep)"
-            track-color="var(--line)"
-            unit=""
-            :ink="ink"
-          />
+          <!-- 整圈按四个分期的占比分色（和月、年档的环同一种画法），圈中是评分；右边列出四段时长，颜色一一对上。 -->
+          <StageRing v-if="score !== null || hasStages" class="hero-ring" :stages="ringStages" :value="score" :stroke="4" :ink="ink" :label="t.scoreKicker" />
           <strong v-else class="score-empty">—</strong>
           <div class="score-copy">
             <p class="kicker">{{ t.scoreKicker }}<MetricInfoButton metric="sleep_score" :label="t.scoreKicker" /></p>
-            <p class="score-num">{{ score !== null ? score : t.notProvided }}<small v-if="score !== null"> / 100</small></p>
+            <!-- 分期明细就在下面「睡眠阶段」卡里，这里不再列一遍：换成这一晚和近几晚比、夜里醒了几次。 -->
+            <dl v-if="heroFacts.length" class="hero-facts">
+              <div v-for="fact in heroFacts" :key="fact.key">
+                <dt>{{ fact.label }}</dt>
+                <dd>{{ fact.value }}<span v-if="fact.delta" :class="['hero-delta', fact.delta.good ? 'good' : 'bad']">{{ fact.delta.text }}</span></dd>
+              </div>
+            </dl>
+            <p v-else class="score-num">{{ score !== null ? score : t.notProvided }}<small v-if="score !== null"> / 100</small></p>
           </div>
         </div>
       </article>

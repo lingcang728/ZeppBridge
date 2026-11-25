@@ -1,49 +1,46 @@
 <script setup lang="ts">
-/* 一条运动轨迹的轮廓（只有形状，lib 里没有坐标）：列表行、方块和月 / 年卡的封面都用它。
-   画在一块小底板上（圆角、淡网格），像一张缩小的地图，而不是悬空的一笔；起点实心、终点空心。
-   描边粗细不随缩放变（vector-effect）。只是图，读屏跳过。`bare`：不要底板（卡片封面自己有底）。 */
+/* 一条运动轨迹的轮廓（只有形状，lib 里没有坐标）：月档小格和日档行上的缩略图都用它。
+   不垫网格底板、不加框：一笔平滑曲线直接画在卡上（后端只给几十个抽样点，这里用 Catmull-Rom 连成曲线，
+   折线的棱角就没了），起点一个实心点。线色跟着 currentColor（列表页按运动类型给）。
+   描边和起点的像素大小不随缩放变（vector-effect）。只是图，读屏跳过。 */
 import { computed } from 'vue';
 import type { RouteShape } from '../../types/album';
 
-const props = defineProps<{ shape: RouteShape; stroke?: number; bare?: boolean }>();
-const PAD = 0.1;
+const props = defineProps<{ shape: RouteShape; stroke?: number }>();
+const PAD = 0.08;
 const box = computed(() => {
   const w = Math.max(props.shape.width, 0.05);
   const h = Math.max(props.shape.height, 0.05);
-  return { w, h, view: `${-PAD} ${-PAD} ${w + PAD * 2} ${h + PAD * 2}` };
+  return `${-PAD} ${-PAD} ${w + PAD * 2} ${h + PAD * 2}`;
 });
-const path = computed(() => props.shape.points.map(([x, y], i) => `${i ? 'L' : 'M'}${x.toFixed(4)} ${y.toFixed(4)}`).join(''));
+const f = (value: number) => value.toFixed(4);
+/** 抽样点 → 过每个点的平滑三次曲线（Catmull-Rom，张力 1/6）。 */
+const path = computed(() => {
+  const p = props.shape.points;
+  if (p.length < 2) return '';
+  let d = `M${f(p[0][0])} ${f(p[0][1])}`;
+  for (let i = 0; i < p.length - 1; i += 1) {
+    const a = p[Math.max(0, i - 1)];
+    const b = p[i];
+    const c = p[i + 1];
+    const e = p[Math.min(p.length - 1, i + 2)];
+    d += `C${f(b[0] + (c[0] - a[0]) / 6)} ${f(b[1] + (c[1] - a[1]) / 6)} ${f(c[0] - (e[0] - b[0]) / 6)} ${f(c[1] - (e[1] - b[1]) / 6)} ${f(c[0])} ${f(c[1])}`;
+  }
+  return d;
+});
 const start = computed(() => props.shape.points[0] ?? [0, 0]);
-const end = computed(() => props.shape.points[props.shape.points.length - 1] ?? [0, 0]);
-/** 首尾离得很近（环线）：只画起点，不叠两个点。 */
-const loop = computed(() => Math.hypot(end.value[0] - start.value[0], end.value[1] - start.value[1]) < 0.08);
 </script>
 
 <template>
-  <span :class="['route-glyph', { bare }]" aria-hidden="true">
-    <svg :viewBox="box.view" preserveAspectRatio="xMidYMid meet" focusable="false">
-      <path class="halo" :d="path" fill="none" :stroke-width="(stroke ?? 2) + 3" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke" />
-      <path :d="path" fill="none" stroke="currentColor" :stroke-width="stroke ?? 2" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke" />
-      <circle v-if="!loop" class="end" :cx="end[0]" :cy="end[1]" r="0.04" vector-effect="non-scaling-stroke" />
-      <circle class="start" :cx="start[0]" :cy="start[1]" r="0.045" fill="currentColor" />
+  <span class="route-glyph" aria-hidden="true">
+    <svg :viewBox="box" preserveAspectRatio="xMidYMid meet" focusable="false">
+      <path :d="path" fill="none" stroke="currentColor" :stroke-width="stroke ?? 2.4" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke" />
+      <path class="start" :d="`M${f(start[0])} ${f(start[1])}h0`" stroke="currentColor" :stroke-width="(stroke ?? 2.4) + 4.6" stroke-linecap="round" vector-effect="non-scaling-stroke" />
     </svg>
   </span>
 </template>
 
 <style scoped>
-.route-glyph {
-  display: block;
-  padding: 4px;
-  border-radius: 9px;
-  /* 淡网格 + 一层品牌色的底：一眼看出是「地图上的一段路」。 */
-  background:
-    linear-gradient(color-mix(in srgb, var(--ink) 6%, transparent) 1px, transparent 1px) 0 0 / 100% 8px,
-    linear-gradient(90deg, color-mix(in srgb, var(--ink) 6%, transparent) 1px, transparent 1px) 0 0 / 8px 100%,
-    color-mix(in srgb, currentColor 8%, var(--mat-card-solid, transparent));
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, currentColor 14%, transparent);
-}
-.route-glyph.bare { padding: 0; border-radius: 0; background: none; box-shadow: none; }
+.route-glyph { display: block; min-width: 0; min-height: 0; }
 svg { display: block; width: 100%; height: 100%; overflow: visible; }
-.halo { stroke: color-mix(in srgb, currentColor 18%, transparent); }
-.end { fill: var(--mat-card-solid, #111); stroke: currentColor; stroke-width: 1.5; }
 </style>

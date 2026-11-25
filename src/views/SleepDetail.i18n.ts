@@ -16,6 +16,9 @@ export const sleepDetailMessages = defineMessages(
     heroMeta: (fellAsleep: string, wokeUp: string, inBed: string) =>
       `${fellAsleep} 入睡 · ${wokeUp} 醒来 · 在床 ${inBed}`,
     scoreKicker: '睡眠评分',
+    weekAvg: '近 7 晚平均',
+    wokeUp: '夜里醒来',
+    wakeTimes: (count: number) => `${count} 次`,
     stagesAria: '睡眠阶段',
     stagesTitle: '睡眠阶段',
     napsTitle: '小睡',
@@ -58,6 +61,9 @@ export const sleepDetailMessages = defineMessages(
     heroMeta: (fellAsleep: string, wokeUp: string, inBed: string) =>
       `Asleep ${fellAsleep} · awake ${wokeUp} · in bed ${inBed}`,
     scoreKicker: 'Sleep score',
+    weekAvg: '7-night average',
+    wokeUp: 'Woke up',
+    wakeTimes: (count: number) => (count === 1 ? 'once' : `${count} times`),
     stagesAria: 'Sleep stages',
     stagesTitle: 'Sleep stages',
     napsTitle: 'Nap',
@@ -100,6 +106,9 @@ export const sleepDetailMessages = defineMessages(
     heroMeta: (fellAsleep: string, wokeUp: string, inBed: string) =>
       `Te dormiste ${fellAsleep} · despertaste ${wokeUp} · en cama ${inBed}`,
     scoreKicker: 'Puntuación de sueño',
+    weekAvg: 'Media de 7 noches',
+    wokeUp: 'Despertares',
+    wakeTimes: (count: number) => (count === 1 ? '1 vez' : `${count} veces`),
     stagesAria: 'Fases del sueño',
     stagesTitle: 'Fases del sueño',
     napsTitle: 'Siesta',

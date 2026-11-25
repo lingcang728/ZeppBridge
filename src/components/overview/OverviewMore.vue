@@ -1,5 +1,5 @@
 <script setup lang="ts">
-/* 概览首屏四张主卡下面的其余区块：这一周、身体状态、训练状态、履历入口、数据来源。
+/* 概览首屏四张主卡下面的其余区块：这一周、身体状态、训练状态、年轮、数据来源。
  * 直接摊开，不再收成卡包——概览本来就是来「多看一眼」的地方，让人先点开才看得到
  * 是多此一举。每一块自己都有卡头和标题，这里只管排布。
  *
@@ -7,7 +7,6 @@
  * 靠前），这里就不重复摆一份；没选时维持原位。 */
 import WeeklyReportCard from '../WeeklyReportCard.vue';
 import SourcesStrip from './SourcesStrip.vue';
-import JournalEntryCard from './JournalEntryCard.vue';
 import RingsSeasonCard from './RingsSeasonCard.vue';
 import StatusEntryCard, { type EntryFact } from './StatusEntryCard.vue';
 
@@ -39,8 +38,7 @@ withDefaults(defineProps<{
         :facts="training.facts" :caption="training.caption" />
     </div>
     <RingsSeasonCard />
-    <JournalEntryCard />
-    <!-- 生活事件不在概览了：合进履历页的「纪元与事件」。 -->
+    <!-- 履历从运动页的「年」档进（/workouts?zoom=year），概览不再挂入口。 -->
     <SourcesStrip />
   </div>
 </template>

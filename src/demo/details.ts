@@ -43,11 +43,15 @@ export const demoWorkoutSeries = (workout: Workout): WorkoutSeries => {
       distance_m: meters, duration_seconds: round(to - from, 1), pace_min_per_km: pace / 60,
       avg_hr: workout.avg_hr, max_hr: workout.max_hr, partial: meters < 1000 };
   });
-  // A clearly synthetic loop, never a person's location history.
+  // A clearly synthetic loop, never a person's location history. Each record gets its own
+  // wobble and stretch (seeded by its id) so list thumbnails are not a wall of identical circles.
   const radius = distance / (2 * Math.PI * 111320);
+  const seed = [...workout.workout_id].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7);
+  const lobes = 2 + (seed % 3), wobble = 0.16 + ((seed >>> 3) % 5) * 0.05, phase = ((seed >>> 6) % 628) / 100, stretch = 0.65 + ((seed >>> 9) % 8) * 0.1;
   const route = workout.gps_available ? samples.map((sample, i) => {
     const angle = i / Math.max(1, samples.length - 1) * Math.PI * 2;
-    return { timestamp: sample.timestamp, latitude: 25.035 + radius * Math.sin(angle), longitude: 121.535 + radius * Math.cos(angle) / Math.cos(25.035 * Math.PI / 180), altitude_m: sample.altitude_m };
+    const r = radius * (1 + wobble * Math.sin(lobes * angle + phase));
+    return { timestamp: sample.timestamp, latitude: 25.035 + r * Math.sin(angle), longitude: 121.535 + r * stretch * Math.cos(angle) / Math.cos(25.035 * Math.PI / 180), altitude_m: sample.altitude_m };
   }) : [];
   return { workout_id: workout.workout_id, samples, route, pauses: [], splits,
     laps: splits.map(s => ({ ...s, avg_hr: s.avg_hr ?? null, max_hr: s.max_hr ?? null })),

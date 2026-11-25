@@ -37,24 +37,40 @@ export interface Ghost {
 
 /**
  * 把 `body` 此刻的样子冻成一张板，绝对定位在它原来的位置（同一个父元素里：祖先选择器、继承都还在）。
- * 只拷屏幕上（上下各多留一截）的那几条：屏幕外的条目和整块不在屏幕上的月份直接去掉，再按第一条留下的条目对齐。
- * 一千多条的列表拷整份，排版和样式重算要好几秒（降速 4× 实测）。
+ * 只拷屏幕上（上下各多留一截）的那几条：屏幕外的条目和整块不在屏幕上的月份根本不拷，再按第一条留下的条目对齐。
+ * 一千多条的列表拷整份，排版和样式重算要好几秒（降速 4× 实测）；先整份深拷再删屏外的，光克隆本身就是大头。
+ * 所以边走边拷：含有单元的容器只做浅拷、逐个孩子往下走；单元在屏外就整棵跳过（连 rect 都不量它的子孙，
+ * 免得逼着 content-visibility 跳过的月份排版）；不含单元的子树（卡头、图标）才整棵深拷。
  */
 const FREEZE_UNITS = '[data-album-item], .tile-month, .heat-year, .period-group';
 export const freeze = (body: HTMLElement): Ghost => {
   const view = viewportBox();
-  const copy = body.cloneNode(true) as HTMLElement;
-  const originals = body.querySelectorAll<HTMLElement>(FREEZE_UNITS);
-  const copies = copy.querySelectorAll<HTMLElement>(FREEZE_UNITS);
   let keep: { original: HTMLElement; copy: HTMLElement } | null = null;
-  originals.forEach((el, i) => {
-    const target = copies[i];
-    if (!target) return;
+  const onScreen = (el: Element) => {
     const r = el.getBoundingClientRect();
-    const onScreen = r.bottom > view.top - 240 && r.top < view.top + view.height + 240;
-    if (!onScreen) target.remove();
-    else if (!keep && el.matches('[data-album-item]')) keep = { original: el, copy: target };
-  });
+    return r.bottom > view.top - 240 && r.top < view.top + view.height + 240;
+  };
+  const cloneVisible = (el: Element): Element | null => {
+    const unit = el.matches(FREEZE_UNITS);
+    if (unit && !onScreen(el)) return null;
+    if (!el.querySelector(FREEZE_UNITS)) {
+      const whole = el.cloneNode(true) as Element;
+      if (!keep && unit && el.matches('[data-album-item]') && el instanceof HTMLElement) keep = { original: el, copy: whole as HTMLElement };
+      return whole;
+    }
+    const shell = el.cloneNode(false) as Element;
+    if (!keep && unit && el.matches('[data-album-item]') && el instanceof HTMLElement) keep = { original: el, copy: shell as HTMLElement };
+    for (const child of el.childNodes) {
+      if (child instanceof Element) {
+        const next = cloneVisible(child);
+        if (next) shell.appendChild(next);
+      } else {
+        shell.appendChild(child.cloneNode(false));
+      }
+    }
+    return shell;
+  };
+  const copy = (cloneVisible(body) ?? body.cloneNode(false)) as HTMLElement;
   // 板上的拷贝不能再被当成真的：锚点、滚动目标、年份滚动条都靠这些属性找元素。
   const MARKS = ['data-album-body', 'data-album-item', 'data-album-id', 'data-album-day', 'data-album-month', 'data-timeline', 'data-period', 'data-period-group', 'data-index'];
   [copy, ...copy.querySelectorAll<HTMLElement>(MARKS.map((m) => `[${m}]`).join(','))].forEach((el) => MARKS.forEach((m) => el.removeAttribute(m)));
