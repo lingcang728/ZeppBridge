@@ -161,7 +161,10 @@ export default {
       refresh: 'Outra pergunta',
       expand: 'Abrir esta pergunta',
       collapse: 'Recolher',
-      dismiss: 'Ocultar por hoje',
+      minimize: 'Recolher junto de «As minhas métricas»',
+      restore: 'Abrir «Pergunta do dia»',
+      promptLabel: 'Pergunta (podes editá-la)',
+      reset: 'Repor predefinição',
       title: {
         plan_tomorrow: 'Planear amanhã',
         sleep_review: 'Como dormi ontem à noite?',
@@ -173,6 +176,15 @@ export default {
       raceTitle: (date: string, what: string) => `Rever a prova de ${date} (${what})`,
       bestTitle: (bucket: string) => `Estou a melhorar os meus tempos em ${bucket}?`,
       comebackTitle: (days: number) => `${days} dias sem treinar. Como posso retomar?`,
+      sameRouteRide: 'Como pedalo no percurso habitual?',
+      sameRouteHike: 'Como vou no trilho habitual?',
+      sessionTitle: (what: string) => `Como vão as sessões recentes de ${what}?`,
+      sportSub: {
+        bestRide: 'Histórico de saídas e de PRs nesta distância',
+        bestSwim: 'Histórico de natação e de PRs nesta distância',
+        routeRide: 'Histórico de saídas nesta rota',
+        routeHike: 'Histórico de caminhadas nesta rota',
+      },
       sub: {
         plan_tomorrow: 'Recuperação e treinos dos últimos 7 dias',
         sleep_review: 'Sono e recuperação das últimas noites',
@@ -182,11 +194,13 @@ export default {
         same_route: 'Todas as corridas neste percurso',
         recovery_nights: 'Noites fora do habitual + treinos do dia anterior',
         comeback: 'Últimos treinos antes da pausa + duas semanas de recuperação',
+        session_review: 'Sessões recentes do mesmo tipo + recuperação',
       },
       swap: 'Trocar algumas cartas',
       swapDone: 'Concluir trocas',
       refine: 'Ajustar em «Enviar para a IA»',
-      sendTo: (name: string) => `Copiar para ${name}`,
+      holdTo: (name: string) => `Mantém premido para enviar para ${name}`,
+      holdHint: 'Só é enviado se mantiveres o botão premido',
       sending: 'A preparar…',
       sent: (name: string) => `Copiado. Cola em ${name}`,
       sendFailed: 'Não foi entregue. Abre «Enviar para a IA» para ver em que etapa ficou bloqueado',
@@ -895,6 +909,8 @@ Se precisares de alguma informação minha (que cliente utilizo, onde está o fi
       tray: 'Zoom e ações da página',
       trayHandle: (zoom: string) => `Vista por ${zoom.toLowerCase()}. Arrasta para cima ou para baixo para mudar de nível. Clica para abrir`,
       levels: 'Nível de navegação',
+      wheel: 'Roda do rato',
+      wheelHint: (key: string) => `${key} + roda do rato: alterna entre as vistas por dia, mês e ano`,
       year: 'Anos',
       month: 'Meses',
       day: 'Dias',
@@ -1976,6 +1992,9 @@ Se precisares de alguma informação minha (que cliente utilizo, onde está o fi
       heroMeta: (fellAsleep: string, wokeUp: string, inBed: string) =>
         `Adormeceu: ${fellAsleep} · acordou: ${wokeUp} · na cama: ${inBed}`,
       scoreKicker: 'Pontuação de sono',
+      weekAvg: 'Média de 7 noites',
+      wokeUp: 'Despertares',
+      wakeTimes: (count: number) => (count === 1 ? '1 vez' : `${count} vezes`),
       stagesAria: 'Fases de sono',
       stagesTitle: 'Fases de sono',
       napsTitle: 'Sesta',
@@ -2354,6 +2373,9 @@ Se precisares de alguma informação minha (que cliente utilizo, onde está o fi
       emptyTitle: 'Sem treinos registados',
       emptyMessage:
         'Após sincronizar, só registos com tipo, hora e pelo menos uma métrica válida aparecem aqui. Sem GPS ou amostras ponto a ponto, não há gráfico vazio.',
+      colDistance: 'Distância',
+      colDuration: 'Duração',
+      colHr: 'FC média',
       avgHr: (bpm: number) => `FC média ${bpm}`,
       notProvided: 'Não fornecido',
       footnote: (count: number) => `${count} treinos apresentados`,
@@ -2747,6 +2769,7 @@ Se precisares de alguma informação minha (que cliente utilizo, onde está o fi
     },
     'components/cards/hands': {
       kind: {
+        session_review: 'Treinos recentes',
         distance_best: 'Mesma distância · PR',
         same_route: 'Mesmo percurso',
         race_review: 'Rever prova',
@@ -2789,6 +2812,20 @@ Se precisares de alguma informação minha (que cliente utilizo, onde está o fi
           `Estas são as minhas corridas no mesmo percurso (cerca de ${km}). Compara o ritmo, a frequência cardíaca e a deriva da frequência cardíaca na segunda metade: neste percurso, estou a correr mais depressa, com maior eficiência ou a perder forma? Indica as causas prováveis.`,
         race_review: (date: string) =>
           `A corrida de ${date} foi uma prova (ou um esforço claramente máximo). Estão anexados os dados das quatro semanas de treino e sono que a antecederam. Revê a estratégia de ritmo e a frequência cardíaca: o volume de treino e a redução da carga antes da prova foram adequados? O sono ou a recuperação prejudicaram o desempenho? O que devo ajustar antes da próxima prova?`,
+        distanceBestRide: (bucket: string) =>
+          `Estas são as minhas melhores e mais recentes saídas de bicicleta de cerca de ${bucket}. Compara a velocidade média, a frequência cardíaca e a carga de treino: de onde veio a evolução, o que falta para o próximo PR e em que devo focar-me nas próximas 4 semanas para esta distância?`,
+        distanceBestSwim: (bucket: string) =>
+          `Estas são as minhas melhores e mais recentes sessões de natação de cerca de ${bucket}. Compara o ritmo por 100 m, a frequência cardíaca e a carga de treino: de onde veio a evolução, o que falta para o próximo PR e em que devo focar-me nas próximas 4 semanas para esta distância?`,
+        sameRouteRide: (km: string) =>
+          `Estas são as minhas saídas de bicicleta no mesmo percurso (cerca de ${km}). Compara a velocidade média, a frequência cardíaca e a deriva da frequência cardíaca na segunda metade: neste percurso, estou mais rápido, a fazer menos esforço ou a perder rendimento? Indica as causas prováveis.`,
+        sameRouteHike: (km: string) =>
+          `Estas são as minhas caminhadas no mesmo percurso (cerca de ${km}). Compara o tempo total, a frequência cardíaca e a deriva da frequência cardíaca na segunda metade: neste percurso, estou a caminhar mais depressa, com menos esforço ou a perder forma? Indica as causas prováveis.`,
+        raceReviewAny: (date: string, what: string) =>
+          `A minha sessão de ${what}, em ${date}, foi uma prova (ou um esforço claramente máximo). Estão anexados os dados das quatro semanas de treino e sono que a antecederam. Revê a distribuição do esforço e a frequência cardíaca: o volume de treino e a redução da carga antes da prova foram adequados? O sono ou a recuperação prejudicaram o desempenho? O que devo ajustar antes da próxima prova?`,
+        sessionReview: (what: string, count: number) =>
+          `Estas são as minhas últimas ${count} sessões de ${what}, com os dados de sono e recuperação do mesmo período. Compara a duração, a frequência cardíaca média e a carga de treino de cada uma: a intensidade está a aumentar, mantém-se ou diminui, e a recuperação acompanha? Diz-me como ajustar as próximas duas semanas.`,
+        sessionStrength: (what: string, count: number) =>
+          `Estas são as minhas últimas ${count} sessões de ${what}, com os dados de sono e recuperação do mesmo período. Compara a duração, a frequência cardíaca média e a carga de treino de cada uma: a intensidade está a aumentar, mantém-se ou diminui, e recupero bem entre sessões? Diz-me como progredir nas próximas duas semanas; se precisares de saber os pesos, as séries ou as repetições, pergunta-me primeiro.`,
         recovery_nights:
           'Nestas noites, os indicadores de recuperação (VFC, frequência cardíaca em repouso ou duração do sono) afastaram-se claramente do meu habitual. Cada noite inclui os dados do treino do dia anterior. Ajuda-me a perceber o padrão: poderá dever-se à carga de treino, à hora do treino ou a outra causa? Sugere ajustes que possa aplicar já.',
         review_workout:
@@ -4104,14 +4141,13 @@ Regras:
           s2: 'Cada painel abre-se para períodos mais longos e detalhes completos.',
           s3: 'Após um treino planeado enviado para o relógio, conta aqui como correu o desempenho.',
           s4: 'Coisas que a IA pretende memorizar aguardam aqui a tua confirmação.',
-          s5: 'O histórico e os anéis anuais abrem por aqui.',
         },
         intro: {
           s1: 'Escuro, claro ou seguir o sistema. Toca para experimentar.',
           s2: 'Muda de idioma a qualquer momento; gira a roda.',
           s3: 'Liga a tua conta Zepp de duas formas: autorização oficial primeiro e dados avançados para o que falta (VFC, SpO₂, stress).',
           s4: 'As tuas métricas habituais ficam afixadas aqui; a linha abaixo é o teu intervalo habitual, sem comparações com outros.',
-          s5: 'Três separadores no topo; sono, treinos e histórico abrem pelos cartões na Visão geral.',
+          s5: 'Três separadores no topo; os cartões da «Visão geral» abrem o sono e os treinos, e o teu «Diário» fica na vista «Ano» de «Treinos».',
           s6: 'O estado de sincronização fica aqui; clica para sincronizar. O anel verde no ícone superior esquerdo indica atualizações.',
           s7: 'O ícone de carta no canto superior direito: clica para escrever ao autor (o botão «Caixa de correio» por baixo da carta permite alternar) ou mantém premido para abrir a caixa de correio. Um ponto vermelho assinala novas cartas ou respostas.',
           s8: 'Cada secção explica-se ao ser aberta pela primeira vez; regressa a este cartão para rever tudo.',

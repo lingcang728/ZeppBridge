@@ -159,6 +159,8 @@ export default {
     tray: 'Panel zmiany widoku i działań',
     trayHandle: (zoom: string) => `Poziom widoku „${zoom.toLowerCase()}”. Przeciągnij w górę lub w dół, aby zmienić poziom. Kliknij, aby otworzyć`,
     levels: 'Poziom widoku',
+    wheel: 'Kółko myszy',
+    wheelHint: (key: string) => `${key} + kółko myszy: przełączaj widok między dniami, miesiącami i latami`,
     year: 'Lata',
     month: 'Miesiące',
     day: 'Dni',
@@ -791,7 +793,10 @@ export default {
     refresh: 'Kolejne pytanie',
     expand: 'Otwórz to pytanie',
     collapse: 'Zwiń',
-    dismiss: 'Ukryj na dziś',
+    minimize: 'Schowaj obok Moich wskaźników',
+    restore: 'Otwórz pytanie dnia',
+    promptLabel: 'Pytanie, możesz je edytować',
+    reset: 'Przywróć domyślne',
     title: {
       plan_tomorrow: 'Zaplanuj jutro',
       sleep_review: 'Jak wyglądał mój sen ostatniej nocy?',
@@ -804,6 +809,15 @@ export default {
     bestTitle: (bucket: string) => `Czy biegam coraz szybciej na tym dystansie? (${bucket})`,
     comebackTitle: (days: number) =>
       `Po ${plural(days, { one: `${days} dniu`, few: `${days} dniach`, many: `${days} dniach`, other: `${days} dnia` })} przerwy — jak wrócić do treningów?`,
+    sameRouteRide: 'Jak mi idzie na zwykłej trasie rowerowej?',
+    sameRouteHike: 'Jak idzie mi na zwykłej trasie pieszej?',
+    sessionTitle: (what: string) => `Jak idą moje ostatnie treningi typu „${what}”?`,
+    sportSub: {
+      bestRide: 'Przejazdy na tym dystansie + historia PR-ów',
+      bestSwim: 'Pływanie na tym dystansie + historia PR-ów',
+      routeRide: 'Wszystkie przejazdy tą trasą',
+      routeHike: 'Wszystkie wędrówki tą trasą',
+    },
     sub: {
       plan_tomorrow: 'Regeneracja i treningi z ostatnich 7 dni',
       sleep_review: 'Sen i regeneracja z ostatnich kilku nocy',
@@ -813,11 +827,13 @@ export default {
       same_route: 'Wszystkie biegi na tej trasie',
       recovery_nights: 'Noce odbiegające od normy + treningi z poprzedniego dnia',
       comeback: 'Ostatnie treningi przed przerwą + regeneracja z ostatnich 2 tygodni',
+      session_review: 'Ostatnie treningi tego typu + regeneracja',
     },
     swap: 'Wymień kilka kart',
     swapDone: 'Zakończ wymianę',
     refine: 'Dopracuj w „Wyślij do AI”',
-    sendTo: (name: string) => `Skopiuj do ${name}`,
+    holdTo: (name: string) => `Przytrzymaj, aby wysłać do ${name}`,
+    holdHint: 'Naciśnij i przytrzymaj, aby wysłać',
     sending: 'Przygotowywanie…',
     sent: (name: string) => `Skopiowano. Wklej do ${name}`,
     sendFailed: 'Nie udało się przekazać. Otwórz „Wyślij do AI”, aby sprawdzić, na którym kroku wystąpił problem',
@@ -836,6 +852,7 @@ export default {
       recovery_day: 'Zaplanuj dzień regeneracji',
       comeback: 'Łagodny powrót',
       plan_tomorrow: 'Zaplanuj jutro',
+      session_review: 'Ostatnie treningi tego typu',
     },
     kindSub: {
       distance_best: 'Dotychczasowe PR-y i ostatnie biegi na tym samym dystansie',
@@ -864,6 +881,29 @@ export default {
       recovery_day: 'Ostatnia noc nie była najlepsza. Dołączono sen i regenerację z kilku ostatnich nocy oraz treningi z ostatnich dni. Pomóż zaplanować dziś jako dzień regeneracji: co robić, jaki limit intensywności ustawić i o której dziś pójść spać?',
       comeback: (days: number) => `Nie było treningu przez ${plural(days, { one: `${days} dzień`, few: `${days} dni`, many: `${days} dni`, other: `${days} dnia` })}. Dołączono ostatnie treningi sprzed przerwy oraz sen i regenerację z dwóch ostatnich tygodni. Zaplanuj lekki trening na powrót, bez przesady z intensywnością, i podpowiedz, jak stopniowo wracać do formy w następnym tygodniu.`,
       plan_tomorrow: (date: string) => `Zaplanuj trening tylko na jutro (${date}). Dołączono treningi, sen, regenerację i obciążenie treningowe z ostatnich 7 dni. Najpierw samodzielnie sprawdź prognozę pogody dla mojej lokalizacji na jutro, a potem zdecyduj, czy trenować w pomieszczeniu, czy na zewnątrz i o której porze. Zwróć wynik w formacie planu treningowego. Pola from i to wypełnij datą ${date}. Pozostałe dni zostaw bez zmian.`,
+      distanceBestRide: (bucket: string) => `To moje najszybsze przejazdy rowerowe na dystansie około ${bucket} oraz ostatnie przejazdy. Porównaj średnią prędkość, tętno i obciążenie treningowe: skąd głównie wziął się postęp, czego brakuje do kolejnego PR-u i na czym skupić treningi w ciągu najbliższych 4 tygodni dla tego dystansu?`,
+      distanceBestSwim: (bucket: string) => `To moje najlepsze wyniki i ostatnie sesje pływackie na dystansie około ${bucket}. Porównaj tempo na 100 m, tętno i obciążenie treningowe: skąd głównie wziął się postęp, czego brakuje do kolejnego PR-u i na czym skupić treningi w ciągu najbliższych 4 tygodni dla tego dystansu?`,
+      sameRouteRide: (km: string) => `To moje przejazdy tą samą trasą (około ${km}). Porównaj średnią prędkość, tętno i dryf tętna w drugiej połowie: czy na tej trasie jadę szybciej, przy mniejszym wysiłku, czy tracę formę? Podaj możliwe przyczyny.`,
+      sameRouteHike: (km: string) => `To moje wędrówki tą samą trasą (około ${km}). Porównaj łączny czas, tętno i dryf tętna w drugiej połowie: czy pokonuję tę trasę szybciej i przy mniejszym wysiłku, czy moja forma spada? Podaj prawdopodobne przyczyny.`,
+      raceReviewAny: (date: string, what: string) => `Aktywność z dnia ${date} (${what}) była startem w zawodach (lub wyraźnym wysiłkiem maksymalnym). Dołączono treningi oraz dane o śnie i regeneracji z czterech tygodni przed startem. Oceń, czy rozłożenie wysiłku i tętno były odpowiednie, czy objętość treningów i zmniejszenie obciążenia przed startem były właściwe oraz czy sen lub regeneracja mnie ograniczały. Co zmienić przed kolejnymi zawodami?`,
+      sessionReview: (what: string, count: number) => {
+        const sessions = plural(count, {
+          one: `moja ostatnia sesja treningowa typu „${what}”`,
+          few: `moje ostatnie ${count} sesje treningowe typu „${what}”`,
+          many: `moje ostatnie ${count} sesji treningowych typu „${what}”`,
+          other: `moje ostatnie ${count} sesji treningowych typu „${what}”`,
+        });
+        return `To ${sessions}; dołączono też dane o śnie i regeneracji z tych dni. Porównaj je pod względem czasu trwania, średniego tętna i obciążenia treningowego: czy intensywność rośnie, utrzymuje się na tym samym poziomie czy spada? Czy regeneracja nadąża? Powiedz, jak dostosować treningi w ciągu najbliższych dwóch tygodni.`;
+      },
+      sessionStrength: (what: string, count: number) => {
+        const sessions = plural(count, {
+          one: `moja ostatnia sesja treningowa typu „${what}”`,
+          few: `moje ostatnie ${count} sesje treningowe typu „${what}”`,
+          many: `moje ostatnie ${count} sesji treningowych typu „${what}”`,
+          other: `moje ostatnie ${count} sesji treningowych typu „${what}”`,
+        });
+        return `To ${sessions}; dołączono też dane o śnie i regeneracji z tych dni. Porównaj je pod względem czasu trwania, średniego tętna i obciążenia treningowego: czy intensywność rośnie, utrzymuje się na tym samym poziomie czy spada? Czy regeneruję się między sesjami? Powiedz, jak zwiększać obciążenie w ciągu najbliższych dwóch tygodni; jeśli potrzebujesz konkretnych ciężarów, serii lub powtórzeń, najpierw o nie zapytaj.`;
+      },
     },
   },
 
@@ -1743,14 +1783,13 @@ export default {
         s2: 'Każdy panel otwiera się na dłuższy okres i więcej szczegółów.',
         s3: 'Po ukończeniu zaplanowanego treningu wysłanego do zegarka opisz tutaj, jak poszło.',
         s4: 'Rzeczy, które AI chce zapamiętać, czekają tutaj na Twoją zgodę.',
-        s5: 'Dziennik i słoje roczne otwierają się stąd.',
       },
       intro: {
         s1: 'Ciemny, jasny lub zgodny z systemem. Dotknij, aby wypróbować.',
         s2: 'Zmieniaj język w dowolnym momencie; zakręć kółkiem.',
         s3: 'Połącz konto Zepp na dwa sposoby: najpierw oficjalna autoryzacja, a dane zaawansowane dla braków (HRV, SpO₂, stres).',
         s4: 'Twoje ulubione wskaźniki są przypięte tutaj; wiersz poniżej to Twój zwykły zakres, bez porównań z innymi.',
-        s5: 'Trzy karty na górze; sen, treningi i dziennik otwierają się z kart w Przeglądzie.',
+        s5: 'Trzy zakładki u góry; sen i treningi otworzysz z kart na stronie „Przegląd”, a „Dziennik” z widoku „Lata” na stronie „Treningi”.',
         s6: 'Stan synchronizacji jest tutaj; kliknij, aby zsynchronizować. Zielony pierścień na ikonie w lewym górnym rogu oznacza aktualizację.',
         s7: 'Ikona listu w prawym górnym rogu: kliknij, aby napisać do autora (przycisk „Skrzynka na listy” pod listem przełącza widok), albo przytrzymaj, aby otworzyć skrzynkę na listy. Czerwona kropka oznacza nową wiadomość lub odpowiedź.',
         s8: 'Każda sekcja wyjaśnia się przy pierwszym otwarciu; wróć do tej karty, aby zobaczyć ją ponownie.',
@@ -4717,6 +4756,14 @@ Zasady:
     heroMeta: (fellAsleep: string, wokeUp: string, inBed: string) =>
       `Zaśnięcie: ${fellAsleep} · pobudka: ${wokeUp} · w łóżku: ${inBed}`,
     scoreKicker: 'Wynik snu',
+    weekAvg: 'Średnia z 7 nocy',
+    wokeUp: 'Wybudzenia',
+    wakeTimes: (count: number) => plural(count, {
+      one: 'raz',
+      few: `${count} razy`,
+      many: `${count} razy`,
+      other: `${count} raza`,
+    }),
     stagesAria: 'Fazy snu',
     stagesTitle: 'Fazy snu',
     napsTitle: 'Drzemka',
@@ -4970,6 +5017,9 @@ Zasady:
     emptyMessage: 'Po synchronizacji pojawiają się tu tylko wpisy mające typ, czas trwania i co najmniej jeden rzeczywisty wskaźnik. Bez GPS lub próbek punktowych, bez pustych wykresów.',
     avgHr: (bpm: number) => `Śr. tętno ${bpm} bpm`,
     notProvided: 'Nie podano',
+    colDistance: 'Dystans',
+    colDuration: 'Czas',
+    colHr: 'Śr. tętno',
     footnote: (count: number) =>
       plural(count, {
         one: `Wyświetlono ${count} wpis`,
