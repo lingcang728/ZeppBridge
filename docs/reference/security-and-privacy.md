@@ -224,6 +224,11 @@ push code reads nothing from the database and sends no request.
 - "Remove" deletes the settings, the keys and the push records. Data already on
   your site stays there; delete it on the site's side. Uninstalling with "delete
   app data" also deletes the push keys.
+- The site template lives in
+  [lingcang728/ZeppBridge-Cloud](https://github.com/lingcang728/ZeppBridge-Cloud): a
+  Cloudflare Worker plus `uploader/keys.mjs`, which creates the connection code. Deploying
+  it and creating keys work on Windows, macOS and Linux; ZeppBridge does the uploading
+  itself, so no extra component is needed.
 - Taking over from the ZeppBridge Cloud component only reads its `config.json`
   and its upload key from Credential Manager; nothing of the component is changed
   or deleted. While its scheduled tasks still exist the interface suggests

@@ -87,6 +87,7 @@ Zepp 官方开放平台要求把应用密钥放在服务器上，所以这是 Ze
 - **密钥只进系统凭据库**（账号名 `push:<目标>`）；配置文件 `data/push/targets.json` 里出现像密钥的字段会被拒绝。界面只知道「有没有连接码」，不会把它显示回来。
 - **日志和结果只记条数、字节数和错误码**，不记数据、地址里的凭据和密钥。
 - 「移除」会删掉配置、密钥和推送记录；你站点上已有的数据不动，要删请到站点那边处理。卸载时勾选删除应用数据，也会一并删掉推送密钥。
+- 站点模板在 [lingcang728/ZeppBridge-Cloud](https://github.com/lingcang728/ZeppBridge-Cloud)：Cloudflare Worker 加生成连接码的 `uploader/keys.mjs`，部署和生成密钥在 Windows、macOS、Linux 上都能做；上传由 ZeppBridge 自己完成，不需要另装组件。
 - 从 ZeppBridge Cloud 组件接过来时，只读取它的 `config.json` 和凭据管理器里的上传密钥，不改也不删组件的任何东西；它的计划任务还在时，界面会提示你删掉，避免重复上传。
 
 ## 主动错误报告
