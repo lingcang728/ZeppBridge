@@ -7,7 +7,7 @@ import { AI_TASK_CATEGORY_META } from '../../lib/aiTask/categories';
 import { formatDistance, formatDuration } from '../../lib/format';
 import { formatPaceSeconds } from '../../lib/metricSeries';
 import { paceUnitLabel } from '../../lib/units';
-import { familyOf, paceOf, type HandCard } from '../../lib/cards/hands';
+import { familyOf, paceOf, sportOf, type HandCard, type Sport } from '../../lib/cards/hands';
 import { routeSketch, sparkPath } from '../../lib/cards/faceValue';
 import { displayDateTimeFormatter, parseDisplayDate } from '../../lib/dateTime';
 import type { HandLines } from '../../types/hands';
@@ -29,7 +29,8 @@ export interface HandFace {
 }
 
 const md = (date: string) => displayDateTimeFormatter({ month: 'numeric', day: 'numeric' }).format(parseDisplayDate(date));
-const ICON: Record<string, IconName> = { run: 'run', ride: 'bike', swim: 'swim' };
+/** 牌面图标按运动大类（lib/cards/hands/sport.ts）。 */
+const ICON: Partial<Record<Sport, IconName>> = { run: 'run', ride: 'bike', swim: 'swim', hike: 'mountain', strength: 'training-load' };
 
 export const handFace = (card: HandCard, t: HandsText, lines?: HandLines | null): HandFace => {
   const top = t.role[card.role];
@@ -52,7 +53,7 @@ export const handFace = (card: HandCard, t: HandsText, lines?: HandLines | null)
   const hr = !route && lines?.hr.length ? sparkPath(lines.hr) : null;
   const sketch = route ? { kind: 'route' as const, d: route } : hr ? { kind: 'line' as const, d: hr } : null;
   return {
-    top, title, value, aside: note, sketch, icon: ICON[family] ?? 'activity', tint: AI_TASK_CATEGORY_META.workout.tint,
+    top, title, value, aside: note, sketch, icon: ICON[sportOf(w.workout_type)] ?? 'activity', tint: AI_TASK_CATEGORY_META.workout.tint,
     label: [top, title, value, note].filter(Boolean).join(', '),
   };
 };

@@ -1,28 +1,45 @@
-/* 发牌桌：首页「今日一问」卡里原地展开的一块（不铺背景、不盖住页面）。主牌一道扇面在上，候补一排小牌在下（按「换几张牌」才出）。 */
+/* 发牌桌：首页「今日一问」卡里原地展开的一块（不铺背景、不盖住页面）。主牌一道扇面；按「换几张牌」才在右侧露出一叠候补。 */
 .hand-table { position: relative; display: grid; gap: 10px; color: var(--ink); --tint: var(--accent); }
 .hand-table.closing { pointer-events: none; }
-.hand-stage { position: relative; display: grid; gap: 12px; min-height: 0; }
-.hand-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 16px; min-height: 0; padding: 10px 8px 14px; }
-.bench-row { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: center; gap: 10px; min-height: calc(var(--card-w) * 1.4); padding: 4px 8px 0; }
-.hslot { position: relative; display: block; flex: 0 0 auto; }
+.hand-stage { position: relative; display: flex; align-items: center; gap: 16px; min-height: 0; }
+.hand-row { display: flex; flex: 1; flex-wrap: wrap; align-items: center; justify-content: center; gap: 16px; min-width: 0; padding: 10px 8px 14px; }
+.hslot { position: relative; display: block; flex: 0 0 auto; border-radius: calc(var(--card-w) * .11); transition: box-shadow 180ms ease; }
 /* 拖着的牌：浮在最上面、带一层更深的影子，手指一松就交给 FLIP / 回弹。 */
-.hslot:has(.is-dragging) { z-index: 5; }
+.hslot:has(.is-dragging) { z-index: 50; }
 .hand-stage :deep(.pcard) { cursor: default; }
 .hand-table.swapping .hand-stage :deep(.pcard) { touch-action: none; cursor: grab; }
 .hand-stage :deep(.pcard.is-dragging) { cursor: grabbing; filter: drop-shadow(0 18px 28px rgba(0, 0, 0, .45)); }
-/* 拖到位：要落进去的那一排亮一圈品牌色的光（候补一道横线变亮，主牌那一排底下铺一层淡光）。 */
-.bench h3 { transition: border-color 180ms ease, color 180ms ease; }
-.hand-stage.drop-bench .bench h3 { border-top-color: var(--accent); color: var(--accent); }
-.hand-row { border-radius: 20px; transition: background-color 200ms ease, box-shadow 200ms ease; }
-.hand-stage.drop-hand .hand-row { background: color-mix(in srgb, var(--accent) 7%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent); }
-/* 分隔线画在标题上：收牌时它跟标题一起淡出，不会单独留在桌上。 */
-.bench { display: grid; gap: 8px; justify-items: center; }
-.bench h3 { justify-self: stretch; margin: 0; padding-top: 12px; border-top: 1px solid color-mix(in srgb, var(--ink) 10%, transparent); color: var(--muted); font-size: var(--fs-xs); font-weight: 650; letter-spacing: .04em; text-align: center; }
-/* 候补里的牌压暗一点，像还没上桌。 */
-.bench-row :deep(.pcard:not(:hover):not(:focus-visible) .pcard-face) { opacity: .78; }
+/* 落点：只亮那一格——要被换下的那张主牌，或右边那叠候补。 */
+.hslot.is-target, .hand-empty.is-target { box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 75%, transparent), 0 0 26px color-mix(in srgb, var(--accent) 45%, transparent); }
+.bench { position: relative; display: grid; flex: none; justify-items: center; gap: 8px; align-self: center; padding: 4px; border-radius: 18px; transition: box-shadow 180ms ease; }
+.hand-stage.drop-bench .bench { box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 75%, transparent), 0 0 26px color-mix(in srgb, var(--accent) 40%, transparent); }
+/* 候补一叠：错开叠着，每张露出上沿（--step）。最新抽下来的那张（数组头）排在最下面、压在最上层，整张看得见；
+   越早的越往上、越往底下压（--z 由模板按序号给）。 */
+.bench-row { display: flex; flex-direction: column-reverse; align-items: center; padding-top: 2px; }
+.bench-row .hslot { z-index: var(--z, auto); }
+.bench-row .hslot + .hslot { margin-bottom: calc(var(--card-w) * -1.4 + var(--step, 30px)); }
+.bench-row .hslot:hover, .bench-row .hslot:focus-within { z-index: 30; }
+/* 刚换过去的那张：飞的途中和落定后都在同一叠最上面，鼠标停着的那张、后面的牌都盖不住它（指针离开候补、或下一次换牌时放下）。 */
+.hslot.is-fresh, .bench-row .hslot.is-fresh { z-index: 40; }
+/* 候补里的牌压暗一点，像还没上桌（用亮度不用透明度：叠着的牌半透明会透出底下那张，一叠看着一团乱）。 */
+.bench-row :deep(.pcard:not(:hover):not(:focus-visible) .pcard-face) { filter: brightness(.8); }
+.bench-label { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: var(--fs-xs); font-weight: 650; letter-spacing: .04em; }
+.bench-label b { min-width: 18px; padding: 0 5px; border-radius: 999px; background: color-mix(in srgb, var(--ink) 9%, transparent); color: var(--ink); font-size: var(--fs-2xs); text-align: center; }
 .hand-empty, .bench-empty { margin: 0; color: var(--muted); font-size: var(--fs-sm); text-align: center; }
-.bench-empty { align-self: center; }
+.hand-empty { padding: 18px 14px; border-radius: 16px; }
+.bench-empty { width: var(--card-w); padding: 18px 0; }
+/* 候补那一叠从右边滑进来、淡入；收起原路退回。只动 transform、opacity。 */
+.bench-pile-enter-active { transition: opacity 240ms ease, transform 420ms cubic-bezier(.2, .8, .2, 1); }
+.bench-pile-leave-active { transition: opacity 160ms ease, transform 240ms cubic-bezier(.4, 0, .6, 1); }
+/* 收起时那一叠立刻让出位置（贴着右边淡出）：主牌马上按变宽后的牌位滑开，台面高度也照最终的样子过渡，不等它退完再跳一下。 */
+.bench-pile-leave-active { position: absolute; top: 50%; right: 0; translate: 0 -50%; }
+.bench-pile-enter-from, .bench-pile-leave-to { opacity: 0; transform: translateX(24px) scale(.96); }
 .hand-foot { display: grid; gap: 12px; }
 @media (max-width: 640px) {
   .hand-row { gap: 10px; }
+  .hand-stage { flex-wrap: wrap; justify-content: center; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bench-pile-enter-active, .bench-pile-leave-active { transition: opacity 120ms ease; }
+  .bench-pile-enter-from, .bench-pile-leave-to { transform: none; }
 }

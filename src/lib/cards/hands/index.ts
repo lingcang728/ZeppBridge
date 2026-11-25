@@ -7,8 +7,9 @@ import { distanceBest, raceReview, recoveryNights, sameRoute } from './question'
 
 export * from './types';
 export * from './constants';
-export { distanceBest, raceReview, recoveryNights, refineSameRoute, sameRoute, sameRouteRough, trackDistance, nightFlags, raceLike, bucketOf, ownBucketKm } from './question';
-export { comeback, planTomorrow, recoveryDay, reviewWorkout } from './suggest';
+export { distanceBest, raceReview, recoveryNights, refineSameRoute, sameRoute, sameRouteRough, trackDistance, nightFlags, raceLike, bucketOf, ownBucketKm, ownBucketM } from './question';
+export { comeback, planTomorrow, recoveryDay, reviewWorkout, sessionReview } from './suggest';
+export { DISTANCE_SPORTS, isDistanceSport, ROUTE_SPORTS, sportOf, sportProfile, type DistanceSport, type Sport } from './sport';
 export { isSuggestTemplate, pickSuggestion, rankSuggestions, SUGGEST_TEMPLATES, type RankedSuggestion, type SuggestTemplate } from './rank';
 export { drawOut, handPicks, swapIn, type HandPicks } from './toTask';
 export { byDate, paceOf, familyOf } from './util';

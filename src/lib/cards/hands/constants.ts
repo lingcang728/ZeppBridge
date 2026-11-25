@@ -39,11 +39,23 @@ export const PR_KEEP = 4;
 export const DISTANCE_RECENT = 3;
 /** 配速超出这个范围（秒 / 公里）的多半是距离或时长坏了，不参与比。和后端周报同一个范围。 */
 export const PACE_RANGE: readonly [number, number] = [120, 1800];
+/** 各大类配速（秒 / 公里）的合理范围：跑步同上；骑行 6–60 km/h；游泳每百米 1–5 分钟；徒步、健走 2.5–15 km/h。 */
+export const PACE_RANGES: Readonly<Record<'run' | 'ride' | 'swim' | 'hike', readonly [number, number]>> = {
+  run: PACE_RANGE, ride: [60, 600], swim: [600, 3000], hike: [240, 1440],
+};
+/** 骑行没有标准距离段：按 5 公里一档分（至少 10 公里）。 */
+export const RIDE_BUCKET_KM = 5;
+export const RIDE_BUCKET_MIN_KM = 10;
+/** 游泳按 100 米一档分（至少 300 米）。 */
+export const SWIM_BUCKET_M = 100;
+export const SWIM_BUCKET_MIN_M = 300;
 
 /* —— 比赛复盘 —— */
 /** 没有标比赛时：配速比此前 90 天同类中位数快这么多（速度比），且距离够长，算「像比赛的一次」。 */
 export const RACE_SPEED_RATIO = 1.08;
 export const RACE_MIN_KM = 3;
+/** 骑行、游泳各自要多长才可能是比赛（短途通勤骑得快不算比赛）。 */
+export const RACE_MIN_KM_BY_SPORT = { run: RACE_MIN_KM, ride: 15, swim: 0.4 } as const;
 export const RACE_BASELINE_DAYS = 90;
 export const RACE_BASELINE_MIN = 5;
 /** 赛前带几天的训练与睡眠（四周）。 */
@@ -70,6 +82,18 @@ export const COMEBACK_LAST = 4;
 export const COMEBACK_SPAN_DAYS = 14;
 /** 一次运动至少这么长才上牌（几分钟的自动识别活动不值得占一张牌）。 */
 export const MIN_WORKOUT_SECONDS = 10 * 60;
+
+/* —— 运动大类与用户画像（sport.ts） —— */
+/** 看最近多少天常练什么。 */
+export const SPORT_PROFILE_DAYS = 90;
+/** 一类至少这么多次才算常练。 */
+export const SPORT_MIN_SESSIONS = 3;
+
+/* —— 同类训练（力量、拉伸、球类……不按距离比的，按一次次比） —— */
+/** 在最近多少天里找、至少几次才发牌、主牌放最近几次。 */
+export const SESSION_DAYS = 56;
+export const SESSION_MIN = 3;
+export const SESSION_KEEP = 6;
 
 /* —— 首页「今日一问」的推荐顺序（rank.ts） —— */
 /** 这么多天内（含今天）比过赛：推荐复盘比赛。 */

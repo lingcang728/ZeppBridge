@@ -1,6 +1,7 @@
-/** 发牌规则共用的小函数：日期加减、运动大类、配速、距离、牌的构造。全是纯函数。 */
+/** 发牌规则共用的小函数：日期加减、运动大类、配速、距离、牌的构造。全是纯函数。大类和配速的规则在 sport.ts。 */
 import { addDays } from '../../aiTask/bridgeScale';
-import { BENCH_MAX, HAND_MAX, MIN_WORKOUT_SECONDS, PACE_RANGE } from './constants';
+import { BENCH_MAX, HAND_MAX, MIN_WORKOUT_SECONDS } from './constants';
+import { paceOf, sportOf } from './sport';
 import type { CardRole, Hand, HandCard, HandNight, HandWorkout, NightFlag } from './types';
 
 export { addDays };
@@ -8,23 +9,17 @@ export { addDays };
 /** 两个本地日相差几天（b − a）。 */
 export const dayDiff = (a: string, b: string): number => Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 86_400_000);
 
-const RUN = new Set(['run', 'running', 'trail_running', 'trail_run', 'treadmill', 'indoor_run', 'outdoor_run']);
-const RIDE = new Set(['ride', 'cycling', 'outdoor_cycling', 'indoor_cycling', 'mountain_biking', 'road_cycling']);
-
-/** 大类：跑、骑，其余就是类型本身。同一路线、同距离段只在同一个大类里比。 */
-export const familyOf = (type: string): string => (RUN.has(type) ? 'run' : RIDE.has(type) ? 'ride' : type);
-export const isRun = (workout: HandWorkout): boolean => familyOf(workout.workout_type) === 'run';
+/** 大类：跑、骑、游、徒步各算一类，其余就是类型本身（力量不和瑜伽比）。同一路线、同距离段、同类只在同一个大类里比。 */
+export const familyOf = (type: string): string => {
+  const sport = sportOf(type);
+  return sport === 'run' || sport === 'ride' || sport === 'swim' || sport === 'hike' ? sport : type;
+};
+export const isRun = (workout: HandWorkout): boolean => sportOf(workout.workout_type) === 'run';
 
 /** 够长、值得上牌的一次运动。 */
 export const substantial = (workout: HandWorkout): boolean => workout.duration_s >= MIN_WORKOUT_SECONDS;
 
-/** 配速（秒 / 公里）；距离或时长缺、或者离谱，就是 null，不拿 0 顶。 */
-export const paceOf = (workout: HandWorkout): number | null => {
-  const km = (workout.distance_m ?? 0) / 1000;
-  if (km <= 0 || workout.duration_s <= 0) return null;
-  const pace = workout.duration_s / km;
-  return pace >= PACE_RANGE[0] && pace <= PACE_RANGE[1] ? pace : null;
-};
+export { paceOf };
 
 /** 两点间的大圆距离（米）。 */
 export const haversine = (a: readonly [number, number], b: readonly [number, number]): number => {

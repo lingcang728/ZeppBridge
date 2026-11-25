@@ -6,11 +6,13 @@
  */
 import {
   OWN_BUCKET_MIN_KM, DISTANCE_BUCKETS, DISTANCE_MIN_RUNS, DISTANCE_RECENT, HRV_LOW_RATIO, OUTLIER_BASELINE_DAYS, OUTLIER_BASELINE_MIN, OUTLIER_KEEP,
-  OUTLIER_LOOKBACK_DAYS, PR_KEEP, RACE_BASELINE_DAYS, RACE_BASELINE_MIN, RACE_LEAD_DAYS, RACE_MIN_KM, RACE_SPEED_RATIO, RHR_HIGH_BPM,
-  ROUTE_ANCHOR_SCAN, ROUTE_DISTANCE_RATIO, ROUTE_END_METERS, ROUTE_MIN_RUNS, ROUTE_TRACK_METERS, SLEEP_SHORT_RATIO,
+  OUTLIER_LOOKBACK_DAYS, PR_KEEP, RACE_BASELINE_DAYS, RACE_BASELINE_MIN, RACE_LEAD_DAYS, RACE_MIN_KM_BY_SPORT, RACE_SPEED_RATIO, RHR_HIGH_BPM,
+  RIDE_BUCKET_KM, RIDE_BUCKET_MIN_KM, ROUTE_ANCHOR_SCAN, ROUTE_DISTANCE_RATIO, ROUTE_END_METERS, ROUTE_MIN_RUNS, ROUTE_TRACK_METERS, SLEEP_SHORT_RATIO,
+  SWIM_BUCKET_M, SWIM_BUCKET_MIN_M,
 } from './constants';
 import type { HandCard, HandFacts, HandLines, HandNight, HandResult, HandWorkout, NightFlag } from './types';
-import { addDays, dayDiff, familyOf, finishHand, haversine, isRun, mean, median, nightCard, paceOf, substantial, workoutCard } from './util';
+import { addDays, dayDiff, familyOf, finishHand, haversine, mean, median, nightCard, paceOf, substantial, workoutCard } from './util';
+import { DISTANCE_SPORTS, isDistanceSport, practiced, ROUTE_SPORTS, sportOf, sportProfile, type DistanceSport } from './sport';
 
 /* —————————— 同一路线的历次 —————————— */
 
@@ -29,8 +31,10 @@ export const trackDistance = (a: ReadonlyArray<readonly [number, number]>, b: Re
   return (oneWay(a, b) + oneWay(b, a)) / 2;
 };
 
+/** 同一条路线：只在跑、骑、徒步里，且是用户常练的那几类（画像是空的就不限）；指定了锚点就照它。 */
 export const sameRoute = (facts: HandFacts, anchorId?: string | null): HandResult => {
-  const routed = facts.workouts.filter((w) => w.start && w.end && w.distance_m && substantial(w));
+  const sports = anchorId ? ROUTE_SPORTS : practiced(ROUTE_SPORTS, sportProfile(facts.workouts, facts.today));
+  const routed = facts.workouts.filter((w) => w.start && w.end && w.distance_m && substantial(w) && sports.includes(sportOf(w.workout_type)));
   const newest = [...routed].reverse();
   const groupOf = (anchor: HandWorkout) => newest.filter((w) => w.workout_id !== anchor.workout_id && sameRouteRough(anchor, w));
   // 锚点：指定的那一次；否则最近一次「这条路线跑过至少三次」的；都没有就取同路线最多的那次。
@@ -89,36 +93,57 @@ const groupBy = (runs: HandWorkout[], keyOf: (run: HandWorkout) => string | null
   return [...byBucket].filter(([, list]) => list.length >= DISTANCE_MIN_RUNS);
 };
 
-/**
- * 同距离段 / 刷 PR：先找 5K、10K、半马、全马；一段都凑不够两次（有人几乎只跑 15 公里），
- * 就按自己常跑的整公里数分段，不发空牌。
- */
-export const distanceBest = (facts: HandFacts): HandResult => {
-  const runs = facts.workouts.filter((w) => isRun(w) && paceOf(w) !== null);
-  let usable = groupBy(runs, (run) => bucketOf(run)?.key ?? null);
-  if (!usable.length) {
-    usable = groupBy(runs, (run) => {
-      const km = (run.distance_m ?? 0) / 1000;
-      return km >= OWN_BUCKET_MIN_KM ? `km:${Math.round(km)}` : null;
-    });
+/** 游泳自己常游的距离这一段的键：`m:1500`。 */
+export const ownBucketM = (key: string): number | null => (key.startsWith('m:') ? Number(key.slice(2)) : null);
+
+/** 每一类怎么分距离段：先按标准段（只有跑步有），凑不够再按自己常练的距离分。 */
+const BUCKETS: Record<DistanceSport, Array<(workout: HandWorkout) => string | null>> = {
+  run: [
+    (run) => bucketOf(run)?.key ?? null,
+    (run) => { const km = (run.distance_m ?? 0) / 1000; return km >= OWN_BUCKET_MIN_KM ? `km:${Math.round(km)}` : null; },
+  ],
+  ride: [(ride) => { const km = (ride.distance_m ?? 0) / 1000; return km >= RIDE_BUCKET_MIN_KM ? `km:${Math.round(km / RIDE_BUCKET_KM) * RIDE_BUCKET_KM}` : null; }],
+  swim: [(swim) => { const m = swim.distance_m ?? 0; return m >= SWIM_BUCKET_MIN_M ? `m:${Math.round(m / SWIM_BUCKET_M) * SWIM_BUCKET_M}` : null; }],
+};
+
+const bestIn = (facts: HandFacts, sport: DistanceSport): HandResult => {
+  const done = facts.workouts.filter((w) => sportOf(w.workout_type) === sport && paceOf(w) !== null);
+  let usable: Array<[string, HandWorkout[]]> = [];
+  for (const keyOf of BUCKETS[sport]) {
+    usable = groupBy(done, keyOf);
+    if (usable.length) break;
   }
   if (!usable.length) return { ok: false, kind: 'distance_best', reason: 'no_distance' };
-  // 哪一段：最近一次跑的那一段（够两次的里面）；两段同一天就取次数多的。
+  // 哪一段：最近一次练的那一段（够两次的里面）；两段同一天就取次数多的。
   usable.sort(([, a], [, b]) => b[b.length - 1]!.start_time.localeCompare(a[a.length - 1]!.start_time) || b.length - a.length);
   const [key, list] = usable[0]!;
   // PR 链：按时间往后走，每刷新一次最好配速记一张。
   const chain: HandWorkout[] = [];
   let best = Infinity;
-  for (const run of list) {
-    const pace = paceOf(run)!;
-    if (pace < best) { best = pace; chain.push(run); }
+  for (const one of list) {
+    const pace = paceOf(one)!;
+    if (pace < best) { best = pace; chain.push(one); }
   }
   const prs = chain.slice(-PR_KEEP);
-  const prIds = new Set(prs.map((run) => run.workout_id));
-  const recent = list.slice(-DISTANCE_RECENT).filter((run) => !prIds.has(run.workout_id));
-  const cards = [...prs.map((run) => workoutCard(run, 'pr', key)), ...recent.map((run) => workoutCard(run, 'recent', key))];
-  const rest = list.filter((run) => !prIds.has(run.workout_id) && !recent.includes(run)).map((run) => workoutCard(run, 'same', key));
-  return { ok: true, hand: finishHand({ kind: 'distance_best', span: null, params: { bucket: key, count: list.length, best: Math.round(best) } }, cards, rest) };
+  const prIds = new Set(prs.map((one) => one.workout_id));
+  const recent = list.slice(-DISTANCE_RECENT).filter((one) => !prIds.has(one.workout_id));
+  const cards = [...prs.map((one) => workoutCard(one, 'pr', key)), ...recent.map((one) => workoutCard(one, 'recent', key))];
+  const rest = list.filter((one) => !prIds.has(one.workout_id) && !recent.includes(one)).map((one) => workoutCard(one, 'same', key));
+  return { ok: true, hand: finishHand({ kind: 'distance_best', span: null, params: { bucket: key, count: list.length, best: Math.round(best), sport } }, cards, rest) };
+};
+
+/**
+ * 同距离段 / 刷 PR：跑、骑、游里用户常练的那几类，按画像的顺序找第一类凑得出一段的（`sport` 给了就只看那一类）。
+ * 跑步先找 5K、10K、半马、全马，一段都凑不够两次（有人几乎只跑 15 公里）就按自己常跑的整公里数分段；
+ * 骑行按 5 公里一档、游泳按 100 米一档。不发空牌，也不问一个用户不练的项目。
+ */
+export const distanceBest = (facts: HandFacts, sport?: DistanceSport): HandResult => {
+  const order = sport ? [sport] : practiced(DISTANCE_SPORTS, sportProfile(facts.workouts, facts.today));
+  for (const one of order) {
+    const result = bestIn(facts, one);
+    if (result.ok) return result;
+  }
+  return { ok: false, kind: 'distance_best', reason: 'no_distance' };
 };
 
 /* —————————— 比赛复盘 —————————— */
@@ -126,8 +151,11 @@ export const distanceBest = (facts: HandFacts): HandResult => {
 /** 像比赛的一次：比赛记录里挂了它；或者配速比此前 90 天同类中位数快 8% 以上、距离够长。 */
 export const raceLike = (workout: HandWorkout, all: HandWorkout[]): boolean => {
   if (workout.race) return true;
+  // 没标比赛：只在按距离比快慢的几类里按配速猜，而且要够长（短途通勤骑得快不算比赛）。
+  const sport = sportOf(workout.workout_type);
+  if (!isDistanceSport(sport)) return false;
   const pace = paceOf(workout);
-  if (pace === null || (workout.distance_m ?? 0) / 1000 < RACE_MIN_KM) return false;
+  if (pace === null || (workout.distance_m ?? 0) / 1000 < RACE_MIN_KM_BY_SPORT[sport]) return false;
   const family = familyOf(workout.workout_type);
   const since = addDays(workout.date, -RACE_BASELINE_DAYS);
   const before = all

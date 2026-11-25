@@ -15,6 +15,7 @@ const messages = defineMessages(
       recovery_day: '排个恢复日',
       comeback: '排个轻松的回归',
       plan_tomorrow: '帮我排明天',
+      session_review: '最近几次同类训练',
     },
     kindSub: {
       distance_best: '同一距离段的历次 PR 和最近几次',
@@ -43,6 +44,14 @@ const messages = defineMessages(
       recovery_day: '我昨晚睡得不太好，附上了最近几晚的睡眠恢复和最近几天的运动。请帮我把今天排成恢复日：适合做什么、强度上限是多少、今晚几点睡比较好。',
       comeback: (days: number) => `我已经 ${days} 天没有运动了，附上了停下来之前的最后几次和最近两周的睡眠恢复。请帮我排一次轻松的回归训练，强度先放低一点，也说说之后一周怎么慢慢加回去。`,
       plan_tomorrow: (date: string) => `请只帮我排明天（${date}）这一天的训练。附上了最近 7 天的运动、睡眠恢复和训练负荷。请先自己查一下我所在地明天的天气，再决定室内还是户外、什么时间段。排好后按训练计划格式输出，from 和 to 都写 ${date}，不要动其他日子。`,
+      // 和运动项目有关的几问按用户常练的大类说（lib/cards/hands/sport.ts），不默认是跑步。
+      distanceBestRide: (bucket: string) => `这是我 ${bucket} 左右的历次最快骑行和最近几次。请对比均速、心率和训练负荷的变化：进步主要来自哪里、离下一个 PR 还差什么，再给我接下来 4 周针对这个距离的训练重点。`,
+      distanceBestSwim: (bucket: string) => `这是我 ${bucket} 左右的历次最快游泳和最近几次。请对比每百米配速、心率和训练负荷的变化：进步主要来自哪里、离下一个 PR 还差什么，再给我接下来 4 周针对这个距离的训练重点。`,
+      sameRouteRide: (km: string) => `这是我在同一条路线（约 ${km}）上骑的几次。请对比每次的均速、心率和后半程的心率漂移：同样的路线我是更快了、更省力了，还是退步了？说说可能的原因。`,
+      sameRouteHike: (km: string) => `这是我在同一条路线（约 ${km}）上走的几次。请对比每次的总用时、心率和后半程的心率漂移：同样的路线我是更快了、更省力了，还是退步了？说说可能的原因。`,
+      raceReviewAny: (date: string, what: string) => `${date} 这次${what}是比赛（或明显全力的一次），附上了赛前四周的训练和睡眠恢复。请复盘：节奏分配和心率是否合理、赛前的训练量和减量是否合适、睡眠恢复有没有拖后腿，下次比赛前该怎么调整。`,
+      sessionReview: (what: string, count: number) => `这是我最近 ${count} 次${what}，附上了这段时间的睡眠恢复。请对比每次的时长、平均心率和训练负荷：强度是在往上走、原地踏步还是在往下掉？恢复跟得上吗？告诉我接下来两周怎么调整。`,
+      sessionStrength: (what: string, count: number) => `这是我最近 ${count} 次${what}，附上了这段时间的睡眠恢复。请对比每次的时长、平均心率和训练负荷：强度是在往上走、原地踏步还是在往下掉？两次之间恢复得过来吗？告诉我接下来两周怎么加量；需要具体的重量、组数、次数的话，先问我。`,
     },
   },
   {
@@ -55,6 +64,7 @@ const messages = defineMessages(
       recovery_day: 'Plan a recovery day',
       comeback: 'Ease back in',
       plan_tomorrow: 'Plan tomorrow',
+      session_review: 'Recent sessions',
     },
     kindSub: {
       distance_best: 'Past PRs and recent runs at one distance',
@@ -83,6 +93,14 @@ const messages = defineMessages(
       recovery_day: 'I slept poorly last night. The last few nights of sleep and recovery and the last few days of workouts are attached. Help me make today a recovery day: what to do, the intensity ceiling, and when to go to bed tonight.',
       comeback: (days: number) => `I have not worked out for ${days} days. The last few workouts before the break and two weeks of sleep and recovery are attached. Plan an easy comeback session that does not overdo it, and tell me how to build back up over the following week.`,
       plan_tomorrow: (date: string) => `Plan only tomorrow (${date}). The last 7 days of workouts, sleep, recovery and training load are attached. First check tomorrow's local weather where I am yourself, then decide indoor or outdoor and what time of day. Output it in the training plan format with both from and to set to ${date}, and leave every other day alone.`,
+      // Questions tied to a sport follow what the user actually trains (lib/cards/hands/sport.ts); never assume running.
+      distanceBestRide: (bucket: string) => `These are my best and most recent rides of about ${bucket}. Compare average speed, heart rate and training load across them: where did the progress come from, what is missing for the next PR, and what should the next 4 weeks focus on for this distance?`,
+      distanceBestSwim: (bucket: string) => `These are my best and most recent swims of about ${bucket}. Compare pace per 100 m, heart rate and training load across them: where did the progress come from, what is missing for the next PR, and what should the next 4 weeks focus on for this distance?`,
+      sameRouteRide: (km: string) => `These are my rides on the same route (about ${km}). Compare average speed, heart rate and second-half heart-rate drift: on the same route, am I faster, more efficient, or slipping? Tell me the likely reasons.`,
+      sameRouteHike: (km: string) => `These are my hikes on the same route (about ${km}). Compare total time, heart rate and second-half heart-rate drift: on the same route, am I faster, more efficient, or slipping? Tell me the likely reasons.`,
+      raceReviewAny: (date: string, what: string) => `My ${what} on ${date} was a race (or a clear all-out effort). Four weeks of training and sleep before it are attached. Review it: were pacing and heart rate sensible, was the training volume and taper right, did sleep or recovery hold me back, and what should I change before the next race?`,
+      sessionReview: (what: string, count: number) => `These are my last ${count} ${what} sessions, with sleep and recovery over the same days. Compare duration, average heart rate and training load across them: is the intensity going up, flat or down, and is recovery keeping up? Tell me how to adjust the next two weeks.`,
+      sessionStrength: (what: string, count: number) => `These are my last ${count} ${what} sessions, with sleep and recovery over the same days. Compare duration, average heart rate and training load across them: is the intensity going up, flat or down, and am I recovering between sessions? Tell me how to progress over the next two weeks; if you need my weights, sets or reps, ask me first.`,
     },
   },
   {
@@ -95,6 +113,7 @@ const messages = defineMessages(
       recovery_day: 'Planear un día de recuperación',
       comeback: 'Volver poco a poco',
       plan_tomorrow: 'Planear mañana',
+      session_review: 'Sesiones recientes',
     },
     kindSub: {
       distance_best: 'Marcas anteriores y carreras recientes en la misma distancia',
@@ -123,6 +142,14 @@ const messages = defineMessages(
       recovery_day: 'Anoche dormí mal. Adjunto los datos de sueño y recuperación de las últimas noches y los entrenamientos de los últimos días. Ayúdame a planear hoy como día de recuperación: ¿qué actividad me conviene, cuál debería ser el límite de intensidad y a qué hora debería acostarme?',
       comeback: (days: number) => `Llevo ${days} días sin entrenar. Adjunto los últimos entrenamientos antes de la pausa y dos semanas de sueño y recuperación. Ayúdame a planear una vuelta suave, sin excederme, y dime cómo retomar poco a poco la semana siguiente.`,
       plan_tomorrow: (date: string) => `Planifica solo el entrenamiento de mañana (${date}). Adjunto los entrenamientos, el sueño, la recuperación y la carga de entrenamiento de los últimos 7 días. Primero consulta por tu cuenta el clima de mañana en mi ubicación. Después decide si conviene entrenar en interiores o al aire libre y a qué hora. Devuélvelo en el formato de plan de entrenamiento, con from y to configurados como ${date}. No modifiques ningún otro día.`,
+      // 和运动项目有关的几问按用户常练的大类说（lib/cards/hands/sport.ts），不默认是跑步。
+      distanceBestRide: (bucket: string) => `Estos son mis récords y mis últimas salidas en bici de unos ${bucket}. Compara la velocidad media, la frecuencia cardíaca y la carga de entrenamiento: ¿de dónde viene la mejora, qué me falta para el próximo récord y en qué debería centrarme las próximas 4 semanas para esta distancia?`,
+      distanceBestSwim: (bucket: string) => `Estos son mis récords y mis últimas sesiones de natación de unos ${bucket}. Compara el ritmo por 100 m, la frecuencia cardíaca y la carga de entrenamiento: ¿de dónde viene la mejora, qué me falta para el próximo récord y en qué debería centrarme las próximas 4 semanas para esta distancia?`,
+      sameRouteRide: (km: string) => `Estas son varias salidas en bici por la misma ruta (aprox. ${km}). Compara la velocidad media, la frecuencia cardíaca y cuánto se eleva en la segunda mitad: en la misma ruta, ¿voy más rápido, con menos esfuerzo o estoy perdiendo rendimiento? Explícame las posibles causas.`,
+      sameRouteHike: (km: string) => `Estas son varias caminatas por la misma ruta (aprox. ${km}). Compara el tiempo total, la frecuencia cardíaca y cuánto se eleva en la segunda mitad: en la misma ruta, ¿voy más rápido, con menos esfuerzo o estoy perdiendo forma? Explícame las posibles causas.`,
+      raceReviewAny: (date: string, what: string) => `La sesión de ${what} del ${date} fue una competición (o un esfuerzo casi máximo). Adjunto las cuatro semanas previas de entrenamiento y sueño. Revísala: ¿fueron adecuados el reparto del esfuerzo y la frecuencia cardíaca, el volumen y la reducción de carga antes de la prueba, y el sueño y la recuperación? ¿Qué debería ajustar antes de la próxima?`,
+      sessionReview: (what: string, count: number) => `Estas son mis últimas ${count} sesiones de ${what}, con el sueño y la recuperación de esos días. Compara la duración, la frecuencia cardíaca media y la carga de entrenamiento de cada una: ¿la intensidad sube, se estanca o baja, y la recuperación acompaña? Dime cómo ajustar las próximas dos semanas.`,
+      sessionStrength: (what: string, count: number) => `Estas son mis últimas ${count} sesiones de ${what}, con el sueño y la recuperación de esos días. Compara la duración, la frecuencia cardíaca media y la carga de entrenamiento de cada una: ¿la intensidad sube, se estanca o baja, y me recupero bien entre sesiones? Dime cómo progresar las próximas dos semanas; si necesitas los pesos, series o repeticiones, pregúntamelos primero.`,
     },
   },
   'components/cards/hands',

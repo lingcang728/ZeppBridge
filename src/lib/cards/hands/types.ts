@@ -12,7 +12,7 @@ export type { HandFacts, HandLines, HandNight, HandWorkout };
 /** 「按问题发牌」的四种（交给 AI 主面板上直接能选）。 */
 export type QuestionHandKind = 'same_route' | 'distance_best' | 'race_review' | 'recovery_nights';
 /** 首页建议卡点进来的几种。 */
-export type SuggestHandKind = 'review_workout' | 'recovery_day' | 'comeback' | 'plan_tomorrow';
+export type SuggestHandKind = 'review_workout' | 'recovery_day' | 'comeback' | 'plan_tomorrow' | 'session_review';
 export type HandKind = QuestionHandKind | SuggestHandKind;
 
 /** 这张牌为什么在这手牌里（牌面角标按它写）。 */

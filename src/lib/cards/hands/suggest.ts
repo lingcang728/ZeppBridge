@@ -1,8 +1,9 @@
 /**
- * 首页建议卡点进来的几手牌：复盘这次、排个恢复日、排个轻松的回归、帮我排明天。
+ * 首页建议卡点进来的几手牌：复盘这次、排个恢复日、排个轻松的回归、帮我排明天、最近几次同类训练。
  * 和「按问题发牌」同一套牌的形状，交给 AI 的时候也走同一条路（toTask.ts）。
  */
-import { COMEBACK_LAST, COMEBACK_SPAN_DAYS, RECENT_DAYS } from './constants';
+import { COMEBACK_LAST, COMEBACK_SPAN_DAYS, RECENT_DAYS, SESSION_DAYS, SESSION_KEEP, SESSION_MIN } from './constants';
+import { DISTANCE_SPORTS, sportOf, sportProfile, type Sport } from './sport';
 import type { HandFacts, HandResult, HandWorkout } from './types';
 import { addDays, familyOf, finishHand, nightCard, substantial, workoutCard } from './util';
 
@@ -77,6 +78,40 @@ export const planTomorrow = (facts: HandFacts): HandResult => {
     hand: finishHand(
       { kind: 'plan_tomorrow', span: { from, to: facts.today, categories: [...RECOVERY_CATEGORIES, 'training'] }, params: { tomorrow: addDays(facts.today, 1) } },
       cards,
+    ),
+  };
+};
+
+/** 不按距离比的几类（力量、拉伸、球类、操课……）。跑、骑、游有同距离段，徒步有同一条路线。 */
+const SESSION_SPORTS: readonly Sport[] = ['strength', 'mobility', 'other'];
+
+/**
+ * 「最近的 X 练得怎么样」：没有距离可比的运动，按一次次的时长、心率、负荷比。
+ * 练哪一种：最近 `SESSION_DAYS` 天里这几类中次数最多的那一个类型（同样多取最近练的），至少 `SESSION_MIN` 次；
+ * 而且这一大类得是用户常练的（画像里有，或者画像里压根没有跑、骑、游——不给天天跑步的人问他偶尔一次的瑜伽）。
+ */
+export const sessionReview = (facts: HandFacts): HandResult => {
+  const profile = sportProfile(facts.workouts, facts.today);
+  const allowed = SESSION_SPORTS.filter((sport) => profile.includes(sport) || !profile.some((one) => (DISTANCE_SPORTS as readonly Sport[]).includes(one)));
+  const from = addDays(facts.today, -(SESSION_DAYS - 1));
+  const tally = new Map<string, HandWorkout[]>();
+  for (const w of facts.workouts) {
+    if (w.date < from || !substantial(w) || !allowed.includes(sportOf(w.workout_type))) continue;
+    tally.set(w.workout_type, [...(tally.get(w.workout_type) ?? []), w]);
+  }
+  const picked = [...tally.values()]
+    .filter((list) => list.length >= SESSION_MIN)
+    .sort((a, b) => b.length - a.length || b[b.length - 1]!.start_time.localeCompare(a[a.length - 1]!.start_time))[0];
+  if (!picked) return { ok: false, kind: 'session_review', reason: 'no_data' };
+  const newest = [...picked].reverse();
+  const kept = newest.slice(0, SESSION_KEEP);
+  const first = kept[kept.length - 1]!.date;
+  return {
+    ok: true,
+    hand: finishHand(
+      { kind: 'session_review', span: { from: first, to: facts.today, categories: [...RECOVERY_CATEGORIES] }, params: { type: picked[0]!.workout_type, count: picked.length } },
+      kept.map((w, i) => workoutCard(w, i === 0 ? 'anchor' : 'recent')),
+      newest.slice(SESSION_KEEP).map((w) => workoutCard(w, 'same')),
     ),
   };
 };

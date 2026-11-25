@@ -86,3 +86,43 @@ describe('今日一问的推荐顺序', () => {
     expect(pickSuggestion(facts([]))).toBeNull();
   });
 });
+
+describe('今日一问按用户常练的项目来问', () => {
+  const ride = (daysAgo: number, km: number, secPerKm: number, extra: Partial<HandWorkout> = {}) => run(daysAgo, km, secPerKm, { workout_type: 'ride', ...extra });
+  const lift = (daysAgo: number, extra: Partial<HandWorkout> = {}) =>
+    run(daysAgo, 0, 0, { workout_type: 'strength', distance_m: null, duration_s: 50 * 60, training_load: 60, ...extra });
+
+  it('只骑车的人：同距离问骑行（按 5 公里一档），不出跑步的题', () => {
+    const f = facts(Array.from({ length: 8 }, (_, i) => ride(30 - i * 3, 40 + (i % 2), 130)));
+    const best = rankSuggestions(f).find((s) => s.template === 'distance_best');
+    expect(best?.hand.params.sport).toBe('ride');
+    expect(best?.hand.params.bucket).toBe('km:40');
+    expect(best?.hand.cards.every((c) => c.kind === 'workout' && c.workout.workout_type === 'ride')).toBe(true);
+  });
+
+  it('常练力量的人：先问最近几次力量训练，不问距离和路线', () => {
+    const f = facts([...Array.from({ length: 10 }, (_, i) => lift(28 - i * 3)), run(200, 5, 330), run(210, 5, 320)]);
+    const templates = order(f);
+    expect(templates).toContain('session_review');
+    expect(templates).not.toContain('distance_best');
+    expect(templates.slice(0, 2)).toContain('session_review');
+    const session = rankSuggestions(f).find((s) => s.template === 'session_review')!;
+    expect(session.hand.params.type).toBe('strength');
+  });
+
+  it('天天跑步、偶尔做一次瑜伽：不问瑜伽', () => {
+    const f = facts([...usual().workouts, run(2, 0, 0, { workout_type: 'yoga', distance_m: null, duration_s: 40 * 60 })]);
+    expect(order(f)).not.toContain('session_review');
+  });
+
+  it('短途通勤骑得快不算比赛；比赛复盘的日期和项目取自同一次运动', () => {
+    const commutes = Array.from({ length: 8 }, (_, i) => ride(40 - i * 4, 6, 200));
+    const fastCommute = ride(1, 6, 150, { workout_id: 'fast-commute' });
+    expect(order(facts([...commutes, fastCommute]))).not.toContain('race_review');
+    const race = ride(2, 40, 100, { workout_id: 'gran-fondo', race: true });
+    const ranked = rankSuggestions(facts([...commutes, race])).find((s) => s.template === 'race_review')!;
+    const card = ranked.hand.cards.find((c) => c.role === 'race')!;
+    expect(card.kind === 'workout' && card.workout.workout_id).toBe('gran-fondo');
+    expect(ranked.hand.params.date).toBe(card.date);
+  });
+});

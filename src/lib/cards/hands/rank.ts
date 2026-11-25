@@ -3,22 +3,24 @@
  *
  * 每个模板就是一手牌（规则在 question.ts / suggest.ts），发不出牌的模板不出，不放空牌。
  * 排序先写死：有当下的事（刚比完赛、刚刷了 PR、刚练完、昨晚恢复异常、昨晚睡得差、很久没动）就排在前面，
- * 其余按固定顺序垫底。第一个就是今天推荐的那一问；卡上的刷新键按这个顺序一个个换过去，转一圈回到第一个。
+ * 其余垫底：通用的（排明天、昨晚睡得怎么样）在前，和运动项目有关的按用户画像（sport.ts）——常练的是跑、骑、游、徒步，
+ * 先问同距离段和同一条路线；常练的是力量、拉伸、球类这些，先问最近几次同类训练。第一个就是今天推荐的那一问；卡上的刷新键按这个顺序一个个换过去，转一圈回到第一个。
  * 阈值在 constants.ts。
  */
 import { PR_RECENT_DAYS, RACE_RECENT_DAYS } from './constants';
 import { distanceBest, raceReview, recoveryNights, sameRoute } from './question';
-import { comeback, planTomorrow, recoveryDay, reviewWorkout } from './suggest';
+import { comeback, planTomorrow, recoveryDay, reviewWorkout, sessionReview } from './suggest';
+import { sportProfile } from './sport';
 import type { Hand, HandFacts, HandResult } from './types';
 import { dayDiff } from './util';
 import type { Suggestion } from '../../../types/hands';
 
 export type SuggestTemplate =
   | 'plan_tomorrow' | 'sleep_review' | 'review_workout' | 'race_review'
-  | 'distance_best' | 'same_route' | 'recovery_nights' | 'comeback';
+  | 'distance_best' | 'same_route' | 'recovery_nights' | 'comeback' | 'session_review';
 
 export const SUGGEST_TEMPLATES: readonly SuggestTemplate[] = [
-  'plan_tomorrow', 'sleep_review', 'review_workout', 'race_review', 'distance_best', 'same_route', 'recovery_nights', 'comeback',
+  'plan_tomorrow', 'sleep_review', 'review_workout', 'race_review', 'distance_best', 'same_route', 'recovery_nights', 'comeback', 'session_review',
 ];
 export const isSuggestTemplate = (value: unknown): value is SuggestTemplate => SUGGEST_TEMPLATES.includes(value as SuggestTemplate);
 
@@ -29,8 +31,11 @@ export interface RankedSuggestion {
   suggestion: Suggestion | null;
 }
 
-/** 没有当下的事时垫底的顺序。 */
-const FALLBACK: readonly SuggestTemplate[] = ['plan_tomorrow', 'sleep_review', 'distance_best', 'same_route', 'recovery_nights', 'race_review'];
+/** 没有当下的事时垫底的顺序：通用的两问在前，`sport` 那几问按画像排，最后是恢复异常夜和比赛复盘。 */
+const fallback = (sportFirst: boolean): SuggestTemplate[] => {
+  const sport: SuggestTemplate[] = sportFirst ? ['distance_best', 'same_route', 'session_review'] : ['session_review', 'distance_best', 'same_route'];
+  return ['plan_tomorrow', 'sleep_review', ...sport, 'recovery_nights', 'race_review'];
+};
 
 const handOf = (result: HandResult): Hand | null => (result.ok && result.hand.cards.length ? result.hand : null);
 
@@ -63,6 +68,7 @@ export const rankSuggestions = (facts: HandFacts, signals: readonly Suggestion[]
       case 'distance_best': hand = handOf(distanceBest(facts)); break;
       case 'same_route': hand = handOf(sameRoute(facts)); break;
       case 'recovery_nights': hand = handOf(recoveryNights(facts)); break;
+      case 'session_review': hand = handOf(sessionReview(facts)); break;
       case 'comeback':
         hand = idle ? handOf(comeback(facts)) : null;
         suggestion = idle;
@@ -94,7 +100,8 @@ export const rankSuggestions = (facts: HandFacts, signals: readonly Suggestion[]
   if (offLastNight()) order.push('recovery_nights');
   if (poor) order.push('sleep_review');
   if (idle) order.push('comeback');
-  order.push(...FALLBACK);
+  const top = sportProfile(facts.workouts, today)[0];
+  order.push(...fallback(!top || top === 'run' || top === 'ride' || top === 'swim' || top === 'hike'));
 
   const seen = new Set<SuggestTemplate>();
   const out: RankedSuggestion[] = [];
