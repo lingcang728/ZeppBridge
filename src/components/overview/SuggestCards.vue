@@ -31,9 +31,11 @@ import HoldSendButton from './HoldSendButton.vue';
 import { CLOSE_EASE, OPEN_EASE, paced } from '../../lib/motion/timing';
 import { useRevisionReload } from '../../composables/useRevisionReload';
 import LastNightStrip from '../sleepJournal/LastNightStrip.vue';
+import BedtimeIcon from '../sleepJournal/BedtimeIcon.vue';
+import MoodFace from '../sleepJournal/MoodFace.vue';
 import { journalSentence } from '../sleepJournal/journalSentence';
 import { useSleepJournalText } from '../sleepJournal/sleepJournal.i18n';
-import { useSleepJournal } from '../../composables/useSleepJournal';
+import { isBlank, useSleepJournal } from '../../composables/useSleepJournal';
 import { dayKey as localDayKey } from '../../lib/aiTask/bridgeScale';
 import { armPageMorph } from '../../composables/usePageMorph';
 import { useStageSend } from '../../composables/ai/useStageSend';
@@ -148,10 +150,20 @@ const subOf = (s: RankedSuggestion): string => {
 const jt = useSleepJournalText();
 const sleepJournal = useSleepJournal();
 const wakeToday = computed(() => deal.facts.value?.today ?? localDayKey());
+const lastNight = computed(() => sleepJournal.entries.value.get(wakeToday.value) ?? null);
 const sleepReviewQuestion = () => {
-  const extra = journalSentence(sleepJournal.entries.value.get(wakeToday.value) ?? null, jt.value);
+  const extra = journalSentence(lastNight.value, jt.value);
   return extra ? `${t.value.sleepReviewQuestion}${jt.value.sentenceGap}${extra}` : t.value.sleepReviewQuestion;
 };
+/* 卡面合着时也要知道昨晚记没记（扇形里那张睡前牌）：轮到这一问就读一下今天这条。 */
+const isSleepReview = computed(() => current.value?.template === 'sleep_review');
+watch([isSleepReview, wakeToday], ([on, day]) => { if (on) void sleepJournal.loadRange(day, day); }, { immediate: true });
+/** 扇形最后那张睡前牌：画第一个睡前标签，只记了心情就画那张脸。 */
+const journalMini = computed(() => {
+  const entry = lastNight.value;
+  if (!isSleepReview.value || isBlank(entry)) return null;
+  return { tag: entry!.behaviors[0] ?? null, mood: entry!.mood };
+});
 const questionOf = (s: RankedSuggestion, hand: Hand) =>
   (s.template === 'sleep_review' ? sleepReviewQuestion() : handQuestion(hand, ht.value, s.suggestion));
 const instant = reducedMotion();
@@ -261,6 +273,13 @@ const prompt = computed({
 });
 watch(() => current.value?.template, () => { edited.value = null; });
 const resetPrompt = () => { edited.value = null; };
+/** 问题里接上的睡前日志那句：用户改问题时只要那句还原样在，就照样标出来。 */
+const promptMark = computed(() => {
+  const extra = isSleepReview.value ? journalSentence(lastNight.value, jt.value) : '';
+  const text = prompt.value;
+  const at = extra ? text.lastIndexOf(extra) : -1;
+  return at < 0 ? null : { before: text.slice(0, at), mark: extra, after: text.slice(at + extra.length) };
+});
 /** 把这一手和问题写进交给 AI 的任务；后端触发的那一问记成「这一次用过了」。 */
 const commit = () => {
   const s = current.value;
@@ -379,8 +398,12 @@ onDeactivated(() => {
                 <strong>{{ face.title }}</strong>
                 <small>{{ face.sub }}</small>
               </span>
-              <span :ref="setStack" class="ask-fan" aria-hidden="true">
-                <span v-for="(icon, i) in face.icons" :key="icon" class="ask-mini" :style="{ '--i': i, '--n': face.icons.length }"><Icon :name="icon" :size="18" /></span>
+              <span :ref="setStack" class="ask-fan" aria-hidden="true" :style="{ '--n': face.icons.length + (journalMini ? 1 : 0) }">
+                <span v-for="(icon, i) in face.icons" :key="icon" class="ask-mini" :style="{ '--i': i }"><Icon :name="icon" :size="18" /></span>
+                <!-- 昨晚记了睡前日志：多一张睡前牌（蓝边、右上角一个小点），它那句话会接在问题后面。 -->
+                <span v-if="journalMini" class="ask-mini journal" :style="{ '--i': face.icons.length }">
+                  <BedtimeIcon v-if="journalMini.tag" :code="journalMini.tag" :size="20" /><MoodFace v-else-if="journalMini.mood" :code="journalMini.mood" :size="22" />
+                </span>
               </span>
             </span>
           </Transition>
@@ -398,7 +421,10 @@ onDeactivated(() => {
           <template #foot>
             <LastNightStrip v-if="current.template === 'sleep_review'" :date="wakeToday" />
             <div class="ask-prompt">
-              <textarea v-model="prompt" class="ask-question" rows="3" :aria-label="t.promptLabel" spellcheck="false" />
+              <div class="ask-field">
+                <div v-if="promptMark" class="ask-shadow" aria-hidden="true">{{ promptMark.before }}<mark :key="promptMark.mark">{{ promptMark.mark }}</mark>{{ promptMark.after }}&#8203;</div>
+                <textarea v-model="prompt" class="ask-question" rows="3" :aria-label="t.promptLabel" spellcheck="false" />
+              </div>
               <button v-if="edited !== null" type="button" class="ask-reset" @click="resetPrompt"><Icon name="undo" :size="13" />{{ t.reset }}</button>
             </div>
             <div class="ask-actions">
@@ -431,11 +457,15 @@ onDeactivated(() => {
 .ask-text strong { color: var(--ink); font-size: var(--fs-3xl); font-weight: 700; line-height: 1.22; text-wrap: balance; overflow-wrap: anywhere; }
 .ask-text small { color: var(--subtle); font-size: var(--fs-sm); font-weight: 600; overflow-wrap: anywhere; }
 /* 右边一把扇开的小牌：这一手的缩影，每张画一个图标。展开时牌从这里抽出来、收起时缩回这里。 */
-.ask-fan { position: relative; flex: none; width: 126px; height: 104px; margin-top: 28px; }
+.ask-fan { position: relative; flex: none; width: calc(74px + (var(--n) - 1) * 26px); height: 104px; margin-top: 28px; }
 .ask-mini { position: absolute; bottom: 0; left: calc(var(--i) * 26px); display: grid; place-items: start; padding: 9px; width: 74px; height: 98px; border-radius: 12px;
   background: var(--mat-raised); color: var(--ask-tone);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ask-tone) 28%, transparent), 0 14px 24px -16px rgb(0 0 0 / .7);
   transform-origin: 50% 120%; rotate: calc((var(--i) - (var(--n) - 1) / 2) * 8deg); }
+/* 睡前牌：睡眠的蓝，右上角一个小点。 */
+.ask-mini.journal { background: linear-gradient(160deg, var(--mat-raised), color-mix(in srgb, var(--sleep) 12%, var(--mat-raised)));
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--sleep) 70%, transparent), 0 14px 24px -16px rgb(0 0 0 / .7); }
+.ask-mini.journal::after { content: ''; position: absolute; top: 7px; right: 7px; width: 7px; height: 7px; border-radius: 50%; background: var(--sleep); }
 .ask-tools { position: absolute; top: 12px; right: 12px; display: flex; gap: 4px; }
 .ask-tool { display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 50%;
   background: color-mix(in srgb, var(--ink) 6%, transparent); color: var(--subtle); cursor: pointer; transition: background 140ms ease, color 140ms ease, opacity 160ms ease; }
@@ -446,9 +476,16 @@ onDeactivated(() => {
 .ask-refresh-icon { display: grid; transition: rotate 560ms cubic-bezier(.32, .72, .24, 1); }
 .ask-open { padding: 0 20px 18px; }
 .ask-prompt { position: relative; display: grid; }
-.ask-question { width: 100%; min-height: 5.2em; field-sizing: content; padding: 12px 14px; border: 0; border-radius: 14px; resize: none;
-  background: color-mix(in srgb, var(--ink) 5%, transparent); box-shadow: inset 0 0 0 1px var(--mat-line); color: var(--ink);
-  font: var(--fs-sm) / 1.6 var(--font-sans); transition: box-shadow 160ms ease; }
+/* 底色铺在外层：影子在 textarea 下面，textarea 本身透明。影子和 textarea 同字体、同内边距、同折行，字透明，只露出那句的下划线。 */
+.ask-field { position: relative; display: grid; border-radius: 14px; background: color-mix(in srgb, var(--ink) 5%, transparent); }
+.ask-question, .ask-shadow { padding: 12px 14px; font: var(--fs-sm) / 1.6 var(--font-sans); letter-spacing: normal; white-space: pre-wrap; overflow-wrap: break-word; }
+.ask-question { position: relative; width: 100%; min-height: 5.2em; field-sizing: content; border: 0; border-radius: 14px; resize: none;
+  background: transparent; box-shadow: inset 0 0 0 1px var(--mat-line); color: var(--ink); transition: box-shadow 160ms ease; }
+.ask-shadow { position: absolute; inset: 0; overflow: hidden; color: transparent; pointer-events: none; user-select: none; }
+.ask-shadow mark { border-radius: 3px; background: transparent; color: transparent;
+  text-decoration: underline 2px var(--sleep); text-underline-offset: 4px; text-decoration-skip-ink: none; animation: ask-ink 700ms ease; }
+/* 那句刚接上（或换了内容）：先泛一层淡蓝再褪掉。 */
+@keyframes ask-ink { from { background: color-mix(in srgb, var(--sleep) 24%, transparent); } to { background: transparent; } }
 .ask-question:hover { box-shadow: inset 0 0 0 1px var(--line-strong); }
 .ask-question:focus-visible { outline: none; box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--accent) 70%, transparent); }
 .ask-reset { justify-self: start; display: inline-flex; align-items: center; gap: 5px; margin-top: 6px; padding: 2px 6px; border: 0; border-radius: 8px;
@@ -475,7 +512,7 @@ onDeactivated(() => {
 /* 整张卡头一次出现：原地淡入。缩成胶囊、从胶囊长回来走窗口形变（chipFlight），那时不加这层过渡。 */
 .ask-card-enter-active { transition: opacity 360ms ease; }
 .ask-card-enter-from { opacity: 0; }
-@media (prefers-reduced-motion: reduce) { .ask-refresh-icon { transition-duration: 1ms; } }
+@media (prefers-reduced-motion: reduce) { .ask-refresh-icon { transition-duration: 1ms; } .ask-shadow mark { animation: none; } }
 @container (max-width: 560px) {
   .ask-main { min-height: 0; padding: 18px 18px 16px; }
   .ask-fan { display: none; }
