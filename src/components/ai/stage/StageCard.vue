@@ -23,7 +23,8 @@ const longestWord = (title: string) => Math.max(1, ...title.split(/\s+/).map((wo
       <TintIcon class="scard-icon" :name="card.icon" :tint="card.tint" :size="26" />
       <strong class="scard-title">{{ card.title }}</strong>
       <span class="scard-line">{{ card.line }}</span>
-      <span v-if="card.kind === 'data'" class="scard-value"><b>{{ card.have ?? '—' }}</b><small v-if="card.total !== null">/{{ card.total }}</small></span>
+      <span v-if="card.kind === 'data' && card.pending && card.have === null" class="scard-value scard-shimmer" aria-hidden="true" />
+      <span v-else-if="card.kind === 'data'" class="scard-value"><b>{{ card.have ?? '—' }}</b><small v-if="card.total !== null">/{{ card.total }}</small></span>
       <span v-if="card.sub" class="scard-sub">{{ card.sub }}</span>
   </span>
 </template>
@@ -49,6 +50,12 @@ const longestWord = (title: string) => Math.max(1, ...title.split(/\s+/).map((wo
 .scard-value small { margin-left: 2px; color: var(--subtle); font: 600 calc(var(--w) * .1) var(--font-mono); }
 .scard-sub { overflow: hidden; color: var(--subtle); font-size: max(10px, calc(var(--w) * .078)); text-overflow: ellipsis; white-space: nowrap; }
 .scard.quiet .scard-value { color: var(--subtle); }
+/* 数字还在读：一条骨架在大数字的位置上闪光（只动 background-position）。 */
+.scard-shimmer { width: 62%; height: calc(var(--w) * .2); border-radius: calc(var(--w) * .05);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--ink) 7%, transparent) 30%, color-mix(in srgb, var(--ink) 16%, transparent) 50%, color-mix(in srgb, var(--ink) 7%, transparent) 70%) 0 0 / 300% 100%;
+  animation: scard-shimmer 1.3s ease-in-out infinite; }
+@keyframes scard-shimmer { from { background-position: 100% 0; } to { background-position: 0 0; } }
+@media (prefers-reduced-motion: reduce) { .scard-shimmer { animation: none; } }
 /* 个人档案：没有大数字，副行（档案前几个字）落在底边。 */
 .scard.profile { grid-template-rows: auto auto auto 1fr; }
 .scard.profile .scard-sub { align-self: end; white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.35; }

@@ -4,6 +4,8 @@
  *
  * 牌面只说三件事：这一类叫什么、交多长一段（最近 N 天 / 挑了 N 天）、里面几天真有数据（`have/total`，
  * 来自 `ai_task_preview` 的 coverage，和寄出前检查同源）。还没算出来时数字写「—」，不写 0。
+ * 关着的类别不在预览里（预览只算要交的）：「加一类」里的牌改从「你的过去」那条 90 天条带现数（只数不导出），
+ * 条带还没读回来时牌面画骨架闪光（`pending`），不画「—」。
  */
 import { computed } from 'vue';
 import type { IconName } from '../../components/Icon.vue';
@@ -22,6 +24,7 @@ import { pageQuery } from '../../lib/pageQueries';
 import { peek } from '../../lib/readCache';
 import { useAiDerived } from './useAiHub';
 import type { Workout } from '../../types';
+import type { DayStripRow } from '../../types/timeBridge';
 
 /** 从运动页「问 AI」进来、只交这一次运动时，运动牌叫「本次运动」（10-28：以前写「期间运动记录 · 最近 1 天」，看不出带的是哪次）。 */
 const anchorMessages = defineMessages(
@@ -45,7 +48,22 @@ export interface StageCardModel {
   have: number | null;
   total: number | null;
   sub: string | null;
+  /** 数字还在读（画骨架闪光）。 */
+  pending?: boolean;
 }
+
+/**
+ * 从 90 天条带数一类在某段范围里几天有记录（同一类的几行指标合在一起，一天有一行有就算）。
+ * 范围是「最近 days 天」或挑的那几天；超出条带的日子不算进分母。没有这一类的行时返回 null。
+ */
+export const stripCoverage = (rows: DayStripRow[], category: AiTaskCategory, days: number, picked: readonly string[] = []) => {
+  const mine = rows.filter((row) => row.category === category);
+  if (!mine.length) return null;
+  const dates = [...new Set(mine.flatMap((row) => row.cells.map((cell) => cell.date)))].sort();
+  const wanted = picked.length ? dates.filter((date) => picked.includes(date)) : dates.slice(-Math.max(1, days));
+  const filled = new Set(mine.flatMap((row) => row.cells.filter((cell) => cell.has || cell.value !== null).map((cell) => cell.date)));
+  return { days_with_data: wanted.filter((date) => filled.has(date)).length, days_in_range: wanted.length };
+};
 
 /** 一类的覆盖：不按运动分的那一行优先（同底栏小牌的取法）。 */
 const coverageOf = (rows: AiTaskCoverage[], category: AiTaskCategory) => {
@@ -89,8 +107,11 @@ export const useStageCards = () => {
   const dataCard = (category: AiTaskCategory): StageCardModel => {
     const meta = AI_TASK_CATEGORY_META[category];
     const range = categoryRangeOf(draft.value.categories, category);
-    const row = freshCoverage(preview.value, previewTask.value, draft.value, category);
     const picked = range.picked_days?.length ?? 0;
+    const row = range.enabled
+      ? freshCoverage(preview.value, previewTask.value, draft.value, category)
+      : stripCoverage(strips.rows.value, category, range.days_before + 1, range.picked_days ?? []);
+    const pending = !row && !range.enabled && strips.loading.value;
     const solo = category === 'workout' ? soloWorkout() : null;
     if (solo) {
       return {
@@ -108,6 +129,7 @@ export const useStageCards = () => {
       have: row ? row.days_with_data : null,
       total: row ? row.days_in_range : null,
       sub: extra ? s.value.extraWorkouts(extra) : row && !row.days_with_data ? s.value.noRecord : null,
+      pending,
     };
   };
 

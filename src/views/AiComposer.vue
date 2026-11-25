@@ -69,7 +69,7 @@ const history = useExchanges();
 const strips = useBridgeStrip();
 const hub = useAiHub();
 const send = useStageSend();
-const { cards, off, empty, dataCard } = useStageCards();
+const { cards, off, dataCard } = useStageCards();
 const { dataReady, isSyncing, syncProgress } = useSyncController();
 const t = useBridgeText();
 const ht = useHandoffText();
@@ -390,7 +390,7 @@ useSectionTour('ai');
     </div>
 
     <StageCardBack v-if="backCard" :card="cards.find((c) => c.id === backCard!.id) ?? backCard" :anchor="cardEl(backCard.id)" @close="backCard = null" @deal="deal" />
-    <AddKindDialog v-if="adding" :cards="off.map(dataCard)" :empty="empty" @close="adding = false" />
+    <AddKindDialog v-if="adding" :cards="off.map(dataCard)" @close="adding = false" />
     <ProfileTray v-if="profile" :anchor="cardEl('profile')" @close="profile = false" />
     <CardTable v-if="deck" :source="deck.source" :range="deck.range" :origin="deck.origin" :anchor="deck.anchor" @close="deck = null" />
     <PlanClearDialog />

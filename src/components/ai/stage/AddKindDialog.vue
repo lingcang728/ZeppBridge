@@ -2,6 +2,7 @@
 /**
  * 「加一类」（2026-10-08）：从那张虚位牌长出来，摊开被关掉的类别，各一张牌；点一张就加回左边。
  * 90 天都没有记录的类别也列出来，牌面写「没有记录」——加上了照样交，导出如实标缺失。
+ * 牌上的天数来自 90 天条带（useStageCards 的 stripCoverage）：关着的类别不在预览里，以前一直画「—」。
  */
 import ModalDialog from '../../ModalDialog.vue';
 import StageCard from './StageCard.vue';
@@ -11,7 +12,7 @@ import { useAiTaskDraft } from '../../../composables/useAiTaskDraft';
 import { useBridgeText } from '../bridge/bridge.i18n';
 import { useStageText } from './stage.i18n';
 
-const props = defineProps<{ cards: StageCardModel[]; empty: Set<AiTaskCategory> }>();
+const props = defineProps<{ cards: StageCardModel[] }>();
 const emit = defineEmits<{ close: [] }>();
 const ctl = useAiTaskDraft();
 const b = useBridgeText();
@@ -26,7 +27,7 @@ const add = (category: AiTaskCategory) => { ctl.setCategoryEnabled(category, tru
       <p v-if="!cards.length">{{ s.addEmpty }}</p>
       <ul>
         <li v-for="card in cards" :key="card.id">
-          <button type="button" @click="add(card.category!)"><StageCard :card="empty.has(card.category!) ? { ...card, sub: s.noRecord, have: null, total: null } : card" /></button>
+          <button type="button" @click="add(card.category!)"><StageCard :card="card" /></button>
         </li>
       </ul>
       <footer><button type="button" class="pill-button" @click="emit('close')">{{ b.close }}</button></footer>
