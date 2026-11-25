@@ -137,8 +137,29 @@ export const drawVisibleText = (width: number, height: number, scope: Element = 
   };
 
   const range = document.createRange();
-  const walker = document.createTreeWalker(scope, NodeFilter.SHOW_TEXT);
-  for (let node = walker.nextNode() as Text | null; node; node = walker.nextNode() as Text | null) {
+  /*
+   * 只走可视区里的那几棵子树。以前逐个文字节点量 rect：睡眠日档几百行平时靠 `content-visibility: auto` 不排版，
+   * 化灰一量就逼着整页几百行全排一遍，换语言卡上好几秒；月档一屏外还有上千个小格的字。
+   * 现在按元素走：跳过渲染的子树（content-visibility）和外接框整个在可视区外的元素连同子树一起跳过，
+   * 只有剩下的文字节点才量 rect。外接框比较宽松（多留半屏），溢出父元素的绝对定位小字不至于被误跳。
+   */
+  const margin = Math.max(width, height) / 2;
+  const nearScreen = (r: DOMRect) => r.right > -margin && r.bottom > -margin && r.left < width + margin && r.top < height + margin;
+  const walker = document.createTreeWalker(scope, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT, {
+    acceptNode(node) {
+      if (node.nodeType === Node.TEXT_NODE) return NodeFilter.FILTER_ACCEPT;
+      const el = node as Element;
+      if (SKIP_TAGS.has(el.tagName)) return NodeFilter.FILTER_REJECT;
+      if (typeof el.checkVisibility === 'function' && !el.checkVisibility({ contentVisibilityAuto: true })) return NodeFilter.FILTER_REJECT;
+      // display: contents 没有自己的框（宽高 0），不能按它判断；固定定位的浮层不跟着父元素走。
+      const box = el.getBoundingClientRect();
+      if ((box.width || box.height) && !nearScreen(box) && getComputedStyle(el).position !== 'fixed') return NodeFilter.FILTER_REJECT;
+      return NodeFilter.FILTER_SKIP;
+    },
+  });
+  for (let next = walker.nextNode(); next; next = walker.nextNode()) {
+    if (next.nodeType !== Node.TEXT_NODE) continue;
+    const node = next as Text;
     const raw = node.data;
     // 只有带字的才化灰：纯数字、日期、符号换了语言也还是那个样子，碎掉再原样出现反而怪。
     if (!LETTER.test(raw)) continue;

@@ -100,6 +100,8 @@ export const breatheCharts = (
   const charts = [...(scope ?? document).querySelectorAll<HTMLElement | SVGSVGElement>('canvas, svg')].filter((el) => {
     // SwapChart 的画布自己跟着涟漪交叉溶解（见下面的 openSweep）；这里再逐帧改它的 blur 就是动滤镜了。
     if (el === skip || el.closest('[data-ash-skip], .swap-chart')) return false;
+    // 跳过渲染的子树（列表行的 content-visibility: auto）先筛掉：对它们量框会逼着整排行重新排版。
+    if (typeof el.checkVisibility === 'function' && !el.checkVisibility({ contentVisibilityAuto: true })) return false;
     const r = el.getBoundingClientRect();
     return r.width >= CHART_MIN_W && r.height >= CHART_MIN_H && r.right > 0 && r.bottom > 0 && r.left < width && r.top < height;
   });

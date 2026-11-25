@@ -9,6 +9,7 @@
  * 往右时镜像。半路再甩，从此刻的样子接着走。减少动态效果时直接换，不飞。
  * 点顶牌（没拖过）去那次运动，卡↔页形变从顶牌出发；拖完浏览器补发的那下 click 吞掉。键盘 ← / → 换牌、Enter 打开。
  * 只动 transform（层次靠 WAAPI 的 z-index 离散关键帧在抽到最远处换）。
+ * 压在下面的牌带 data-ash-skip：被顶牌整张盖住，换语言时不必烧字，查文字重叠时也不算。
  */
 import { computed, nextTick, ref, type ComponentPublicInstance } from 'vue';
 import { RouterLink } from 'vue-router';
@@ -164,7 +165,7 @@ const cardStyle = (i: number) => {
         :class="['pb-card', { top: i === top, link: !!effort.workout_id }]" :style="cardStyle(i)"
         :data-morph-card="i === top && effort.workout_id ? '' : undefined"
         :tabindex="i === top && !effort.workout_id && swipeable ? 0 : undefined" draggable="false"
-        :inert="i !== top || undefined" :aria-hidden="i !== top || undefined" :aria-label="label(i)">
+        :inert="i !== top || undefined" :aria-hidden="i !== top || undefined" :data-ash-skip="i !== top ? '' : undefined" :aria-label="label(i)">
         <span :class="['pb-medal', `rank-${i + 1}`]" aria-hidden="true">{{ i + 1 }}</span>
         <span class="pb-dist">{{ t.distances[row.key] }}</span>
         <span class="pb-time">{{ clockText(effort.seconds) }}</span>
