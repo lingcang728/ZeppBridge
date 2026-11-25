@@ -424,7 +424,7 @@ within) or `err.mcp.scope_no_grants` (nothing is shared).
 | `list_available_metrics` | Actual local metrics, with source, unit, count and date range |
 | `get_metric_records` | Paged stored daily values or individual readings for any discovered metric |
 | `list_sleep_sessions` | Paged sleep summaries and IDs |
-| `get_sleep_detail` | One night in detail, stage durations in minutes |
+| `get_sleep_detail` | One night in detail, stage durations in minutes; `bedtimeJournal` is the bedtime journal kept for that night (`beforeBed` English codes, `wakeMood`), `null` when not kept, left out inside task scope |
 | `list_life_events` | Locally authored life events in a date window |
 | `get_data_health` | Fetch/parse/write state and coverage per stream. Per-stream parse counts separate `empty_response` (Zepp answered with an empty list for that window: nothing there, not an error) from `quarantined` (a payload the parser could not read) |
 | `get_training_context` | Recent training and recovery in one call (default 28 days, maximum 90): a day-by-day table aligned to local dates (readiness, resting heart rate and baseline — taken from the sleep summary's `rhr`, not the average heart rate during sleep — sleep HRV and baseline, stress, daily load, steps, sleep and naps), a summary of every workout (pace in s/km, seconds per heart-rate zone, load, training effect, the watch's RPE plus the user's own `userRpe` and sore spots), days since the last workout, the active plan and life events (`epoch: true` marks a named era such as a marathon build) |

@@ -350,7 +350,7 @@ stdio 传输，**不监听任何端口**。只有被调用的工具需要时才�
 | `list_available_metrics` | 本机实际入库的指标，带来源、单位、记录数和日期范围 |
 | `get_metric_records` | 分页读取任一已发现指标的每日值或逐次测量值 |
 | `list_sleep_sessions` | 分页列出睡眠摘要和 ID |
-| `get_sleep_detail` | 一晚睡眠的明细，分期时长单位分钟 |
+| `get_sleep_detail` | 一晚睡眠的明细，分期时长单位分钟；`bedtimeJournal` 是这一晚自己记的睡前日志（`beforeBed` 英文码、`wakeMood`），没记是 `null`，任务范围里不带 |
 | `list_life_events` | 指定日期窗口内的本机生活事件 |
 | `get_data_health` | 每条流的抓取 / 解析 / 写入状态与覆盖情况。逐流解析计数把 `empty_response`（Zepp 对那段时间回了空列表：本来就没有，不是错误）和 `quarantined`（解析器读不懂的报文）分开 |
 | `get_training_context` | 近期训练与恢复一次给齐（默认 28 天，最多 90）：按本地日对齐的每日表（准备度、静息心率及基线——取自睡眠汇总的 `rhr`，不是睡眠期间的平均心率——睡眠 HRV 及基线、压力、每日负荷、步数、睡眠与小睡）、每次运动摘要（配速 s/km、心率区间秒数、负荷、训练效果、手表 RPE 和用户自己的 `userRpe` 与酸痛部位）、距上次运动几天、已生效的计划和生活事件（`epoch: true` 是起了名的纪元，如「备战首马」） |

@@ -21,6 +21,11 @@ import { bucketOf, rankSuggestions, type Hand, type RankedSuggestion, type Sugge
 import { afterMotion } from '../../lib/motion/budget';
 import { useSuggestCards } from '../../composables/useSuggestCards';
 import { useRevisionReload } from '../../composables/useRevisionReload';
+import LastNightStrip from '../sleepJournal/LastNightStrip.vue';
+import { journalSentence } from '../sleepJournal/journalSentence';
+import { useSleepJournalText } from '../sleepJournal/sleepJournal.i18n';
+import { useSleepJournal } from '../../composables/useSleepJournal';
+import { dayKey as localDayKey } from '../../lib/aiTask/bridgeScale';
 import { armPageMorph } from '../../composables/usePageMorph';
 import { useStageSend } from '../../composables/ai/useStageSend';
 import { useAiTaskDraft } from '../../composables/useAiTaskDraft';
@@ -101,8 +106,16 @@ const titleOf = (s: RankedSuggestion): string => {
     default: return tt.title[s.template];
   }
 };
+/* 「昨晚睡得怎么样」：昨晚记了睡前日志（醒来那天 = 今天）就接在问题后面一起交出去。 */
+const jt = useSleepJournalText();
+const sleepJournal = useSleepJournal();
+const wakeToday = computed(() => deal.facts.value?.today ?? localDayKey());
+const sleepReviewQuestion = () => {
+  const extra = journalSentence(sleepJournal.entries.value.get(wakeToday.value) ?? null, jt.value);
+  return extra ? `${t.value.sleepReviewQuestion}${jt.value.sentenceGap}${extra}` : t.value.sleepReviewQuestion;
+};
 const questionOf = (s: RankedSuggestion, hand: Hand) =>
-  (s.template === 'sleep_review' ? t.value.sleepReviewQuestion : handQuestion(hand, ht.value, s.suggestion));
+  (s.template === 'sleep_review' ? sleepReviewQuestion() : handQuestion(hand, ht.value, s.suggestion));
 const face = computed(() => {
   const s = current.value;
   if (!s) return null;
@@ -205,6 +218,7 @@ const instant = reducedMotion();
           <HandTable ref="table" :hand="hand" :title="face.title" :lines="deal.lines.value" :anchor="stack" :show-bench="showBench"
             @change="onChange" @close="onClose">
             <template #foot>
+              <LastNightStrip v-if="current.template === 'sleep_review'" :date="wakeToday" />
               <p class="ask-question">{{ question }}</p>
               <div class="ask-actions">
                 <button type="button" :class="['ask-action', { on: showBench }]" :aria-pressed="showBench" @click="showBench = !showBench">

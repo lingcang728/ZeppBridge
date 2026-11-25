@@ -287,6 +287,12 @@ pub(crate) use feedback::{
     workout_feedback_toast_due, workout_feedback_toast_show,
 };
 
+mod sleep_journal;
+pub(crate) use sleep_journal::{
+    sleep_journal_dismiss, sleep_journal_factors, sleep_journal_list, sleep_journal_prompt,
+    sleep_journal_save, sleep_journal_snooze,
+};
+
 mod logbook;
 pub(crate) use logbook::{
     injuries_list, injury_delete, injury_save, personal_records, race_delete, race_save,

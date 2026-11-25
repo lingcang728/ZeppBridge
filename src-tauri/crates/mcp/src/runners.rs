@@ -246,8 +246,19 @@ pub(super) fn run_sleep_detail(
                 let day = session.end_time.with_timezone(&Local).date_naive();
                 access::project_sleep_fields(&mut sleep, &permit.sleep_excluded_fields(day));
             }
+            // 睡前日志记在醒来那天下：这一晚自己勾的睡前做了什么、醒来感觉。
+            // 任务授权只开了睡眠数据，没开自己记的东西，任务范围里不带。
+            let wake_day = session.end_time.with_timezone(&Local).date_naive();
+            let journal = if scope.is_task_scoped() {
+                None
+            } else {
+                db.sleep_journal_entry(&wake_day.to_string())
+                    .map_err(|error| CallFailure::plain(error.user_message()))?
+                    .and_then(|entry| entry.export_json())
+            };
             json!({
                 "sleep": sleep,
+                "bedtimeJournal": journal,
                 "units": { "stageMinutes": "min", "heartRate": "bpm" },
                 "missingValues": contract::MISSING_VALUE_CONVENTION,
             })

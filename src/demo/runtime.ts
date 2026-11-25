@@ -32,6 +32,7 @@ import { createDemoDataLetters } from './dataLetters';
 import { createDemoExtras } from './extras';
 import { createDemoHands } from './hands';
 import { createDemoAlbum } from './album';
+import { createDemoSleepJournal } from './sleepJournal';
 import { demoPlanHistory } from './plan';
 import type { HeartRateZonePreference } from '../types';
 
@@ -220,7 +221,7 @@ export const installDemoRuntime = (now: Date = new Date()): DemoData => {
     training_plan_set_ai_publish: a => plan.setAiPublish(!!a.allowed),
     training_plan_publish: (args) => plan.publish(args.action as PlanPublishAction, Boolean(args.confirmClear)),
   };
-  Object.assign(handlers, operations.handlers, createDemoLogbook(data), createDemoDataLetters(data), createDemoWorkoutEdits(data), createDemoImports(data), createDemoExtras(data), createDemoHands(data), createDemoAlbum(data), {
+  Object.assign(handlers, operations.handlers, createDemoLogbook(data), createDemoDataLetters(data), createDemoWorkoutEdits(data), createDemoImports(data), createDemoExtras(data), createDemoHands(data), createDemoAlbum(data), createDemoSleepJournal(data), {
     // 演示里不发系统通知。
     workout_feedback_toast_due: () => null, workout_feedback_toast_show: () => null,
     export_my_records: () => 128,

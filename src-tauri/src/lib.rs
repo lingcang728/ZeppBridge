@@ -78,6 +78,10 @@ use commands::{card_hand_facts, card_hand_lines, suggestion_cards};
 use commands::{
     get_sleep_months, get_sleep_stage_strips, get_workout_months, get_workout_route_shapes,
 };
+use commands::{
+    sleep_journal_dismiss, sleep_journal_factors, sleep_journal_list, sleep_journal_prompt,
+    sleep_journal_save, sleep_journal_snooze,
+};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 use tauri::menu::{Menu, MenuItem};
@@ -842,6 +846,12 @@ pub fn run() {
             workout_feedback_toast_due,
             workout_feedback_toast_show,
             workout_feedback_adjusted,
+            sleep_journal_prompt,
+            sleep_journal_list,
+            sleep_journal_save,
+            sleep_journal_dismiss,
+            sleep_journal_snooze,
+            sleep_journal_factors,
             coach_notes_list,
             coach_note_add,
             coach_note_decide,

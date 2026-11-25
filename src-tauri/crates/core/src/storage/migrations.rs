@@ -1647,6 +1647,26 @@ impl Database {
             "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(54, ?1)",
             [Utc::now().to_rfc3339()],
         )?;
+        // v55：睡前日志与睡醒心情（Zepp App 的 manualData，type=sleep）。一行一个醒来那天的本地日期。
+        // `behaviors` 是 Zepp 的 sb 码（JSON 字符串数组，"1"–"18"），`mood` 是 sf 码（"1"–"5"）。
+        // 用户自己的东西：不挂外键到 sleep_sessions，重放、保留期清理都不碰。
+        // `pending_upload`：本机改过、还没写回 Zepp；同步拉回云端那份时不覆盖它。
+        self.conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS sleep_journal (
+                date TEXT PRIMARY KEY,
+                behaviors TEXT NOT NULL DEFAULT '[]',
+                mood TEXT CHECK(mood IS NULL OR mood IN ('1', '2', '3', '4', '5')),
+                source TEXT NOT NULL CHECK(source IN ('zepp', 'local')),
+                pending_upload INTEGER NOT NULL DEFAULT 0,
+                cloud_synced_at TEXT,
+                updated_at TEXT NOT NULL
+             );",
+        )?;
+        self.conn.execute_batch("PRAGMA user_version = 55;")?;
+        self.conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(55, ?1)",
+            [Utc::now().to_rfc3339()],
+        )?;
         self.ensure_cloud_sync_metadata()?;
         Ok(())
     }

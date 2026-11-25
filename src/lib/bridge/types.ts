@@ -351,6 +351,17 @@ export interface BridgeBackend {
   /** 「这周别问」：返回到哪天为止（下周一）。 */
   workoutFeedbackSnooze(): Promise<string>;
   workoutFeedbackAdjusted(workoutId: string, adjustment: import('../../types/feedback').FeedbackAdjustment): Promise<void>;
+  /** 睡前日志：首页现在该不该问「昨晚」（今天醒来的主睡眠、18 小时内、还没记）。 */
+  sleepJournalPrompt(): Promise<import('../../types/sleepJournal').SleepJournalPrompt | null>;
+  /** 一段日期里记过的晚上（醒来那天，含两端），新的在前。 */
+  sleepJournalList(from: string, to: string): Promise<import('../../types/sleepJournal').SleepJournalEntry[]>;
+  /** 记一晚：先存本机，再试着写回 Zepp。 */
+  sleepJournalSave(input: import('../../types/sleepJournal').SleepJournalInput): Promise<import('../../types/sleepJournal').SleepJournalSaved>;
+  sleepJournalDismiss(): Promise<void>;
+  /** 「这周别问」：返回到哪天为止（下周一）。 */
+  sleepJournalSnooze(): Promise<string>;
+  /** 睡前因素：往回一年里记过的晚上，按标签比评分、深睡、夜醒。 */
+  sleepJournalFactors(): Promise<import('../../types/sleepJournal').SleepFactors>;
   /** 教练档案（AI 记忆收件箱）：记住的 + 等确认的。 */
   coachNotesList(): Promise<import('../../types/coachNotes').CoachNotes>;
   coachNoteAdd(text: string): Promise<number>;

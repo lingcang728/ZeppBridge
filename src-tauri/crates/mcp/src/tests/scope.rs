@@ -433,3 +433,33 @@ fn request_meta_and_params_cannot_override_the_process_scope() {
     // 这里会真的走 open_db——没有数据库时也是 isError，绝不是放行。
     assert!(result.is_ok());
 }
+
+#[test]
+fn sleep_detail_carries_the_bedtime_journal_of_the_wake_day() {
+    let night = sleep_session("night", 3, None);
+    let library = TestLibrary::new(std::slice::from_ref(&night));
+    let wake_day = night
+        .end_time
+        .with_timezone(&Local)
+        .date_naive()
+        .to_string();
+    let db = Database::open_migrated(&library.0.join("zepp.db")).unwrap();
+    db.save_sleep_journal(
+        &zeppbridge_core::storage::sleep_journal::SleepJournalInput {
+            date: wake_day.clone(),
+            behaviors: vec!["17".into(), "3".into()],
+            mood: Some("3".into()),
+        },
+    )
+    .unwrap();
+    drop(db);
+    let detail = library.call_sleep(json!({ "sleepId": "night" }));
+    assert_eq!(
+        detail["structuredContent"]["bedtimeJournal"],
+        json!({ "date": wake_day, "beforeBed": ["music", "late_water"], "wakeMood": "calm" })
+    );
+
+    let bare = TestLibrary::new(&[sleep_session("other", 4, None)]);
+    let detail = bare.call_sleep(json!({ "sleepId": "other" }));
+    assert_eq!(detail["structuredContent"]["bedtimeJournal"], Value::Null);
+}

@@ -262,6 +262,13 @@ impl SyncManager {
                 return Err(error);
             }
         }
+        // 睡前日志也一样：一次请求拉回全部，顺带把本机记过、还没写回的写回去。
+        if let Err(error) = self.sync_sleep_journal().await {
+            if error.is_cancelled() {
+                return Err(error);
+            }
+            tracing::warn!(code = error.code(), "睡前日志这一步没成，下次同步再试");
+        }
 
         // 真正失败的流。`Unavailable` / `Unverified` 不在其中：那是「这块表
         // 没有这个能力」，不是「取失败了」。

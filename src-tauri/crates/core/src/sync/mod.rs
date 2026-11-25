@@ -356,6 +356,41 @@ impl SyncManager {
         Ok(true)
     }
 
+    /// 睡前日志与睡醒心情：拉回 Zepp 那份并进本机（本机还没写回的不动），再把还没写回的写回去。
+    /// 写回失败的留着标记，下次同步再写；返回这次写回了几晚。
+    pub async fn sync_sleep_journal(&self) -> Result<usize> {
+        let today = chrono::Local::now().date_naive().to_string();
+        let items = self.fetcher.fetch_sleep_journal(&today).await?;
+        self.abort_if_cancelled()?;
+        if !items.is_empty() {
+            let database = self.write_db().await?;
+            database.merge_cloud_sleep_journal(&items)?;
+        }
+        let pending = self.db.lock().await.pending_sleep_journal()?;
+        let mut uploaded = 0;
+        for entry in pending {
+            self.abort_if_cancelled()?;
+            match self
+                .fetcher
+                .upload_sleep_journal(&entry.date, &entry.zepp_summary())
+                .await
+            {
+                Ok(()) => {
+                    let database = self.write_db().await?;
+                    if database.mark_sleep_journal_uploaded(&entry)? {
+                        uploaded += 1;
+                    }
+                }
+                Err(error) if error.is_cancelled() => return Err(error),
+                // 一晚写不回去不拦后面的晚上；也不重试，标记留着下次再写。
+                Err(error) => {
+                    tracing::warn!(code = error.code(), "睡前日志有一晚没写回 Zepp");
+                }
+            }
+        }
+        Ok(uploaded)
+    }
+
     pub async fn initial_sync_report(&self) -> Result<SyncReport> {
         self.history_sync_report(UserPrefs::DEFAULT_HISTORY_SYNC_DAYS)
             .await

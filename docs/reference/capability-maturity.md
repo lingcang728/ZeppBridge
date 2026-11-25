@@ -23,6 +23,7 @@
 | Training plan drafting / sending to the watch | ✓ | ✓ paste the AI reply, week view, per-day tuning | ✗ | ✓ drafting; publishing needs "Let AI publish training plans directly" | — | refused |
 | Post-workout rating | ✓ | ✓ overview card, plan archive | ✗ | ✓ read in `get_training_plan` (`recentFeedback`); written with `annotate_workout` | — | refused |
 | Coach notes (AI memory) | ✓ | ✓ edit / delete / export Markdown; included in the AI handoff `.md` | ✗ | ✓ `propose_coach_note` (takes effect at once, undoable under Recent AI changes) | — | refused |
+| Bedtime journal and wake-up mood (same entries as the Zepp App) | ✓ pulled in full on sync; local edits written back | ✓ morning check-in on Overview, "last night" in Question of the day, bedtime factors on the Sleep page, edit a night from the sleep list | ✗ | ✓ read in `get_sleep_detail` (`bedtimeJournal`) | — | left out |
 | Account ownership (one account per library) | ✓ | ✓ | ✓ checked before sync | — | — | n/a |
 
 Legend: ✓ wired; ✗ not wired, use the desktop app; — not done by design.

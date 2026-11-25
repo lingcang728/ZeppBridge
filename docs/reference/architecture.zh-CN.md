@@ -46,7 +46,7 @@ Zepp 官方授权 ──► 中转站（zeppbridge.com）──► api-open.zepp
 - 保留期可选 1–365 天，默认 365。清理按健康记录自己的时间戳，并回收不再被引用的原始行。新建的库默认开启长期归档，不自动清理。
 - 保留 `user_fused`、`device`、`unknown` 来源；来源不明时不静默融合。
 - 编码未验证的报文只存原始数据。`band_data` 里唯一解码的是核对过的逐分钟格式（1440 分钟 × 8 字节），从中读出每小时步数（`storage/hourly_steps.rs`）。没有真实样本或路线的地方不画模拟曲线或地图。
-- 当前 schema 版本是 `PRAGMA user_version = CURRENT_SCHEMA_VERSION`（`storage/mod.rs`，目前是 52），迁移步骤在 `storage/migrations.rs`。派生列由 `NORMALIZER_REVISION` 变更触发的本地重放回填，不需要重新联网。主要节点：
+- 当前 schema 版本是 `PRAGMA user_version = CURRENT_SCHEMA_VERSION`（`storage/mod.rs`，目前是 55），迁移步骤在 `storage/migrations.rs`。派生列由 `NORMALIZER_REVISION` 变更触发的本地重放回填，不需要重新联网。主要节点：
 
   | 版本 | 改动 |
   | --- | --- |
@@ -58,6 +58,7 @@ Zepp 官方授权 ──► 中转站（zeppbridge.com）──► api-open.zepp
   | v46、v50、v51 | 导入（GPX、FIT、Strava 整包、Apple 健康；unstrap 备份） |
   | v47–v49 | 隐藏设备、小睡阶段、MCP 改动账本 |
   | v52 | 力量训练逐组明细 |
+  | v55 | 睡前日志与睡醒心情 |
 
 - 每次 schema 迁移前自动做一份一致性备份；备份或它的完整性检查失败，迁移就不进行。迁移本身拿到跨进程写锁后才开始。
 - 重放进行中 `storage::replay_in_progress()` 为真，这时发起的云端同步会以 `deferred` 结果让开、一分钟后自动重试，不和重放抢 SQLite 写锁。

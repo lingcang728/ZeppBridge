@@ -112,7 +112,7 @@ this number".
   bytes), from which hourly steps are read (`storage/hourly_steps.rs`). No
   simulated curve or map is drawn where there is no real sample or route.
 - The live schema version is `PRAGMA user_version = CURRENT_SCHEMA_VERSION`
-  (`storage/mod.rs`, currently 52). Migration steps live in
+  (`storage/mod.rs`, currently 55). Migration steps live in
   `storage/migrations.rs`. Derived columns are backfilled by a local replay
   triggered by a `NORMALIZER_REVISION` change, with no network access needed.
   Notable steps:
@@ -127,6 +127,7 @@ this number".
   | v46, v50, v51 | Imports (GPX, FIT, Strava bundle, Apple Health; unstrap backups) |
   | v47–v49 | Hidden devices, nap stages, the ledger of MCP writes |
   | v52 | Per-set strength training detail |
+  | v55 | Bedtime journal and wake-up mood |
 
 - A consistency backup is created automatically before every schema migration;
   the migration does not proceed if the backup or its integrity check fails. The

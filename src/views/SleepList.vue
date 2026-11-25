@@ -21,6 +21,9 @@ import AlbumGrid from '../components/album/AlbumGrid.vue';
 import AlbumMonthHead from '../components/album/AlbumMonthHead.vue';
 import SleepYearCard from '../components/album/SleepYearCard.vue';
 import SleepNightMark from '../components/album/SleepNightMark.vue';
+import BedtimeFactors from '../components/sleepJournal/BedtimeFactors.vue';
+import NightJournalMark from '../components/sleepJournal/NightJournalMark.vue';
+import { useSleepJournal } from '../composables/useSleepJournal';
 import { albumMessages } from '../components/album/album.i18n';
 import { useRecordAlbum } from '../composables/useRecordAlbum';
 import { useAlbumNav } from '../composables/useAlbumNav';
@@ -191,6 +194,22 @@ const scoreOf = (id: string): number | null => {
 const yearAnalysis = (year: number) => sleepYearAnalysis((months.value ?? []) as SleepMonth[], String(year));
 
 useRevisionReload(() => { void loadList(); album.invalidate(); });
+
+/* 睡前日志记在醒来那天下：读进来的晚上一次读一段，每晚右边画一枚小标记（午睡不算那一晚）。 */
+const journal = useSleepJournal();
+const wakeDay = (session: SleepSession) => localDay(session.end_time);
+const isMainSleep = (session: SleepSession) => (session.duration_minutes ?? 0) >= 180;
+let journalSpan = '';
+const loadJournal = (force = false) => {
+  const days = sessions.value.map(wakeDay).sort();
+  if (!days.length) return;
+  const span = `${days[0]}/${days[days.length - 1]}`;
+  if (!force && span === journalSpan) return;
+  journalSpan = span;
+  afterMotion(() => { void journal.loadRange(days[0]!, days[days.length - 1]!); });
+};
+watch(() => sessions.value.length, () => loadJournal(), { immediate: true });
+useRevisionReload(() => loadJournal(true));
 /* 新手引导：这个板块第一次打开时就地讲一遍（lib/tour/chapters.ts）。 */
 useSectionTour('sleep');
 </script>
@@ -223,7 +242,10 @@ useSectionTour('sleep');
           <span v-if="scoreOf(tile.id) !== null" class="tile-score">{{ albumText.scoreLabel(scoreOf(tile.id)!) }}</span>
         </template>
       </AlbumGrid>
-      <div v-else data-album-body class="record-list sleep-records">
+      <template v-else>
+        <!-- 睡前因素放在列表外面：列表左边那根时间轴竖线不穿过它。 -->
+        <BedtimeFactors />
+      <div data-album-body class="record-list sleep-records">
         <RecordRow
           v-for="session in rendered"
           :key="session.sleep_id"
@@ -240,11 +262,14 @@ useSectionTour('sleep');
           :fact="`${formatTime(session.start_time)} – ${formatTime(session.end_time)}`"
         >
           <template #aside>
+            <NightJournalMark v-if="isMainSleep(session)" :date="wakeDay(session)"
+              :label="`${formatDate(session.start_time, 'auto')} · ${formatDuration(session.duration_minutes)}`" />
             <SleepNightMark v-bind="nightOf(session)" :axis="axis" :score="session.score"
               :score-label="scoreOf(session.sleep_id) !== null ? albumText.scoreLabel(scoreOf(session.sleep_id)!) : undefined" />
           </template>
         </RecordRow>
       </div>
+      </template>
     </div>
     <AlbumTray v-if="sessions.length && !error" :zoom="zoom" @zoom="goZoom" />
     <p v-if="staleError" class="stale-note" role="status">{{ staleError }}</p>
@@ -271,6 +296,8 @@ useSectionTour('sleep');
 .load-more { display: flex; justify-content: center; margin-top: 12px; }
 /* 换档时的幽灵板（lib/album/albumMotion.ts）绝对定位在这一层里。 */
 .album-stage { position: relative; }
+/* 睡前日志的小标记排在那根细线左边。 */
+.sleep-records :deep(.record-aside) { align-items: center; gap: 10px; }
 /* 左边大字时长 + 入睡–醒来，右边那根细线占这一行的大半。
    行不在屏幕上就不排版不画：几百晚的列表，滚动和退出页面的形变都少画一大片。 */
 .sleep-records { --record-main: max-content; --record-aside: minmax(120px, 1fr); }

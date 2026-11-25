@@ -21,6 +21,7 @@ import SegmentTrack from '../components/SegmentTrack.vue';
 import OverviewMore from '../components/overview/OverviewMore.vue';
 import PinnedMetrics from '../components/overview/PinnedMetrics.vue';
 import FeedbackCard from '../components/feedback/FeedbackCard.vue';
+import SleepJournalCard from '../components/sleepJournal/SleepJournalCard.vue';
 import CoachInboxCard from '../components/coachNotes/CoachInboxCard.vue';
 import SuggestCards from '../components/overview/SuggestCards.vue';
 import '../components/overview/panels.css';
@@ -447,6 +448,8 @@ useSectionTour('home');
     <PinnedMetrics />
 
     <!-- 跑后打分（批次 7）：练完推到手表的计划后问一句，最多一张、48 小时后自己消失。 -->
+    <!-- 早安打卡：今天醒来的那一晚睡前做了什么、醒来感觉怎么样；和 Zepp App 里那两项是同一份。 -->
+    <SleepJournalCard />
     <FeedbackCard />
     <CoachInboxCard />
     <!-- 建议卡：刚练完 / 昨晚睡得差 / 很久没动 + 「帮我排明天」，点了发好牌交给 AI。 -->

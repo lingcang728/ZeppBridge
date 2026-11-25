@@ -81,6 +81,7 @@ mod official;
 mod queries;
 mod replay;
 mod schema;
+mod sleep_journal;
 mod time_bridge;
 mod training_plan;
 mod unchanged_raw;

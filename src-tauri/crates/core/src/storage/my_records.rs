@@ -15,8 +15,9 @@ use super::Database;
 use crate::models::error::Result;
 
 /// 导出哪些表。只放用户自己产生的东西；同步来的健康数据、报文和内部账本不在这里。
-pub const MY_RECORD_TABLES: [&str; 22] = [
+pub const MY_RECORD_TABLES: [&str; 23] = [
     "workout_feedback",
+    "sleep_journal",
     "workout_annotations",
     "workout_local_state",
     "workout_code_labels",

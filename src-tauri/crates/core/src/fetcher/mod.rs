@@ -183,6 +183,20 @@ impl DataFetcher {
         Self { connector }
     }
 
+    /// 睡前日志与睡醒心情：一次拉回全部历史，解析成一晚一条。不落原始报文（只有用户自己的勾选）。
+    pub async fn fetch_sleep_journal(
+        &self,
+        today: &str,
+    ) -> Result<Vec<crate::storage::sleep_journal::CloudJournalItem>> {
+        let payload = self.connector.fetch_manual_sleep_data(today).await?;
+        Ok(crate::storage::sleep_journal::parse_manual_data(&payload))
+    }
+
+    /// 把一晚写回 Zepp（同一接口、按日期覆盖）。
+    pub async fn upload_sleep_journal(&self, date: &str, summary: &str) -> Result<()> {
+        self.connector.upload_manual_sleep_data(date, summary).await
+    }
+
     pub async fn fetch_heart_rate_records(
         &self,
         window: FetchWindow,

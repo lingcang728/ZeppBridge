@@ -731,6 +731,62 @@ impl ZeppConnector {
         self.fetch_events("hrv_sdnn", Some("real_data"), start, end, 2000, true)
             .await
     }
+
+    /// 睡前日志与睡醒心情（Zepp App 手记的那两项）。实测服务端不看 `date`，一次给回这个账号的全部历史；
+    /// 照 App 的样子带上当天日期。
+    pub async fn fetch_manual_sleep_data(&self, today: &str) -> Result<Value> {
+        self.get_json(
+            "/v1/user/manualData.json",
+            vec![
+                ("userid", self.auth.user_id.clone()),
+                ("type", "sleep".to_owned()),
+                ("date", today.to_owned()),
+            ],
+        )
+        .await
+    }
+
+    /// 写回一晚的睡前日志：和 Zepp App 同一个接口、同一种表单（按日期整条覆盖）。
+    ///
+    /// 只发一次、不跟跳转、不重试：失败的那一晚留着「待写回」，下次同步再写，
+    /// 不在这里替用户反复提交。
+    pub async fn upload_manual_sleep_data(&self, date: &str, summary: &str) -> Result<()> {
+        let url = self.path_url("/v1/user/manualData.json")?;
+        let headers = self.build_headers()?;
+        let form = [
+            ("userid", self.auth.user_id.as_str()),
+            ("type", "sleep"),
+            ("date", date),
+            ("summary", summary),
+        ];
+        let send = self
+            .client
+            .post(url)
+            .headers(headers)
+            .query(&[("r", Self::request_id())])
+            .form(&form)
+            .send();
+        let response = tokio::select! {
+            biased;
+            _ = self.cancelled() => return Err(ZeppBridgeError::Cancelled),
+            outcome = send => outcome.map_err(ZeppBridgeError::NetworkError)?,
+        };
+        let status = response.status().as_u16();
+        if (300..=399).contains(&status) {
+            return Err(ZeppBridgeError::HttpStatus {
+                status,
+                message: "写回睡前日志时被重定向".into(),
+            });
+        }
+        if let Some(error) = classify_status(status) {
+            return Err(error);
+        }
+        let body = read_json_body(response).await?;
+        if let Some(error) = classify_business_code(&body) {
+            return Err(error);
+        }
+        Ok(())
+    }
 }
 
 #[cfg(test)]
