@@ -7,6 +7,7 @@
  * 一个都没固定时是一张引导卡，点开挑选面板（PinPicker）。
  *
  * 动效：挑完回来，新加的磁贴由下往上漫出类别色再显出内容；留下的原地不动（缓存页回场不重放）。 */
+import SuggestChip from './SuggestChip.vue';
 import { computed, defineAsyncComponent, onMounted, provide, ref } from 'vue';
 import Icon from '../Icon.vue';
 import PinTile from './PinTile.vue';
@@ -138,6 +139,8 @@ const apply = async (next: string[]) => {
   <section class="pins" aria-labelledby="pins-title">
     <header class="pins-head">
       <h2 id="pins-title">{{ t.title }}</h2>
+      <!-- 「今日一问」按 × 后缩成的小胶囊（当天有效）。 -->
+      <SuggestChip />
       <button v-if="pins.length" type="button" class="pill-button quiet pins-edit" :title="t.edit" @click="pickerOpen = true">
         <Icon name="sliders" :size="14" /><span>{{ t.edit }}</span>
       </button>

@@ -109,6 +109,16 @@ const copyCanvases = (from: HTMLElement, to: HTMLElement) => {
   });
 };
 
+/** 输入框里此刻的字也拷过去（cloneNode 只拷默认值：v-model 写进去、用户改过的字都丢）。 */
+const copyFields = (from: HTMLElement, to: HTMLElement) => {
+  const sources = from.querySelectorAll<HTMLTextAreaElement | HTMLInputElement>('textarea, input');
+  const targets = to.querySelectorAll<HTMLTextAreaElement | HTMLInputElement>('textarea, input');
+  sources.forEach((source, index) => {
+    const target = targets[index];
+    if (target) target.value = source.value;
+  });
+};
+
 /**
  * 那张卡的一份拷贝：只是用来「看」的——去掉可交互性、固定成卡此刻的尺寸，放进窗口里跟着缩放。
  * 返回的 `el` 是外面那层（卡的大小、裁成卡的形状），动画动它。
@@ -177,6 +187,7 @@ export function cardReplica(card: HTMLElement): { el: HTMLElement; rect: Replica
     color: style.color,
   });
   copyCanvases(card, copy);
+  copyFields(card, copy);
   if (parent === el) parent.appendChild(copy);
   else placeLike(parent, copy, card);
 
