@@ -1,6 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-afterEach(() => { vi.unstubAllGlobals(); vi.resetModules(); });
+// 初始化和切语言会在后台装语言包（不 await）。包晚到时会写全局 document.title，
+// 换完桩以后才到就会写进下一条用例的页面，所以先等当前模块手上的包装完再清。
+afterEach(async () => {
+  const { useLandingLocale } = await import('../useLandingLocale');
+  const language = useLandingLocale();
+  await language.ensureLandingCopy(language.locale.value);
+  vi.unstubAllGlobals();
+  vi.resetModules();
+});
 
 const stubDocument = () => {
   const meta = { setAttribute: vi.fn() };
