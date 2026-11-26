@@ -13,7 +13,7 @@ import { createDemoPush } from './push';
 import { demoText } from './texts';
 import { at, dayKey, iso } from './rng';
 import { letterVersions } from '../services/letters';
-import type { CloudCompanionState, CloudConfigInput, CloudSetupCommand } from '../lib/bridge/types';
+import type { AutostartState, CloudCompanionState, CloudConfigInput, CloudSetupCommand } from '../lib/bridge/types';
 import type { SleepStageSlice, Workout, WorkoutCodeLabel, WorkoutFitOverride } from '../types';
 import type { LetterBoxView, LetterReplyInput, StructureSample } from '../types/letters';
 
@@ -120,6 +120,7 @@ export const createDemoExtras = (data: DemoData): Record<string, DemoHandler> =>
     task_follow: true, task_upload: true, running: false, default_bin_dir: 'C:/Users/demo/ZeppBridge',
   };
   const cloudCopy = () => structuredClone(cloud);
+  const autostart: AutostartState = { enabled: false, stale: false, tray_only: false };
 
   return {
     system_region_locale: () => navigator.language || null,
@@ -153,6 +154,14 @@ export const createDemoExtras = (data: DemoData): Record<string, DemoHandler> =>
       w.moving_seconds = fit.originalMovingSeconds;
       fits.delete(w.workout_id);
       return true;
+    },
+
+    // 演示里的开机自启：只记在这一页里，不碰访客的系统。
+    autostart_state: () => ({ ...autostart }),
+    set_autostart: a => {
+      autostart.enabled = Boolean(a.enabled);
+      autostart.tray_only = Boolean(a.trayOnly);
+      return { ...autostart };
     },
 
     // 演示里的结构样本：和后端同样的外形，字段都是虚构的占位值。
