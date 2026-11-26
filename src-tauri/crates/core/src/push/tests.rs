@@ -3,7 +3,7 @@
 use super::*;
 use crate::models::{SourceScope, Workout};
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicU16, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU16, AtomicUsize, Ordering};
 use std::sync::Mutex;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
@@ -32,12 +32,14 @@ impl CredentialBackend for Store {
 /// 假站点记下的一个请求。
 type Recorded = (String, String, Vec<u8>, String);
 
-/// 记下每个请求（方法、路径、正文）的假 PA 站点。`status` 可以中途改。
+/// 记下每个请求（方法、路径、正文）的假 PA 站点。`status` 可以中途改；`old_template` 打开时
+/// 像还不认 `unstrap/` 路径的旧站点模板，那些路径回 404。
 struct FakeSite {
     base: String,
     hits: Arc<AtomicUsize>,
     requests: Arc<Mutex<Vec<Recorded>>>,
     status: Arc<AtomicU16>,
+    old_template: Arc<AtomicBool>,
 }
 
 async fn fake_site() -> FakeSite {
@@ -46,13 +48,19 @@ async fn fake_site() -> FakeSite {
     let hits = Arc::new(AtomicUsize::new(0));
     let requests = Arc::new(Mutex::new(Vec::new()));
     let status = Arc::new(AtomicU16::new(200));
-    let (h, r, s) = (hits.clone(), requests.clone(), status.clone());
+    let old_template = Arc::new(AtomicBool::new(false));
+    let (h, r, s, o) = (
+        hits.clone(),
+        requests.clone(),
+        status.clone(),
+        old_template.clone(),
+    );
     tokio::spawn(async move {
         loop {
             let Ok((mut socket, _)) = listener.accept().await else {
                 return;
             };
-            let (h, r, s) = (h.clone(), r.clone(), s.clone());
+            let (h, r, s, o) = (h.clone(), r.clone(), s.clone(), o.clone());
             tokio::spawn(async move {
                 let mut buffer = Vec::new();
                 let mut chunk = [0u8; 8192];
@@ -94,10 +102,14 @@ async fn fake_site() -> FakeSite {
                     })
                     .unwrap_or_default();
                 h.fetch_add(1, Ordering::SeqCst);
+                let code = if o.load(Ordering::SeqCst) && path.starts_with("/v1/objects/unstrap/") {
+                    404
+                } else {
+                    s.load(Ordering::SeqCst)
+                };
                 r.lock()
                     .unwrap()
                     .push((method, path, buffer[header_end..].to_vec(), auth));
-                let code = s.load(Ordering::SeqCst);
                 let reply = format!(
                     "HTTP/1.1 {code} X\r\ncontent-length: 2\r\nconnection: close\r\n\r\n{{}}"
                 );
@@ -111,6 +123,7 @@ async fn fake_site() -> FakeSite {
         hits,
         requests,
         status,
+        old_template,
     }
 }
 
@@ -248,6 +261,44 @@ async fn pushes_encrypted_objects_then_skips_unchanged_content() {
         serde_json::from_slice(&std::fs::read(push_dir(&dir).join("pa.status.json")).unwrap())
             .unwrap();
     assert_eq!(status["result"], "unchanged");
+}
+
+#[tokio::test]
+async fn an_older_site_skips_the_unstrap_package_and_takes_it_once_updated() {
+    let site = fake_site().await;
+    let dir = temp_dir("unstrap");
+    seed_library(&dir);
+    let config = serde_json::json!({ "version": 1, "targets": [{
+        "id": "pa", "kind": "pa", "enabled": true, "site": site.base,
+        "retention_days": 3, "summary_days": 2, "dev_loopback": true, "unstrap": true
+    }]});
+    std::fs::write(
+        push_dir(&dir).join(TARGETS_FILE),
+        serde_json::to_vec(&config).unwrap(),
+    )
+    .unwrap();
+    let store = store_with_secrets();
+    let unstrap_path = format!("/v1/objects/{}", pa::UNSTRAP_OBJECT);
+
+    // 旧模板不认这条路径：整轮照样成功，只是这一个对象没进清单。
+    site.old_template.store(true, Ordering::SeqCst);
+    let first = run(&dir, store.clone()).await;
+    assert_eq!(first.targets[0].result, "ok", "{:?}", first.targets[0]);
+    let manifest: Value =
+        serde_json::from_slice(&std::fs::read(push_dir(&dir).join("pa.manifest.json")).unwrap())
+            .unwrap();
+    assert!(manifest["objects"].get(pa::UNSTRAP_OBJECT).is_none());
+
+    // 站点更新了：下一轮只补这一个（和最后的 status）。
+    site.old_template.store(false, Ordering::SeqCst);
+    let before = site.requests.lock().unwrap().len();
+    let second = run(&dir, store).await;
+    assert_eq!(second.targets[0].result, "ok", "{:?}", second.targets[0]);
+    let sent: Vec<String> = site.requests.lock().unwrap()[before..]
+        .iter()
+        .map(|(_, path, _, _)| path.clone())
+        .collect();
+    assert_eq!(sent, [unstrap_path, "/v1/objects/status.json".to_string()]);
 }
 
 #[tokio::test]

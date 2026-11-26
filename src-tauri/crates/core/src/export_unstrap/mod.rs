@@ -60,8 +60,41 @@ fn zip_error(error: zip::result::ZipError) -> ZeppBridgeError {
     ZeppBridgeError::IoError(std::io::Error::other(error))
 }
 
+/// 包里的文件（unstrap 的表名 → CSV 文本），没有行的健康表不在里面。推送把它直接放进
+/// 站点对象，导出文件把它写成 zip。
+#[derive(Debug, Clone, PartialEq)]
+pub struct UnstrapFiles {
+    pub files: Vec<(&'static str, String)>,
+    pub workouts: usize,
+    pub heart_rate_points: usize,
+    pub tables: Vec<(&'static str, usize)>,
+}
+
 /// 读出 `since` 之后（含）开始的全部可见运动，写成 zip。`since` 为空就是全部。
 pub fn build_unstrap_export(db: &Database, since: Option<DateTime<Utc>>) -> Result<UnstrapExport> {
+    let files = unstrap_files(db, since, chrono::Local::now().date_naive())?;
+    let mut zip = zip::ZipWriter::new(Cursor::new(Vec::new()));
+    let options = zip::write::SimpleFileOptions::default()
+        .compression_method(zip::CompressionMethod::Deflated);
+    for (name, text) in &files.files {
+        zip.start_file(*name, options).map_err(zip_error)?;
+        zip.write_all(text.as_bytes())?;
+    }
+    let bytes = zip.finish().map_err(zip_error)?.into_inner();
+    Ok(UnstrapExport {
+        bytes,
+        workouts: files.workouts,
+        heart_rate_points: files.heart_rate_points,
+        tables: files.tables,
+    })
+}
+
+/// `since` 起（含）的运动和健康表；`today` 是本机的今天（按天的表不写还没过完的今天）。
+pub fn unstrap_files(
+    db: &Database,
+    since: Option<DateTime<Utc>>,
+    today: chrono::NaiveDate,
+) -> Result<UnstrapFiles> {
     let mut workouts_csv = String::from(WORKOUT_HEADER);
     workouts_csv.push('\n');
     let mut hr_csv = String::from(WORKOUT_HR_HEADER);
@@ -131,25 +164,17 @@ pub fn build_unstrap_export(db: &Database, since: Option<DateTime<Utc>>) -> Resu
         }
     }
 
-    let mut zip = zip::ZipWriter::new(Cursor::new(Vec::new()));
-    let options = zip::write::SimpleFileOptions::default()
-        .compression_method(zip::CompressionMethod::Deflated);
-    for (name, text) in [("workout.csv", &workouts_csv), ("workout_hr.csv", &hr_csv)] {
-        zip.start_file(name, options).map_err(zip_error)?;
-        zip.write_all(text.as_bytes())?;
-    }
+    let mut files = vec![("workout.csv", workouts_csv), ("workout_hr.csv", hr_csv)];
     let mut tables = Vec::new();
-    for table in health::health_tables(db, since)? {
+    for table in health::health_tables(db, since, today)? {
         if table.rows == 0 {
             continue;
         }
-        zip.start_file(table.name, options).map_err(zip_error)?;
-        zip.write_all(table.text.as_bytes())?;
         tables.push((table.name, table.rows));
+        files.push((table.name, table.text));
     }
-    let bytes = zip.finish().map_err(zip_error)?.into_inner();
-    Ok(UnstrapExport {
-        bytes,
+    Ok(UnstrapFiles {
+        files,
         workouts,
         heart_rate_points,
         tables,

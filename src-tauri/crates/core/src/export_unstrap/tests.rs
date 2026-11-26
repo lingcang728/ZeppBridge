@@ -309,6 +309,54 @@ fn health_tables_carry_what_unstrap_keeps_once_per_moment() {
 }
 
 #[test]
+fn a_day_still_under_way_leaves_out_the_values_unstrap_would_pin() {
+    let db = health_seeded();
+    // 「今天」的正午（UTC）还有一个心率样本：今天的 PAI 记在它那一刻。
+    let noon = T0 + 86_400 + 12 * 3600;
+    db.conn
+        .execute(
+            "INSERT INTO metric_samples(metric, timestamp, value, unit, source_scope, device_id)
+             VALUES('heart_rate', ?1, 65, 'x', 'device', 'a')",
+            rusqlite::params![at(noon).to_rfc3339()],
+        )
+        .unwrap();
+    let today = chrono::NaiveDate::from_ymd_opt(2024, 5, 2).unwrap();
+    let package = super::unstrap_files(&db, None, today).unwrap();
+    let rows: std::collections::HashMap<&str, usize> = package.tables.iter().copied().collect();
+    // 按天为键的表：手机上有了就不再改，半天的值不写。
+    for name in ["resting_hr.csv", "daily_max_hr.csv", "strap_readiness.csv"] {
+        assert!(!rows.contains_key(name), "{name}");
+    }
+    let pai = &package
+        .files
+        .iter()
+        .find(|(name, _)| *name == "pai.csv")
+        .unwrap()
+        .1;
+    assert_eq!(
+        pai.lines().nth(1).unwrap().split(',').nth(1),
+        Some(&*noon.to_string())
+    );
+
+    // 过了这一天，再导就是记在当天最后一分钟的定值。
+    let tomorrow = today.succ_opt().unwrap();
+    let package = super::unstrap_files(&db, None, tomorrow).unwrap();
+    let rows: std::collections::HashMap<&str, usize> = package.tables.iter().copied().collect();
+    assert_eq!(rows["resting_hr.csv"], 1);
+    let last_minute = super::health::midnight(tomorrow).unwrap() - 60;
+    let pai = &package
+        .files
+        .iter()
+        .find(|(name, _)| *name == "pai.csv")
+        .unwrap()
+        .1;
+    assert_eq!(
+        pai.lines().nth(1).unwrap().split(',').nth(1),
+        Some(&*last_minute.to_string())
+    );
+}
+
+#[test]
 fn a_range_trims_the_health_tables_too() {
     let db = health_seeded();
     let export = build_unstrap_export(&db, Some(at(T0 + 30 * 86_400))).unwrap();

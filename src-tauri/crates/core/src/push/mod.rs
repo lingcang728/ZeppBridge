@@ -17,8 +17,12 @@
 //! ```json
 //! { "version": 1, "targets": [
 //!   { "id": "pa", "kind": "pa", "enabled": true, "site": "example.com",
-//!     "retention_days": 90, "summary_days": 30, "full_resolution_workouts": false } ] }
+//!     "retention_days": 90, "summary_days": 30, "full_resolution_workouts": false,
+//!     "unstrap": false } ] }
 //! ```
+//!
+//! `unstrap` 打开时多推一个 `unstrap/recent.json`：最近几天写成 unstrap 的表，给手机上不连手环的
+//! unstrap（自动恢复）读。默认关，设置界面里还没有开关。
 
 pub mod client;
 pub mod pa;
@@ -54,6 +58,9 @@ pub struct TargetConfig {
     pub summary_days: u32,
     #[serde(default)]
     pub full_resolution_workouts: bool,
+    /// 多推一份给 unstrap 的增量包（`unstrap/recent.json`）。
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub unstrap: bool,
     /// 只给测试和本地自测：放行 `http://127.0.0.1:<端口>`。
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub dev_loopback: bool,
@@ -394,6 +401,7 @@ async fn run_target(
         retention_days: target.retention_days,
         summary_days: target.summary_days,
         full_resolution_workouts: target.full_resolution_workouts,
+        unstrap: target.unstrap,
     };
     let plan = tokio::task::spawn_blocking(move || {
         let db_path = data_dir.join("zepp.db");
@@ -440,8 +448,13 @@ async fn run_target(
         };
     }
     match pa::upload(&site, &keys, &plan).await {
-        Ok(stats) => {
-            if let Err(error) = write_json(&manifest_file, &plan.manifest) {
+        Ok((stats, skipped)) => {
+            // 站点不收的可选对象（旧模板没有这条路径）不记进清单：站点更新后下一轮自己补上。
+            let mut manifest = plan.manifest;
+            for rel in &skipped {
+                manifest.objects.remove(rel);
+            }
+            if let Err(error) = write_json(&manifest_file, &manifest) {
                 return failed(error.code, error.detail);
             }
             TargetOutcome {

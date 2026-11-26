@@ -51,6 +51,20 @@ pub struct PaOptions {
     pub retention_days: u32,
     pub summary_days: u32,
     pub full_resolution_workouts: bool,
+    /// 多推 [`UNSTRAP_OBJECT`]。
+    pub unstrap: bool,
+}
+
+/// 给手机上的 unstrap 读的增量包：`{ "format": 1, "from": 首日, "files": { 表名: CSV } }`。
+pub const UNSTRAP_OBJECT: &str = "unstrap/recent.json";
+
+/// 增量包覆盖最近几天（含今天）。手机隔几天没打开，再打开时也接得上；它只补缺的行，
+/// 重叠的部分不会多出东西。
+pub const UNSTRAP_DAYS: u64 = 7;
+
+/// 可选对象：站点是旧模板、不认这条路径（404）时跳过，不让整轮推送失败。
+fn optional(rel: &str) -> bool {
+    rel == UNSTRAP_OBJECT
 }
 
 /// 凭据库里存的三样东西（JSON）。只在内存里用，不落盘、不进日志。
@@ -413,6 +427,29 @@ pub fn build_plan(
     }
     queue("contract.json".into(), crate::contract::contract_json())?;
 
+    if options.unstrap {
+        // 首日的本机零点起；表名 → CSV。内容没变（没有新数据）就不重发。
+        let from = today
+            .checked_sub_days(chrono::Days::new(UNSTRAP_DAYS - 1))
+            .unwrap_or(today);
+        let since = from
+            .and_hms_opt(0, 0, 0)
+            .and_then(|start| start.and_local_timezone(Local).earliest())
+            .map(|start| start.with_timezone(&Utc));
+        let package = crate::export_unstrap::unstrap_files(db, since, today)?;
+        let files: serde_json::Map<String, Value> = package
+            .files
+            .into_iter()
+            .map(|(name, text)| (name.to_string(), Value::String(text)))
+            .collect();
+        queue(
+            UNSTRAP_OBJECT.into(),
+            json!({ "format": 1, "from": from.to_string(), "files": files }),
+        )?;
+    } else if previous.objects.contains_key(UNSTRAP_OBJECT) {
+        deletes.insert(UNSTRAP_OBJECT.into());
+    }
+
     for day in &window {
         manifest
             .days
@@ -512,19 +549,21 @@ pub struct UploadStats {
     pub bytes_sent: usize,
 }
 
-/// 压缩 → 加密 → 发送。先删后传，`status.json` 最后。
+/// 压缩 → 加密 → 发送。先删后传，`status.json` 最后。成功时还给出站点不收、跳过的可选对象
+/// （见 [`optional`]），调用方别把它们记进清单。
 pub async fn upload(
     site: &SiteUrl,
     keys: &PaKeys,
     plan: &Plan,
-) -> std::result::Result<UploadStats, String> {
+) -> std::result::Result<(UploadStats, Vec<String>), String> {
+    let mut skipped = Vec::new();
     let client = client::build_client()?;
     let mut stats = UploadStats {
         unchanged: plan.unchanged,
         ..Default::default()
     };
     for rel in &plan.deletes {
-        client::send(
+        let sent = client::send(
             &client,
             reqwest::Method::DELETE,
             &format!("{}/objects/{rel}", site.api),
@@ -533,16 +572,19 @@ pub async fn upload(
             None,
             &format!("DELETE {rel}"),
         )
-        .await?;
-        stats.deleted += 1;
+        .await;
+        match sent {
+            Ok(()) => stats.deleted += 1,
+            Err(message) if optional(rel) && message.ends_with("HTTP 404") => {}
+            Err(message) => return Err(message),
+        }
     }
     for (rel, text) in &plan.outgoing {
         let gz = gzip(text);
         let sealed = crypto::encrypt_object(&keys.dk, &crypto::object_key(&keys.tenant, rel), &gz)
             .map_err(|_| "encryption failed".to_string())?;
-        stats.bytes_plain += text.len();
-        stats.bytes_sent += sealed.len();
-        client::send(
+        let size = sealed.len();
+        let sent = client::send(
             &client,
             reqwest::Method::PUT,
             &format!("{}/objects/{rel}", site.api),
@@ -551,10 +593,20 @@ pub async fn upload(
             Some(sealed),
             &format!("PUT {rel}"),
         )
-        .await?;
+        .await;
+        match sent {
+            Ok(()) => {}
+            Err(message) if optional(rel) && message.ends_with("HTTP 404") => {
+                skipped.push(rel.clone());
+                continue;
+            }
+            Err(message) => return Err(message),
+        }
+        stats.bytes_plain += text.len();
+        stats.bytes_sent += size;
         stats.objects += 1;
     }
-    Ok(stats)
+    Ok((stats, skipped))
 }
 
 #[cfg(test)]

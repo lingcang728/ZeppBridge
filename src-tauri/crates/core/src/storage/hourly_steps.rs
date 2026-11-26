@@ -128,12 +128,16 @@ impl Database {
             .collect())
     }
 
-    /// 旧通道逐分钟明细原样给出（导出给 unstrap 的逐分钟活动）：本地日 → 1440 × 8 字节。
-    /// 同一块表同一天几份报文取最新拉到的；几块表同一天都有时取戴着的分钟最多的那块
-    /// （逐分钟记录不能几块表拼，同一分钟只能有一条）。
-    pub(crate) fn legacy_minute_records(&self) -> Result<BTreeMap<NaiveDate, Vec<u8>>> {
+    /// 旧通道逐分钟明细原样给出（导出给 unstrap 的逐分钟活动）：本地日 → 1440 × 8 字节，
+    /// `from` 起（含；空就是全部）。同一块表同一天几份报文取最新拉到的；几块表同一天都有时
+    /// 取戴着的分钟最多的那块（逐分钟记录不能几块表拼，同一分钟只能有一条）。
+    /// 键里的末日早于 `from` 的报文不解压（推送每轮只要最近几天）。
+    pub(crate) fn legacy_minute_records(
+        &self,
+        from: Option<NaiveDate>,
+    ) -> Result<BTreeMap<NaiveDate, Vec<u8>>> {
         let mut stmt = self.conn.prepare(
-            "SELECT payload, payload_zip FROM raw_records
+            "SELECT source_key, payload, payload_zip FROM raw_records
              WHERE source_key LIKE 'band_data:detail:%'
              ORDER BY fetched_at DESC, id DESC",
         )?;
@@ -141,7 +145,13 @@ impl Database {
         let mut best: BTreeMap<NaiveDate, (usize, Vec<u8>)> = BTreeMap::new();
         let mut seen: BTreeSet<(NaiveDate, String)> = BTreeSet::new();
         while let Some(row) = rows.next()? {
-            let Ok(payload) = decode_raw_payload(row.get(0)?, row.get(1)?) else {
+            let key: String = row.get(0)?;
+            if let (Some(from), Some((_, span_end))) = (from, key_span(&key)) {
+                if span_end < from {
+                    continue;
+                }
+            }
+            let Ok(payload) = decode_raw_payload(row.get(1)?, row.get(2)?) else {
                 continue;
             };
             let Ok(payload) = serde_json::from_str::<serde_json::Value>(&payload) else {
@@ -154,7 +164,7 @@ impl Database {
                 let Some((date, device, bytes)) = legacy_minute_bytes(item) else {
                     continue;
                 };
-                if !seen.insert((date, device)) {
+                if from.is_some_and(|from| date < from) || !seen.insert((date, device)) {
                     continue;
                 }
                 let worn = bytes

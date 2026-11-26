@@ -57,8 +57,14 @@ Beta 实验室「从 unstrap 导入」读的是 unstrap（Helio Strap 的开源�
 | `resting_hr.csv` / `daily_max_hr.csv` | `resting_hr` / `device_max_hr` 日值 | |
 | `sleep_session.csv` + `sleep_stage.csv` | 睡眠和分期、小睡分期 | 同一晚几条重叠时留最长的那条（unstrap 也不收重叠的）。小睡是主睡上挂的小睡分期，间隔不到 5 分钟的并成一次，各阶段分钟数从分期加。主睡算醒来那天，小睡算开始那天。 |
 | `breath_rate.csv` | `respiratory_rate` 日值 | Zepp 一晚一个值；unstrap 取睡眠里的样本求平均，所以记在那晚主睡的正中间。 |
-| `pai.csv` | `pai_daily` `pai_total` `device_resting_hr` `device_max_hr` | 记在当天最后一分钟（unstrap 取一天里最后一条）；四个值缺一个就不写。 |
+| `pai.csv` | `pai_daily` `pai_total` `device_resting_hr` `device_max_hr` | 过完的天记在最后一分钟（unstrap 取一天里最后一条）；今天记在今天最新一个心率样本的时刻，今天还没有心率就不写。四个值缺一个就不写。 |
 | `strap_readiness.csv` | `readiness` 和四项分（HRV / 静息心率 / 皮温 / 呼吸紊乱）、`sleep_hrv` `sleep_rhr` | Zepp 的准备度就是带子自己那套，正好对上 unstrap 留给带子准备度的表；`algorithm_version` 写 `zepp`。 |
+
+`resting_hr` / `daily_max_hr` / `strap_readiness` 在 unstrap 里一天一条、有了就不再改，所以还没过完的今天不写，免得把半天的值钉死；它们第二天随下一份包补上。
+
+### 推送里的增量包
+
+推送目标打开 `unstrap` 时，每轮多传一个 `unstrap/recent.json`：最近 7 天（含今天，从首日本机零点起）的同一批表，`{ "format": 1, "from": 首日, "files": { 表名: CSV } }`。手机上的 unstrap 从站点的 `/v1/unstrap` 读它、当成恢复包导入；7 天是为了手机隔几天没打开也接得上，重叠的行 unstrap 不会重复收。内容没变就不重发。站点还是旧模板、这条路径回 404 时只跳过这一个对象，下轮再试。
 
 ## 还没用真实备份核对的
 

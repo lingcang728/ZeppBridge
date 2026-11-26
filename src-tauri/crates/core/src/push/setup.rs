@@ -52,6 +52,7 @@ pub fn upsert_pa_target(data_dir: &Path, site: &str, enabled: bool) -> Result<()
             retention_days: 90,
             summary_days: 30,
             full_resolution_workouts: false,
+            unstrap: false,
             dev_loopback: false,
         }),
     }

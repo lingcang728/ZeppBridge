@@ -69,18 +69,23 @@ fn opt<T: ToString>(value: Option<T>) -> String {
     value.map(|v| v.to_string()).unwrap_or_default()
 }
 
-/// 导出范围：`since` 起（含）。
+/// 导出范围：`since` 起（含），和本机的「今天」。
+///
+/// unstrap 按天为键的表（静息心率、当天最大心率、准备度）手机上有了就不再改，所以还没过完的
+/// 今天不写：写进去的半天值会被钉住，后面再导也换不掉。
 #[derive(Clone, Copy)]
 pub(super) struct Since {
     epoch: Option<i64>,
     date: Option<NaiveDate>,
+    today: NaiveDate,
 }
 
 impl Since {
-    pub(super) fn new(since: Option<DateTime<Utc>>) -> Self {
+    pub(super) fn new(since: Option<DateTime<Utc>>, today: NaiveDate) -> Self {
         Since {
             epoch: since.map(|t| t.timestamp()),
             date: since.map(|t| t.with_timezone(&Local).date_naive()),
+            today,
         }
     }
 
@@ -90,6 +95,20 @@ impl Since {
 
     fn keeps_day(&self, date: NaiveDate) -> bool {
         self.date.is_none_or(|since| date >= since)
+    }
+
+    /// 过完了的一天（不含今天）。
+    fn keeps_finished_day(&self, date: NaiveDate) -> bool {
+        self.keeps_day(date) && date < self.today
+    }
+
+    /// SQL 里按文本时间粗筛的下限（ISO 文本按字典序比较）：比 `since` 早两天，跨时区、跨夜的
+    /// 都留得住，准不准由 [`Since::keeps`] 再定。没有 `since` 就是空串，全要。
+    fn floor(&self) -> String {
+        self.date
+            .and_then(|date| date.checked_sub_days(chrono::Days::new(2)))
+            .map(|date| date.to_string())
+            .unwrap_or_default()
     }
 }
 
@@ -101,9 +120,10 @@ fn samples(
     since: Since,
 ) -> Result<BTreeMap<i64, f64>> {
     let mut stmt = db.conn.prepare(
-        "SELECT timestamp, value FROM metric_samples WHERE metric = ?1 ORDER BY timestamp, id",
+        "SELECT timestamp, value FROM metric_samples WHERE metric = ?1 AND timestamp >= ?2
+         ORDER BY timestamp, id",
     )?;
-    let mut rows = stmt.query([metric])?;
+    let mut rows = stmt.query(rusqlite::params![metric, since.floor()])?;
     let mut out = BTreeMap::new();
     while let Some(row) = rows.next()? {
         let (text, value): (String, f64) = (row.get(0)?, row.get(1)?);
@@ -157,10 +177,18 @@ fn rounded(v: f64) -> String {
     (v.round() as i64).to_string()
 }
 
-/// 按天的值写成 `day,epoch,<列>,date`（静息心率、当天最大心率）。
-fn day_table(name: &'static str, header: &str, days: &BTreeMap<NaiveDate, f64>) -> Table {
+/// 按天的值写成 `day,epoch,<列>,date`（静息心率、当天最大心率）。今天不写（见 [`Since`]）。
+fn day_table(
+    name: &'static str,
+    header: &str,
+    days: &BTreeMap<NaiveDate, f64>,
+    since: Since,
+) -> Table {
     let mut table = Table::new(name, header);
-    for (date, value) in days {
+    for (date, value) in days
+        .iter()
+        .filter(|(date, _)| since.keeps_finished_day(**date))
+    {
         let Some(midnight) = local_midnight(*date) else {
             continue;
         };
@@ -212,9 +240,10 @@ fn nights(db: &Database, since: Since) -> Result<Vec<Night>> {
         ("sleep_nap_stages", &mut naps),
     ] {
         let mut stmt = db.conn.prepare(&format!(
-            "SELECT sleep_id, stage, start_time, end_time FROM {table} ORDER BY start_time"
+            "SELECT sleep_id, stage, start_time, end_time FROM {table}
+             WHERE start_time >= ?1 ORDER BY start_time"
         ))?;
-        let mut rows = stmt.query([])?;
+        let mut rows = stmt.query([since.floor()])?;
         while let Some(row) = rows.next()? {
             let (id, stage, start, end): (String, String, String, String) =
                 (row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?);
@@ -385,7 +414,9 @@ fn breath_table(db: &Database, nights: &[Night], since: Since) -> Result<Table> 
 }
 
 /// PAI：一天一条，记在当天最后一分钟（unstrap 取一天里最后那条当这天的值）。四个值缺一个就不写。
-fn pai_table(db: &Database, since: Since) -> Result<Table> {
+/// 今天还没过完：记在今天最后一个心率样本那一刻。之后再导，新样本带来更晚的一条，手机上就换成
+/// 新值；没有新样本时内容不变，推送也就不重发。
+fn pai_table(db: &Database, since: Since, heart: &BTreeMap<i64, f64>) -> Result<Table> {
     let daily_pai = daily(db, "pai_daily", since)?;
     let total = daily(db, "pai_total", since)?;
     let resting = daily(db, "device_resting_hr", since)?;
@@ -403,7 +434,16 @@ fn pai_table(db: &Database, since: Since) -> Result<Table> {
         ) else {
             continue;
         };
-        let at = next - 60;
+        let mut at = next - 60;
+        if *date >= since.today {
+            let Some(latest) = heart.range(..next).next_back().map(|(epoch, _)| *epoch) else {
+                continue;
+            };
+            if local_date(latest) != Some(*date) {
+                continue;
+            }
+            at = latest;
+        }
         table.push(&[
             iso(at),
             at.to_string(),
@@ -438,7 +478,10 @@ fn readiness_table(db: &Database, since: Since) -> Result<Table> {
         "strap_readiness.csv",
         "day_epoch,updated_epoch,score,hrv_score,resting_hr_score,skin_temperature_score,breathing_score,sleep_hrv,sleep_resting_hr,algorithm_version,date",
     );
-    for (date, value) in &score {
+    for (date, value) in score
+        .iter()
+        .filter(|(date, _)| since.keeps_finished_day(**date))
+    {
         let Some(midnight) = local_midnight(*date) else {
             continue;
         };
@@ -463,7 +506,7 @@ fn activity_table(db: &Database, since: Since) -> Result<Table> {
         "activity_minute.csv",
         "time,epoch,steps,intensity,kind,heart_rate",
     );
-    for (date, bytes) in db.legacy_minute_records()? {
+    for (date, bytes) in db.legacy_minute_records(since.date.and_then(|d| d.pred_opt()))? {
         let Some(midnight) = local_midnight(date) else {
             continue;
         };
@@ -495,8 +538,12 @@ fn activity_table(db: &Database, since: Since) -> Result<Table> {
 }
 
 /// 全部健康表，按 unstrap 的表名。
-pub(super) fn health_tables(db: &Database, since: Option<DateTime<Utc>>) -> Result<Vec<Table>> {
-    let since = Since::new(since);
+pub(super) fn health_tables(
+    db: &Database,
+    since: Option<DateTime<Utc>>,
+    today: NaiveDate,
+) -> Result<Vec<Table>> {
+    let since = Since::new(since, today);
     let heart = samples(db, "heart_rate", 25.0..=250.0, since)?;
     let rmssd = samples(db, "hrv_rmssd", 1.0..=400.0, since)?;
     let sdnn = samples(db, "hrv", 1.0..=400.0, since)?;
@@ -526,16 +573,18 @@ pub(super) fn health_tables(db: &Database, since: Option<DateTime<Utc>>) -> Resu
             "resting_hr.csv",
             "day,epoch,bpm,date",
             &daily(db, "resting_hr", since)?,
+            since,
         ),
         day_table(
             "daily_max_hr.csv",
             "day,epoch,bpm,date",
             &daily(db, "device_max_hr", since)?,
+            since,
         ),
         sessions,
         stages,
         breath_table(db, &nights, since)?,
-        pai_table(db, since)?,
+        pai_table(db, since, &heart)?,
         readiness_table(db, since)?,
         activity_table(db, since)?,
     ])

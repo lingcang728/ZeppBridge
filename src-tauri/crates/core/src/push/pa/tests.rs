@@ -11,6 +11,7 @@ fn options(full: bool) -> PaOptions {
         retention_days: 5,
         summary_days: 2,
         full_resolution_workouts: full,
+        unstrap: false,
     }
 }
 
@@ -74,6 +75,49 @@ fn first_round_sends_the_whole_window_and_status_last() {
     let second = plan(&db, &first.manifest, false);
     assert_eq!(second.days_considered, 5);
     assert!(second.is_empty(), "{:?}", rels(&second));
+}
+
+#[test]
+fn the_unstrap_package_goes_up_only_when_asked_and_comes_down_when_turned_off() {
+    let db = with_workout("w1");
+    let with = |unstrap: bool, previous: &Manifest| {
+        build_plan(
+            &db,
+            &PaOptions {
+                unstrap,
+                ..options(false)
+            },
+            previous,
+            today(),
+            &LocalStatus::default(),
+            Utc::now(),
+            "UTC",
+        )
+        .unwrap()
+    };
+    assert!(!rels(&plan(&db, &Manifest::default(), false)).contains(&UNSTRAP_OBJECT));
+
+    let on = with(true, &Manifest::default());
+    let (_, text) = on
+        .outgoing
+        .iter()
+        .find(|(rel, _)| rel == UNSTRAP_OBJECT)
+        .expect("unstrap package");
+    let package: Value = serde_json::from_str(text).unwrap();
+    assert_eq!(package["format"], 1);
+    assert_eq!(package["from"], "2024-03-04");
+    // 今天的运动在里面，CSV 原样。
+    let workouts = package["files"]["workout.csv"].as_str().unwrap();
+    assert!(workouts.starts_with("start,start_epoch,end_epoch,sport_type,"));
+    assert_eq!(workouts.lines().count(), 2);
+    assert!(check_no_coordinates(&on).is_ok());
+
+    // 没有新数据：不重发。
+    assert!(with(true, &on.manifest).is_empty());
+    // 关掉：站点上那份删掉。
+    let off = with(false, &on.manifest);
+    assert!(off.deletes.contains(UNSTRAP_OBJECT));
+    assert!(!off.manifest.objects.contains_key(UNSTRAP_OBJECT));
 }
 
 #[test]
