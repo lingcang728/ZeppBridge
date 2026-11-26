@@ -424,7 +424,7 @@ export default {
       emptyAfterSync:
         'Synchronisatie geslaagd, maar er is niets ontvangen. Misschien heeft dit account voor die periode niets in Zepp, of het horloge heeft nog niet naar de Zepp-app geüpload. Controleer eerst in de Zepp-app op je telefoon of er gegevens zijn en synchroniseer dan opnieuw.',
       wrongAccount:
-        'Je hebt mogelijk met een ander account ingelogd dan het account dat aan je horloge is gekoppeld. Heb je dat account met Google of Apple aangemaakt, koppel er dan eerst een e-mailadres aan in de Zepp App en meld je daarna hier aan met dat e-mailadres.',
+        'Je hebt mogelijk met een ander account ingelogd dan het account dat aan je horloge is gekoppeld. Heb je dat account met Google of Apple aangemaakt, tik dan in de Zepp App op je profielfoto rechtsboven op het startscherm en ga onderaan de pagina naar Instellingen → Account en beveiliging → E-mailadres wijzigen. Meld je daarna weer bij ZeppBridge aan met dat e-mailadres.',
       emptyUnconfirmedRegion:
         'Synchronisatie geslaagd, maar er is niets ontvangen. Bij het inloggen kon je Zepp-regio niet worden vastgesteld en wordt er nu gegokt — zo ziet een sync naar de verkeerde regio eruit: alles lukt, niets komt terug. Koppel het account opnieuw.',
       reconnect: 'Account opnieuw koppelen',

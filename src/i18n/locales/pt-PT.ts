@@ -773,7 +773,7 @@ Se precisares de alguma informação minha (que cliente utilizo, onde está o fi
       emptyAfterSync:
         'A sincronização terminou sem novos dados. O período pode estar vazio no Zepp ou o relógio ainda não sincronizou com o telemóvel. Verifica a app Zepp e tenta novamente.',
       wrongAccount:
-        'Podes ter iniciado sessão numa conta diferente da associada ao relógio: se criaste a conta com o Google ou a Apple, associa primeiro um endereço de e-mail à conta na Zepp App e inicia sessão com esse endereço.',
+        'Podes ter iniciado sessão numa conta diferente da associada ao relógio. Se criaste a conta com o Google ou a Apple, associa-lhe primeiro um endereço de e-mail na aplicação Zepp. No ecrã inicial, toca no avatar no canto superior direito, abre as Definições no fundo da página e vai a Conta e segurança → Alterar e-mail. Depois volta ao ZeppBridge e inicia sessão com esse endereço.',
       emptyUnconfirmedRegion:
         'A sincronização terminou sem dados. Não foi possível confirmar a região Zepp da conta, pelo que o ZeppBridge usou a melhor estimativa. Se a região estiver errada, a sincronização conclui com sucesso mas vazia. Tenta ligar a conta novamente.',
       reconnect: 'Ligar a conta novamente',

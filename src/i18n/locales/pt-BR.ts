@@ -494,7 +494,7 @@ export default {
       emptyAfterSync:
         'A sincronização rodou, mas não trouxe nenhum registro. Talvez a conta não tenha dados desse período no Zepp, ou o relógio ainda não tenha enviado ao app. Confira no Zepp do celular e sincronize de novo.',
       wrongAccount:
-        'Talvez você tenha entrado em uma conta diferente da vinculada ao relógio. Se ela foi criada com Google ou Apple, primeiro adicione um e-mail a essa conta no Zepp App e depois entre aqui com esse e-mail.',
+        'Talvez você tenha entrado em uma conta diferente daquela vinculada ao relógio. Se ela foi criada usando Google ou Apple, no Zepp App toque na foto de perfil no canto superior direito da página inicial, vá até as configurações no fim da página, abra as opções de conta e segurança e escolha a opção para alterar o e-mail. Depois, volte ao ZeppBridge e entre com esse e-mail.',
       emptyUnconfirmedRegion:
         'A sincronização rodou, mas não trouxe nada. O login não confirmou a região Zepp da conta e o app está num palpite: mirar a região errada termina com sucesso e vazio, assim. Reconecte a conta.',
       reconnect: 'Reconectar conta',

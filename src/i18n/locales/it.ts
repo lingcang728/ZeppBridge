@@ -241,7 +241,7 @@ export default {
     empty: 'Nessun dato su questo computer. Sincronizza una volta per visualizzare i grafici.',
     emptyAfterSync: 'La sincronizzazione è stata completata senza trovare dati. Questo account non ha dati per questo periodo in Zepp oppure l’orologio non li ha ancora inviati all’app Zepp. Controlla prima l’app Zepp sul telefono, quindi sincronizza di nuovo.',
     emptyUnconfirmedRegion: 'La sincronizzazione è stata completata senza trovare dati. La connessione non ha potuto confermare la regione Zepp del tuo account e ZeppBridge sta usando una stima: se la regione è errata, la sincronizzazione sembra riuscire ma non restituisce nulla. Prova a riconnettere l’account.',
-    wrongAccount: 'Potresti aver effettuato l’accesso con un account diverso da quello associato all’orologio. Se hai creato l’account con Google o Apple, aggiungi prima un indirizzo email in Zepp App, poi accedi qui con quell’indirizzo.',
+    wrongAccount: 'Potresti aver effettuato l’accesso con un account diverso da quello associato all’orologio. Se hai creato l’account con Google o Apple, nell’app Zepp tocca l’avatar in alto a destra nella schermata iniziale, poi Impostazioni in fondo alla pagina, Account e sicurezza e Cambia email. Torna quindi a ZeppBridge e accedi con quell’indirizzo.',
     short: (covered: number, earliest: string) =>
       `Questo computer conserva solo ${covered} giorni (a partire dal ${earliest}). Prima di questa data non c’è nulla perché non è ancora stato recuperato nulla, non perché non ci fossero registrazioni.`,
     syncNow: 'Sincronizza ora',

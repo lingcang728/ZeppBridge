@@ -645,7 +645,7 @@ Si tu as besoin d’informations de ma part (quel client j’utilise, où se tro
       empty: 'Aucune donnée sur cette machine. Synchronisez une fois pour afficher les graphiques.',
       emptyAfterSync: 'La synchro a tourné sans rien rapporter. Soit ce compte n’a pas de données pour cette période dans Zepp, soit la montre n’a pas encore envoyé ses données à l’app Zepp. Vérifiez d’abord dans Zepp sur votre téléphone, puis resynchronisez.',
       emptyUnconfirmedRegion: 'La synchro a tourné sans rien rapporter. La connexion n’a pas pu confirmer à quelle région Zepp votre compte appartient, et ZeppBridge utilise son estimation — viser la mauvaise région donne exactement ça : tout réussit, rien ne revient. Essayez de reconnecter le compte.',
-      wrongAccount: 'Vous vous êtes peut-être connecté à un autre compte que celui associé à votre montre. Si vous l’avez créé avec Google ou Apple, ajoutez d’abord une adresse e-mail à ce compte dans Zepp App, puis connectez-vous ici avec cette adresse.',
+      wrongAccount: 'Vous vous êtes peut-être connecté à un autre compte que celui associé à votre montre. Si ce compte a été créé avec Google ou Apple, ajoutez-y d’abord une adresse e-mail dans l’app Zepp. Depuis l’accueil, touchez votre avatar en haut à droite, puis ouvrez les paramètres en bas de page, Compte et sécurité, puis Changer d’adresse e-mail. Revenez ensuite dans ZeppBridge et connectez-vous avec cette adresse.',
       short: (covered: number, earliest: string) =>
         `Cette machine ne garde que ${covered} jours (au plus tôt le ${earliest}). Avant cette date, c’est vide parce que rien n’a encore été récupéré — pas parce que vous n’aviez rien enregistré.`,
       syncNow: 'Synchroniser maintenant',

@@ -63,6 +63,11 @@ use those. Signing in with a different account than your official
 authorization is flagged right away, so you won't end up with half of two
 accounts.
 
+To link an email in the Zepp app, tap your profile photo at the top right of
+the home screen. Open the settings at the bottom of the page, go to the account
+and security section, and choose the option to change your email address. Then
+return to ZeppBridge and sign in with that address.
+
 The same explanation is in the app under **Settings › Account and devices › Why is some data
 missing?**
 

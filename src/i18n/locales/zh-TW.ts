@@ -440,7 +440,7 @@ export default {
       emptyAfterSync: '同步已完成，但未取得任何紀錄。可能是此帳號在 Zepp 中本來就沒有這段資料，也可能是手錶尚未上傳至 Zepp App。請先在手機 Zepp 中確認有資料，再回來同步。',
       emptyNotConnected: '本機尚未有任何資料。請先連線你的 Zepp 帳號，再同步一次，圖表才有內容可繪製。',
       emptyUnconfirmedRegion: '同步已完成，但未取得任何紀錄。登入時未能確認帳號屬於哪個 Zepp 區域，目前使用的是推測的區域——連線至錯誤區域的同步就是如此：全程成功，卻什麼都沒有。請嘗試重新連線帳號。',
-      wrongAccount: '登入的可能不是手錶綁定的那個帳號。若是用 Google / Apple 註冊，請先在 Zepp App 中為該帳號綁定電子郵件，再用電子郵件登入。',
+      wrongAccount: '登入的可能不是手錶綁定的帳號。若以 Google / Apple 註冊，請先在 Zepp App 首頁點選右上角個人頭像 → 頁面底部的設定 → 帳號與安全 → 更換電子郵件，再回 ZeppBridge 使用該電子郵件地址登入。',
       keepAllChange: '改為只保留最近一段',
       keepAllHint: '本機預設長期保留全部紀錄，同步後不會自動清理。',
       reconnect: '前往重新連線',

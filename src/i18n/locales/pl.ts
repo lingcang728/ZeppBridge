@@ -778,7 +778,7 @@ export default {
     emptyUnconfirmedRegion:
       'Synchronizacja została przeprowadzona, ale nie zwróciła danych. Podczas logowania nie udało się potwierdzić regionu Twojego konta Zepp, dlatego ZeppBridge wybiera go szacunkowo — synchronizacja skierowana do niewłaściwego regionu kończy się sukcesem, ale nic nie zwraca, dokładnie tak jak w tym przypadku. Połącz konto ponownie.',
     wrongAccount:
-      'Możliwe, że logujesz się na inne konto niż to powiązane z zegarkiem. Jeśli utworzono je za pomocą Google lub Apple, najpierw dodaj do niego adres e-mail w aplikacji Zepp, a potem zaloguj się tutaj tym adresem.',
+      'Możliwe, że logujesz się na inne konto niż to powiązane z zegarkiem. Jeśli utworzono je za pomocą Google lub Apple, w aplikacji Zepp stuknij awatar w prawym górnym rogu strony głównej, wybierz ustawienia na dole strony, przejdź do ustawień konta i bezpieczeństwa, a następnie zmień adres e-mail. Wróć do ZeppBridge i zaloguj się tym adresem.',
     reconnect: 'Połącz konto ponownie',
     short: (covered: number, earliest: string) =>
       `To urządzenie zawiera ${plural(covered, { one: `${covered} dzień`, few: `${covered} dni`, many: `${covered} dni`, other: `${covered} dnia` })} danych (najwcześniejsze: ${earliest}). Wcześniejsze daty są puste, ponieważ nie zostały jeszcze pobrane — a nie dlatego, że nic wtedy nie zarejestrowano.`,

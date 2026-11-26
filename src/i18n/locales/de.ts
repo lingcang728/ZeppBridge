@@ -1164,7 +1164,7 @@ Wenn du weitere Informationen von mir brauchst (welcher Client verwendet wird, w
         'Noch keine Daten auf diesem Rechner. Einmal synchronisieren, damit Diagramme gezeichnet werden können.',
       emptyAfterSync:
         'Synchronisierung war erfolgreich, lieferte aber keine Einträge. Entweder gibt es bei Zepp keine Daten für diesen Zeitraum, oder die Uhr hat sie noch nicht an die Zepp-App übertragen. Prüfe zuerst die Zepp-App am Smartphone und synchronisiere erneut.',
-      wrongAccount: 'Möglicherweise bist du mit einem anderen Konto angemeldet als dem, das mit deiner Uhr gekoppelt ist. Wenn du dich mit Google oder Apple registriert hast, verknüpfe zuerst in der Zepp App eine E-Mail-Adresse mit dem Konto und melde dich dann mit dieser Adresse an.',
+      wrongAccount: 'Möglicherweise bist du mit einem anderen Konto angemeldet als dem, das mit deiner Uhr gekoppelt ist. Wenn du dieses Konto mit Google oder Apple erstellt hast, verknüpfe zuerst eine E-Mail-Adresse damit. Öffne in der Zepp App auf der Startseite oben rechts dein Profilbild, gehe unten auf der Seite zu Einstellungen und dann zu Konto und Sicherheit → E-Mail-Adresse ändern. Melde dich anschließend bei ZeppBridge mit dieser E-Mail-Adresse an.',
       emptyUnconfirmedRegion:
         'Synchronisierung war erfolgreich, lieferte aber keine Einträge. Deine Zepp-Region konnte bei der Anmeldung nicht bestätigt werden (ZeppBridge nutzt eine Schätzung). Eine falsche Region läuft fehlerfrei durch, bleibt aber leer. Verbinde das Konto erneut.',
       reconnect: 'Konto erneut verbinden',

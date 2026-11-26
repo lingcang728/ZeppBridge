@@ -61,7 +61,7 @@ const messages = defineMessages(
       'Sync ran but brought back nothing. Either this account has no Zepp data for this period, or the watch has not uploaded to the Zepp app yet. Check Zepp on your phone, then sync again.',
     emptyUnconfirmedRegion:
       'Sync ran but brought back nothing. Sign-in could not confirm your account’s Zepp region, so ZeppBridge is guessing — a sync aimed at the wrong region succeeds and returns nothing, exactly like this. Reconnect your account.',
-    wrongAccount: 'You may have signed in to a different account than the one your watch is paired with. If that account was created with Google or Apple, add an email to it in the Zepp app first, then sign in here with that email.',
+    wrongAccount: 'You may have signed in to a different account than the one paired with your watch. If you created that account with Google or Apple, first link an email address in the Zepp app. Tap your profile photo at the top right of the home screen. Open the settings at the bottom of the page, go to the account and security section, and choose the option to change your email address. Then return to ZeppBridge and sign in with that address.',
     reconnect: 'Reconnect account',
     short: (covered: number, earliest: string) =>
       `This machine holds ${covered} days (earliest ${earliest}). Earlier dates are blank because they are not fetched yet — not because you recorded nothing then.`,
@@ -79,7 +79,7 @@ const messages = defineMessages(
       'La sincronización funcionó, pero no trajo ni un registro. O esta cuenta no tiene datos de este periodo en Zepp, o el reloj aún no los sube a la app Zepp. Confirma en la app Zepp del teléfono que haya datos y vuelve a sincronizar.',
     emptyUnconfirmedRegion:
       'La sincronización terminó, pero no trajo nada. Al iniciar sesión no se pudo confirmar la región Zepp de tu cuenta, así que ZeppBridge está usando una región adivinada: una sincronización a la región equivocada hace justo esto, funciona y no devuelve nada. Vuelve a conectar tu cuenta.',
-    wrongAccount: 'Puede que hayas iniciado sesión con una cuenta distinta de la vinculada a tu reloj. Si te registraste con Google o Apple, primero añade un correo electrónico a esa cuenta en Zepp App y luego inicia sesión aquí con ese correo.',
+    wrongAccount: 'Puede que hayas iniciado sesión con una cuenta distinta de la vinculada a tu reloj. Si creaste esa cuenta con Google o Apple, primero añade un correo electrónico en la app Zepp. En la pantalla de inicio, toca el avatar en la esquina superior derecha y abre Ajustes al final de la página. Ve a Cuenta y seguridad y elige Cambiar correo electrónico. Luego vuelve a ZeppBridge e inicia sesión con ese correo.',
     reconnect: 'Volver a conectar la cuenta',
     short: (covered: number, earliest: string) =>
       `Este equipo solo tiene ${covered} días de datos (desde ${earliest}). Lo anterior está en blanco porque aún no se descarga de la nube, no porque no hubiera registros.`,
