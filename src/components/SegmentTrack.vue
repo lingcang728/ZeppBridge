@@ -332,7 +332,8 @@ const fly = async (value: T, lift: boolean, fromColor: T | null = null) => {
   placeOn(value);
   settling.value = true;
   window.clearTimeout(colorTimer);
-  const startColor = fromColor ?? props.modelValue;
+  // 还没选时起飞处是 placeholder 那一项（它没上色），不从一个不存在的值淡过去。
+  const startColor = fromColor ?? (parked.value && props.placeholder !== undefined ? props.placeholder : props.modelValue);
   const quiet = !wasVisible || reducedMotion();
   if (quiet || startColor === value) {
     lensValue.value = value;
@@ -503,7 +504,10 @@ const onDown = (event: PointerEvent) => {
   const button = (event.target as Element).closest<HTMLElement>('.segment-item');
   const index = button ? buttons().indexOf(button) : -1;
   const startValue = index >= 0 ? props.items[index]!.value : props.modelValue;
-  const active = stops.value.find((stop) => stop.value === props.modelValue) ?? stops.value[0];
+  // 还没选（停在 placeholder 上）：从 placeholder 那一项起拖。以前退回第一项，按下时手稍一动，滑块就先跳到最左边再飞回来。
+  const active = stops.value.find((stop) => stop.value === props.modelValue)
+    ?? (parked.value ? stops.value.find((stop) => stop.value === props.placeholder) : undefined)
+    ?? stops.value[0];
   if (!active) return;
   gesture = {
     id: event.pointerId,
