@@ -355,8 +355,8 @@ export interface BridgeBackend {
   sleepJournalPrompt(): Promise<import('../../types/sleepJournal').SleepJournalPrompt | null>;
   /** 一段日期里记过的晚上（醒来那天，含两端），新的在前。 */
   sleepJournalList(from: string, to: string): Promise<import('../../types/sleepJournal').SleepJournalEntry[]>;
-  /** 记一晚：先存本机，再试着写回 Zepp。 */
-  sleepJournalSave(input: import('../../types/sleepJournal').SleepJournalInput): Promise<import('../../types/sleepJournal').SleepJournalSaved>;
+  /** 记一晚：只存本机，不写回 Zepp。 */
+  sleepJournalSave(input: import('../../types/sleepJournal').SleepJournalInput): Promise<import('../../types/sleepJournal').SleepJournalEntry>;
   sleepJournalDismiss(): Promise<void>;
   /** 「这周别问」：返回到哪天为止（下周一）。 */
   sleepJournalSnooze(): Promise<string>;

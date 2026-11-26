@@ -29,6 +29,8 @@ PATHS = ['/', '/body', '/training', '/heart', '/activity', '/ai', '/ai/exchanges
 OVERLAYS = {'/body': ('.pick-days', '牌桌'), '/ai': ('.face-switch .segment-item >> nth=1', '计划面'),
             # 首页「今日一问」展开、列表左下托盘点开。
             '/': ('.ask-main', '今日一问'), '/sleep': ('.tray-handle', '托盘'), '/workouts': ('.tray-handle', '托盘')}
+# 从列表点进第一晚的详情页（时长卡中间那块），再点开睡前日志浮层。
+DRILLS = {'/sleep': ('a[href*="sleep/"]', '/sleep/详情', '.np-journal', '日志浮层')}
 
 PROBE = """() => {
   const boxes = [];
@@ -125,6 +127,30 @@ async def main():
                             print(f'✓ {loc:6} {name}')
                         await page.keyboard.press('Escape')
                         await page.wait_for_timeout(1500)
+                if path in DRILLS:
+                    link, name, pop, pop_label = DRILLS[path]
+                    target = page.locator(link).first
+                    if not await target.count():
+                        failures += 1
+                        print(f'✗ {loc:6} {name:12} 找不到入口 {link}')
+                        continue
+                    await target.click()
+                    await page.wait_for_timeout(2600)
+                    for label, trigger in ((name, None), (f'{name}+{pop_label}', pop)):
+                        if trigger:
+                            button = page.locator(trigger).first
+                            if not await button.count():
+                                continue
+                            await button.click()
+                            await page.wait_for_timeout(1500)
+                        found = await page.evaluate(PROBE)
+                        if found:
+                            failures += 1
+                            print(f'✗ {loc:6} {label:12} ' + '；'.join(found))
+                        else:
+                            print(f'✓ {loc:6} {label}')
+                    await page.keyboard.press('Escape')
+                    await page.wait_for_timeout(800)
             await page.close()
         await browser.close()
     print(f'\n{failures} 处页面有文字重叠' if failures else '\n全部通过：没有文字压在一起')

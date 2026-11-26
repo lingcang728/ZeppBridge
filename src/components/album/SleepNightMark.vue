@@ -2,7 +2,8 @@
 /* 睡眠日档一行右边的小记号：一根细横线只标入睡、醒来两个点（所有行共用一条时间轴，上下对得齐），
    右边一枚分期环：整圈按深睡 / 浅睡 / REM / 清醒分四色（各行起点一致，上下一扫就能比结构），圈中写评分。
    以前每行是一整条分期色带（一晚几十到上百段），滚动和退出页面的形变都要整页重画，这里只有几个元素。
-   没有分期就退回单色评分弧；分期、评分都没有就不画环。 */
+   没有分期就退回单色评分弧；分期、评分都没有就不画环。
+   默认插槽钉在横线正中间（睡前日志的标记）：浮在线上、不占横向位置，各行的线照样从同一处起、到同一处止。 */
 import { computed } from 'vue';
 import StageRing from './StageRing.vue';
 import type { SleepStages } from '../../lib/album/album';
@@ -31,7 +32,7 @@ const hasStages = computed(() => Object.values(props.stages ?? {}).some((v) => t
 
 <template>
   <span class="night-mark">
-    <span class="night-line" aria-hidden="true" :style="{ '--start': `${span.start}%`, '--end': `${span.end}%` }"><i class="dot onset" /><i class="dot wake" /></span>
+    <span class="night-line" aria-hidden="true" :style="{ '--start': `${span.start}%`, '--end': `${span.end}%` }"><i class="dot onset" /><i class="dot wake" /><span v-if="$slots.default" class="night-pin"><slot /></span></span>
     <StageRing v-if="ringScore !== null || hasStages" class="score-ring" :stages="stages" :value="ringScore" :stroke="4.6" :label="scoreLabel" />
   </span>
 </template>
@@ -46,5 +47,6 @@ const hasStages = computed(() => Object.values(props.stages ?? {}).some((v) => t
 .dot { position: absolute; z-index: 1; top: 50%; width: 8px; height: 8px; border-radius: 50%; translate: -50% -50%; }
 .dot.onset { left: var(--start); background: var(--sleep); }
 .dot.wake { left: var(--end); background: var(--mat-card-solid); box-shadow: inset 0 0 0 2px var(--sleep); }
+.night-pin { position: absolute; z-index: 2; top: 50%; left: 50%; translate: -50% -50%; display: flex; }
 .score-ring { width: 38px; height: 38px; }
 </style>

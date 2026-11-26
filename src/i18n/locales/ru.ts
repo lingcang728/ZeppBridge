@@ -1453,9 +1453,6 @@ export default {
       more: (count: number) => `Ещё +${count}`,
       less: 'Свернуть',
       save: 'Готово',
-      written: 'Сохранено в Zepp',
-      pending: 'Запись будет отправлена в Zepp при следующей синхронизации',
-      localOnly: 'Сохранено только на этом компьютере',
       edit: 'Изменить',
       lastNight: 'Прошлая ночь',
       extraBefore: (list: string) => `Перед сном прошлой ночью: ${list}.`,
@@ -1475,7 +1472,6 @@ export default {
         plural(count, { one: `${count} ночь`, few: `${count} ночи`, many: `${count} ночей`, other: `${count} ночей` }),
       needMore: (count: number) =>
         `Ещё ${plural(count, { one: `${count} ночь`, few: `${count} ночи`, many: `${count} ночей`, other: `${count} ночей` })}`,
-      caveat: 'Совпадение не обязательно означает причинную связь',
       markAdd: 'Отметить, что было перед сном',
       markEdit: 'Изменить запись за эту ночь',
       moodLabel: 'Самочувствие после пробуждения',

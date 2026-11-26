@@ -16,6 +16,8 @@ import AskAiButton from '../components/ask/AskAiButton.vue';
 import { dayKey } from '../lib/aiTask/bridgeScale';
 import PickDaysButton from '../components/cards/PickDaysButton.vue';
 import DurationText from '../components/DurationText.vue';
+import NightJournalPanel from '../components/sleepJournal/NightJournalPanel.vue';
+import { localDay } from '../lib/album/album';
 import { useSyncController } from '../composables/useSyncController';
 import { useLoadingAfterMotion } from '../composables/useFirstLoad';
 import { useDevices } from '../composables/useDevices';
@@ -92,6 +94,19 @@ const heroFacts = computed(() => {
   const wakes = session.value?.wake_count;
   if (isFiniteNumber(wakes) && wakes >= 0) facts.push({ key: 'wake', label: t.value.wokeUp, value: t.value.wakeTimes(Math.round(wakes)) });
   return facts;
+});
+
+/* 时长卡中间：几点睡着、几点醒，和这一晚的睡前日志（只有主睡眠记，和睡眠列表同一条线：至少 3 小时）。 */
+const heroNight = computed(() => {
+  const s = session.value;
+  if (!s) return null;
+  const asleep = formatTimeWithPeriod(s.start_time);
+  const awake = formatTimeWithPeriod(s.end_time);
+  const inBed = Math.max(0, Math.round((new Date(s.end_time).getTime() - new Date(s.start_time).getTime()) / 60000));
+  return {
+    date: localDay(s.end_time), asleep, awake, spanLabel: t.value.heroMeta(asleep, awake, formatDuration(inBed)),
+    label: `${formatDate(s.start_time, 'auto')} · ${formatDuration(s.duration_minutes)}`, journal: (s.duration_minutes ?? 0) >= 180,
+  };
 });
 
 const syncTimeLabel = computed(() => {
@@ -304,6 +319,7 @@ const metaSummary = computed(() => [providerLabel.value, deviceLabel.value].filt
           <p class="kicker"><span class="mark"><Icon name="moon" :size="16" /></span>{{ t.durationKicker }}<MetricInfoButton metric="sleep_duration" :label="t.durationKicker" /></p>
           <p class="value"><DurationText :minutes="session.duration_minutes" :empty="t.notProvided" /></p>
         </div>
+        <NightJournalPanel v-if="heroNight" class="hero-night" v-bind="heroNight" />
         <div class="hero-score">
           <!-- 整圈按四个分期的占比分色（和月、年档的环同一种画法），圈中是评分；右边列出四段时长，颜色一一对上。 -->
           <StageRing v-if="score !== null || hasStages" class="hero-ring" :stages="ringStages" :value="score" :stroke="4" :ink="ink" :label="t.scoreKicker" />

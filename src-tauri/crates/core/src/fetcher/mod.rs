@@ -192,11 +192,6 @@ impl DataFetcher {
         Ok(crate::storage::sleep_journal::parse_manual_data(&payload))
     }
 
-    /// 把一晚写回 Zepp（同一接口、按日期覆盖）。
-    pub async fn upload_sleep_journal(&self, date: &str, summary: &str) -> Result<()> {
-        self.connector.upload_manual_sleep_data(date, summary).await
-    }
-
     pub async fn fetch_heart_rate_records(
         &self,
         window: FetchWindow,

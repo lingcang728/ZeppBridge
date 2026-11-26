@@ -262,7 +262,7 @@ impl SyncManager {
                 return Err(error);
             }
         }
-        // 睡前日志也一样：一次请求拉回全部，顺带把本机记过、还没写回的写回去。
+        // 睡前日志也一样：一次请求拉回全部（只拉，本机记的不写回去）。
         if let Err(error) = self.sync_sleep_journal().await {
             if error.is_cancelled() {
                 return Err(error);

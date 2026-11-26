@@ -15,11 +15,12 @@
   font-size: var(--fs-sm);
 }
 .muted-line { color: var(--muted); }
+/* 时长 | 几点睡几点醒 + 睡前日志 | 评分：中间那块填满，不留一大片空。 */
 .sleep-hero {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: 24px;
+  gap: 24px 40px;
   min-width: 0;
   padding: 18px 20px;
   overflow: hidden;
@@ -27,6 +28,7 @@
   background: var(--mat-card); box-shadow: var(--mat-rim), var(--mat-shadow);
 }
 .hero-duration, .hero-score { min-width: 0; }
+.hero-night { max-width: 560px; width: 100%; justify-self: center; }
 .hero-score {
   display: flex;
   align-items: center;
@@ -130,6 +132,11 @@
   font-size: var(--fs-md);
 }
 .note { margin: 0; color: var(--muted); font-size: var(--fs-sm); }
+/* 窄一点：中间那块挪到第二行、占满整宽。 */
+@media (max-width: 1080px) {
+  .sleep-hero { grid-template-columns: minmax(0, 1fr) auto; }
+  .hero-night { grid-column: 1 / -1; order: 3; max-width: none; }
+}
 @media (max-width: 760px) {
   .sleep-hero, .meta-grid { grid-template-columns: 1fr; }
   .hero-score { justify-content: flex-start; }

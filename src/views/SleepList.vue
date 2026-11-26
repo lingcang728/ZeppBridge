@@ -267,10 +267,12 @@ useSectionTour('sleep');
           :fact="`${formatTime(session.start_time)} – ${formatTime(session.end_time)}`"
         >
           <template #aside>
-            <NightJournalMark v-if="isMainSleep(session)" :date="wakeDay(session)"
-              :label="`${formatDate(session.start_time, 'auto')} · ${formatDuration(session.duration_minutes)}`" />
             <SleepNightMark v-bind="nightOf(session)" :axis="axis" :score="session.score" :stages="stagesOf(session)"
-              :score-label="scoreOf(session.sleep_id) !== null ? albumText.scoreLabel(scoreOf(session.sleep_id)!) : undefined" />
+              :score-label="scoreOf(session.sleep_id) !== null ? albumText.scoreLabel(scoreOf(session.sleep_id)!) : undefined">
+              <!-- 睡前日志钉在横线正中：不占位置，各行横线的起止照样对齐。 -->
+              <NightJournalMark v-if="isMainSleep(session)" :date="wakeDay(session)"
+                :label="`${formatDate(session.start_time, 'auto')} · ${formatDuration(session.duration_minutes)}`" />
+            </SleepNightMark>
           </template>
         </RecordRow>
       </div>

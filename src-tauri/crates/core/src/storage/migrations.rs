@@ -1650,7 +1650,7 @@ impl Database {
         // v55：睡前日志与睡醒心情（Zepp App 的 manualData，type=sleep）。一行一个醒来那天的本地日期。
         // `behaviors` 是 Zepp 的 sb 码（JSON 字符串数组，"1"–"18"），`mood` 是 sf 码（"1"–"5"）。
         // 用户自己的东西：不挂外键到 sleep_sessions，重放、保留期清理都不碰。
-        // `pending_upload`：本机改过、还没写回 Zepp；同步拉回云端那份时不覆盖它。
+        // `pending_upload` / `cloud_synced_at`：原先给写回 Zepp 用，现在只拉不写，两列不再读写（DDL 不改）。
         self.conn.execute_batch(
             "CREATE TABLE IF NOT EXISTS sleep_journal (
                 date TEXT PRIMARY KEY,

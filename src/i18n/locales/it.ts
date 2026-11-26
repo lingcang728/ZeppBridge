@@ -1447,9 +1447,6 @@ export default {
     more: (count: number) => count === 0 ? 'Nessun’altra' : count === 1 ? `Altra +${count}` : `Altre +${count}`,
     less: 'Meno',
     save: 'Salva',
-    written: 'Scritto su Zepp',
-    pending: 'Verrà scritto su Zepp alla prossima sincronizzazione',
-    localOnly: 'Salvato solo su questo computer',
     edit: 'Modifica',
     lastNight: 'Ieri notte',
     extraBefore: (list: string) => `Ieri sera prima di dormire: ${list}.`,
@@ -1468,7 +1465,6 @@ export default {
     nights: (count: number) => count === 1 ? `${count} notte` : `${count} notti`,
     needMore: (count: number) =>
       count === 0 ? 'Nessun’altra notte' : count === 1 ? `Ancora ${count} notte` : `Ancora ${count} notti`,
-    caveat: 'La correlazione non dimostra la causalità',
     markAdd: 'Registra cosa hai fatto prima di dormire',
     markEdit: 'Modifica il diario del sonno di questa notte',
     moodLabel: 'Come ti senti al risveglio?',

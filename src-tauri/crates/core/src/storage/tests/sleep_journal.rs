@@ -81,7 +81,7 @@ fn parses_the_manual_data_payload_and_skips_bad_rows() {
 }
 
 #[test]
-fn local_edits_survive_a_cloud_pull_until_written_back() {
+fn local_edits_stay_local_and_survive_cloud_pulls() {
     let db = Database::in_memory().unwrap();
     let cloud = vec![CloudJournalItem {
         date: "2026-11-20".into(),
@@ -97,40 +97,29 @@ fn local_edits_survive_a_cloud_pull_until_written_back() {
         .unwrap();
     assert_eq!(saved.behaviors, vec!["1", "12"]);
     assert_eq!(saved.source, "local");
-    assert!(saved.pending_upload);
-    assert_eq!(saved.zepp_summary(), r#"{"sb":["1","12"],"sf":"2"}"#);
 
-    // 还没写回：云端旧的那份不能把它冲掉。
+    // 本机记过的晚上只留在本机：云端那份（旧的、新的）都不能把它冲掉。
     assert_eq!(db.merge_cloud_sleep_journal(&cloud).unwrap(), 0);
-    let kept = db.sleep_journal_entry("2026-11-20").unwrap().unwrap();
-    assert_eq!(kept.behaviors, vec!["1", "12"]);
-    assert_eq!(db.pending_sleep_journal().unwrap().len(), 1);
-
-    assert!(db.mark_sleep_journal_uploaded(&kept).unwrap());
-    assert!(db.pending_sleep_journal().unwrap().is_empty());
-    // 写回之后，云端的新内容照常进来。
     let newer = vec![CloudJournalItem {
         date: "2026-11-20".into(),
         behaviors: vec!["8".into()],
         mood: None,
     }];
-    assert_eq!(db.merge_cloud_sleep_journal(&newer).unwrap(), 1);
-    let entry = db.sleep_journal_entry("2026-11-20").unwrap().unwrap();
-    assert_eq!(entry.behaviors, vec!["8"]);
-    assert_eq!(entry.mood, None);
-}
+    assert_eq!(db.merge_cloud_sleep_journal(&newer).unwrap(), 0);
+    let kept = db.sleep_journal_entry("2026-11-20").unwrap().unwrap();
+    assert_eq!(kept.behaviors, vec!["1", "12"]);
+    assert_eq!(kept.mood.as_deref(), Some("2"));
 
-#[test]
-fn a_write_back_of_an_older_copy_leaves_the_newer_edit_pending() {
-    let db = Database::in_memory().unwrap();
-    let first = db
-        .save_sleep_journal(&input("2026-11-20", &["3"], None))
-        .unwrap();
-    std::thread::sleep(std::time::Duration::from_millis(5));
-    db.save_sleep_journal(&input("2026-11-20", &["3", "17"], None))
-        .unwrap();
-    assert!(!db.mark_sleep_journal_uploaded(&first).unwrap());
-    assert_eq!(db.pending_sleep_journal().unwrap().len(), 1);
+    // 没在本机记过的晚上，云端的新内容照常进来。
+    let other = vec![CloudJournalItem {
+        date: "2026-11-21".into(),
+        behaviors: vec!["8".into()],
+        mood: None,
+    }];
+    assert_eq!(db.merge_cloud_sleep_journal(&other).unwrap(), 1);
+    let entry = db.sleep_journal_entry("2026-11-21").unwrap().unwrap();
+    assert_eq!(entry.behaviors, vec!["8"]);
+    assert_eq!(entry.source, "zepp");
 }
 
 #[test]

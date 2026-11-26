@@ -12,8 +12,8 @@ export interface SleepJournalEntry {
   date: string;
   behaviors: BedtimeCode[];
   mood: WakeMood | null;
+  /** zepp：从 Zepp App 拉回来的；local：在这里记的（只存本机，不写回 Zepp）。 */
   source: 'zepp' | 'local';
-  pending_upload: boolean;
   updated_at: string;
 }
 
@@ -21,12 +21,6 @@ export interface SleepJournalInput {
   date: string;
   behaviors: BedtimeCode[];
   mood: WakeMood | null;
-}
-
-export interface SleepJournalSaved {
-  entry: SleepJournalEntry;
-  /** written 已写回 Zepp；pending 下次同步再写；local_only 没有 Zepp 登录、只存本机。 */
-  zepp: 'written' | 'pending' | 'local_only';
 }
 
 /** 首页打卡问的那一晚。 */

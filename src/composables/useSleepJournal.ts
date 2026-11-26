@@ -2,19 +2,17 @@
  * 睡前日志与睡醒心情的全局状态：首页打卡、今日一问「昨晚」那一条、睡眠列表上的标记、睡眠页的睡前因素都读这一份。
  *
  * - 记在醒来那天下（和 Zepp 一样）。一处改了，别处立刻跟着变：同一张表。
- * - 保存先落本机，再由后端试着写回 Zepp；`zepp` 记着这一晚最后一次保存写回了没有。
- * - 点一下就存的地方（今日一问那一条、列表上的浮层）走 `saveSoon`：连点几下只存最后一次，免得每点一下就写回一次 Zepp。
+ * - 在这里记的只存本机，不写回 Zepp（同步只把 Zepp App 里记的拉回来）。
+ * - 点一下就存的地方（今日一问那一条、列表上的浮层）走 `saveSoon`：连点几下只存最后一次。
  */
 import { ref, shallowRef, triggerRef } from 'vue';
 import { backend, isDesktop } from '../lib/bridge';
-import type { BedtimeCode, SleepFactors, SleepJournalEntry, SleepJournalPrompt, SleepJournalSaved, WakeMood } from '../types/sleepJournal';
+import type { BedtimeCode, SleepFactors, SleepJournalEntry, SleepJournalPrompt, WakeMood } from '../types/sleepJournal';
 import { sortCodes } from '../components/sleepJournal/journalCodes';
 
 const prompt = ref<SleepJournalPrompt | null>(null);
 /** 醒来那天 → 那一晚。只放读到过的日期。 */
 const entries = shallowRef(new Map<string, SleepJournalEntry>());
-/** 醒来那天 → 这次打开以来最后一次保存写回 Zepp 没有。 */
-const zepp = shallowRef(new Map<string, SleepJournalSaved['zepp']>());
 const factors = ref<SleepFactors | null>(null);
 /** 每存一次加一：睡前因素据此重读。 */
 const saves = ref(0);
@@ -71,9 +69,7 @@ export const useSleepJournal = () => {
     const pendingTimer = timers.get(date);
     if (pendingTimer) { window.clearTimeout(pendingTimer); timers.delete(date); }
     const saved = await backend.sleepJournalSave({ date, behaviors: sortCodes(behaviors), mood });
-    put(saved.entry);
-    zepp.value.set(date, saved.zepp);
-    triggerRef(zepp);
+    put(saved);
     saves.value += 1;
     return saved;
   };
@@ -82,7 +78,7 @@ export const useSleepJournal = () => {
   const saveSoon = (date: string, behaviors: Iterable<BedtimeCode>, mood: WakeMood | null) => {
     const codes = sortCodes(behaviors);
     const previous = entries.value.get(date);
-    put({ date, behaviors: codes, mood, source: 'local', pending_upload: true, updated_at: previous?.updated_at ?? '' });
+    put({ date, behaviors: codes, mood, source: 'local', updated_at: previous?.updated_at ?? '' });
     window.clearTimeout(timers.get(date));
     timers.set(date, window.setTimeout(() => {
       timers.delete(date);
@@ -102,5 +98,5 @@ export const useSleepJournal = () => {
     try { await backend.sleepJournalSnooze(); } catch { /* 同上 */ }
   };
 
-  return { prompt, entries, zepp, factors, saves, loadPrompt, loadRange, loadFactors, entry, save, saveSoon, dismiss, snooze };
+  return { prompt, entries, factors, saves, loadPrompt, loadRange, loadFactors, entry, save, saveSoon, dismiss, snooze };
 };

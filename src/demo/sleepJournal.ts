@@ -26,7 +26,7 @@ export const createDemoSleepJournal = (data: DemoData) => {
     if (i % 9 === 5) tags.add('1');
     const mood: WakeMood = score >= 84 ? '4' : score >= 78 ? '3' : score >= 72 ? '2' : '1';
     entries.set(wakeDay(night), {
-      date: wakeDay(night), behaviors: [...tags].sort((a, b) => Number(a) - Number(b)), mood, source: 'zepp', pending_upload: false, updated_at: stamp,
+      date: wakeDay(night), behaviors: [...tags].sort((a, b) => Number(a) - Number(b)), mood, source: 'zepp', updated_at: stamp,
     });
   });
   let dismissed = false;
@@ -69,9 +69,9 @@ export const createDemoSleepJournal = (data: DemoData) => {
       .sort((a, b) => b.date.localeCompare(a.date)),
     sleep_journal_save: (args: Record<string, unknown>) => {
       const input = args.input as SleepJournalInput;
-      const entry: SleepJournalEntry = { date: input.date, behaviors: [...input.behaviors], mood: input.mood, source: 'local', pending_upload: false, updated_at: new Date().toISOString() };
+      const entry: SleepJournalEntry = { date: input.date, behaviors: [...input.behaviors], mood: input.mood, source: 'local', updated_at: new Date().toISOString() };
       entries.set(input.date, entry);
-      return { entry, zepp: 'written' };
+      return entry;
     },
     sleep_journal_dismiss: () => { dismissed = true; },
     sleep_journal_snooze: () => { dismissed = true; return dayKey(new Date(data.now.getTime() + 7 * 864e5)); },

@@ -5,8 +5,9 @@
 //! - **一行一个醒来那天**：Zepp 把这一晚记在醒来那天的本地日期下，这里照用，对睡眠时按醒来那天找主睡眠。
 //! - **码照存**：`behaviors` 是 Zepp 的 sb 码（"1"–"18"），`mood` 是 sf 码（"1"–"5"）。后端不出文案，
 //!   界面按码翻译；导出 / MCP 用 [`behavior_code`] / [`mood_code`] 给英文码。
-//! - **本机改过的不被云端冲掉**：本机保存记 `pending_upload = 1`，写回 Zepp 成功才清；同步拉回的云端那份
-//!   碰到还没写回的行就跳过。
+//! - **只拉不写**：同步只把 Zepp 那份拉回来；在这里记的只留在本机，不写回 Zepp。
+//! - **本机记过的不被云端冲掉**：`source = 'local'` 的行，同步拉回的云端那份不动它。
+//!   （v55 的 `pending_upload` / `cloud_synced_at` 两列已不再用，迁移只能追加，列留着。）
 //! - **问一次就够**：首页打卡只问「昨晚」那一晚，醒来后当天有效；记过、关掉、「这周别问」都不再问。
 //! - **睡前因素只比记过的晚上**：有这个标签的晚上 vs 记过但没这个标签的晚上，两边都够
 //!   [`FACTOR_MIN_NIGHTS`] 晚才给差值。没记的晚上不知道做没做，不当「没有」用。
@@ -99,8 +100,6 @@ pub struct SleepJournalEntry {
     pub mood: Option<String>,
     /// `zepp`（从 Zepp 拉回来的）/ `local`（在这里记的）。
     pub source: String,
-    /// 本机改过、还没写回 Zepp。
-    pub pending_upload: bool,
     pub updated_at: String,
 }
 
@@ -108,16 +107,6 @@ impl SleepJournalEntry {
     /// 什么都没勾、也没选心情：Zepp 里打开过但没记，界面当没记。
     pub fn is_empty(&self) -> bool {
         self.behaviors.is_empty() && self.mood.is_none()
-    }
-
-    /// 写回 Zepp 的 `summary`：和 Zepp App 自己写的同一个样子。
-    pub fn zepp_summary(&self) -> String {
-        let mut summary = serde_json::Map::new();
-        summary.insert("sb".into(), serde_json::json!(self.behaviors));
-        if let Some(mood) = &self.mood {
-            summary.insert("sf".into(), serde_json::json!(mood));
-        }
-        serde_json::Value::Object(summary).to_string()
     }
 
     /// 导出 / MCP 用：英文码，不带本机状态。没记的晚上给 `None`。
@@ -278,15 +267,14 @@ impl Database {
             behaviors: serde_json::from_str(&behaviors).unwrap_or_default(),
             mood: row.get(2)?,
             source: row.get(3)?,
-            pending_upload: row.get::<_, i64>(4)? != 0,
-            updated_at: row.get(5)?,
+            updated_at: row.get(4)?,
         })
     }
 
     /// 一段日期里记过的晚上（含两端），新的在前。
     pub fn sleep_journal_range(&self, from: &str, to: &str) -> Result<Vec<SleepJournalEntry>> {
         let mut statement = self.conn.prepare(
-            "SELECT date, behaviors, mood, source, pending_upload, updated_at
+            "SELECT date, behaviors, mood, source, updated_at
                FROM sleep_journal WHERE date >= ?1 AND date <= ?2 ORDER BY date DESC",
         )?;
         let rows = statement.query_map(params![from, to], Self::journal_row)?;
@@ -297,7 +285,7 @@ impl Database {
         Ok(self
             .conn
             .query_row(
-                "SELECT date, behaviors, mood, source, pending_upload, updated_at
+                "SELECT date, behaviors, mood, source, updated_at
                    FROM sleep_journal WHERE date = ?1",
                 [date],
                 Self::journal_row,
@@ -305,7 +293,7 @@ impl Database {
             .optional()?)
     }
 
-    /// 在这里记一晚（或改）。全清空也照存一行：写回 Zepp 是空的 `sb`，两边都当「没记」。
+    /// 在这里记一晚（或改），只存本机。全清空也照存一行，界面当「没记」。
     pub fn save_sleep_journal(&self, input: &SleepJournalInput) -> Result<SleepJournalEntry> {
         if NaiveDate::parse_from_str(&input.date, "%Y-%m-%d").is_err() {
             return Err(invalid("日期格式不对"));
@@ -320,18 +308,18 @@ impl Database {
         let behaviors = clean_behaviors(&input.behaviors);
         let now = Utc::now().to_rfc3339();
         self.conn.execute(
-            "INSERT INTO sleep_journal(date, behaviors, mood, source, pending_upload, updated_at)
-             VALUES(?1, ?2, ?3, 'local', 1, ?4)
+            "INSERT INTO sleep_journal(date, behaviors, mood, source, updated_at)
+             VALUES(?1, ?2, ?3, 'local', ?4)
              ON CONFLICT(date) DO UPDATE SET
                 behaviors = excluded.behaviors, mood = excluded.mood, source = 'local',
-                pending_upload = 1, updated_at = excluded.updated_at",
+                updated_at = excluded.updated_at",
             params![input.date, serde_json::to_string(&behaviors)?, mood, now],
         )?;
         self.sleep_journal_entry(&input.date)?
             .ok_or_else(|| invalid("没有存上"))
     }
 
-    /// 同步拉回的云端那份。本机还没写回的行不动；内容没变的行不改时间。返回改了几行。
+    /// 同步拉回的云端那份。本机记过的行不动；内容没变的行不改时间。返回改了几行。
     pub fn merge_cloud_sleep_journal(&self, items: &[CloudJournalItem]) -> Result<usize> {
         let now = Utc::now().to_rfc3339();
         let mut changed = 0;
@@ -343,33 +331,13 @@ impl Database {
                  ON CONFLICT(date) DO UPDATE SET
                     behaviors = excluded.behaviors, mood = excluded.mood,
                     cloud_synced_at = excluded.cloud_synced_at, updated_at = excluded.updated_at
-                 WHERE sleep_journal.pending_upload = 0
+                 WHERE sleep_journal.source <> 'local'
                    AND (sleep_journal.behaviors != excluded.behaviors
                         OR sleep_journal.mood IS NOT excluded.mood)",
                 params![item.date, behaviors, item.mood, now],
             )?;
         }
         Ok(changed)
-    }
-
-    /// 还没写回 Zepp 的晚上，旧的在前。
-    pub fn pending_sleep_journal(&self) -> Result<Vec<SleepJournalEntry>> {
-        let mut statement = self.conn.prepare(
-            "SELECT date, behaviors, mood, source, pending_upload, updated_at
-               FROM sleep_journal WHERE pending_upload = 1 ORDER BY date ASC",
-        )?;
-        let rows = statement.query_map([], Self::journal_row)?;
-        Ok(rows.collect::<std::result::Result<Vec<_>, _>>()?)
-    }
-
-    /// 写回成功：只有写回的就是现在这一份时才清标记（写回途中又改了，就留着下次再写）。
-    pub fn mark_sleep_journal_uploaded(&self, entry: &SleepJournalEntry) -> Result<bool> {
-        let changed = self.conn.execute(
-            "UPDATE sleep_journal SET pending_upload = 0, cloud_synced_at = ?2
-              WHERE date = ?1 AND updated_at = ?3",
-            params![entry.date, Utc::now().to_rfc3339(), entry.updated_at],
-        )?;
-        Ok(changed > 0)
     }
 
     /// 醒来那天 `date` 的主睡眠：那天醒来、至少 3 小时，取最长的一段。
