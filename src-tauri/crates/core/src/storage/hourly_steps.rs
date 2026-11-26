@@ -40,6 +40,22 @@ pub(super) fn legacy_hourly_steps(item: &serde_json::Value) -> Option<(String, S
     Some((date.to_string(), device, hours))
 }
 
+/// 一条旧通道日记录的逐分钟原始字节（只认已核对的 1440 × 8 字节格式）。
+fn legacy_minute_bytes(item: &serde_json::Value) -> Option<(NaiveDate, String, Vec<u8>)> {
+    let object = item.as_object()?;
+    let date = NaiveDate::parse_from_str(object.get("date_time")?.as_str()?, "%Y-%m-%d").ok()?;
+    let bytes = STANDARD.decode(object.get("data")?.as_str()?.trim()).ok()?;
+    if bytes.len() != MINUTES * BYTES_PER_MINUTE {
+        return None;
+    }
+    let device = object
+        .get("device_id")
+        .and_then(|value| value.as_str())
+        .unwrap_or_default()
+        .to_string();
+    Some((date, device, bytes))
+}
+
 /// 键里的首末日；不是预期格式时返回 None（调用方照样解，只是没法按日期跳过）。
 fn key_span(source_key: &str) -> Option<(NaiveDate, NaiveDate)> {
     let rest = source_key.strip_prefix(LEGACY_KEY_PREFIX)?;
@@ -109,6 +125,52 @@ impl Database {
                     steps,
                 })
             })
+            .collect())
+    }
+
+    /// 旧通道逐分钟明细原样给出（导出给 unstrap 的逐分钟活动）：本地日 → 1440 × 8 字节。
+    /// 同一块表同一天几份报文取最新拉到的；几块表同一天都有时取戴着的分钟最多的那块
+    /// （逐分钟记录不能几块表拼，同一分钟只能有一条）。
+    pub(crate) fn legacy_minute_records(&self) -> Result<BTreeMap<NaiveDate, Vec<u8>>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT payload, payload_zip FROM raw_records
+             WHERE source_key LIKE 'band_data:detail:%'
+             ORDER BY fetched_at DESC, id DESC",
+        )?;
+        let mut rows = stmt.query([])?;
+        let mut best: BTreeMap<NaiveDate, (usize, Vec<u8>)> = BTreeMap::new();
+        let mut seen: BTreeSet<(NaiveDate, String)> = BTreeSet::new();
+        while let Some(row) = rows.next()? {
+            let Ok(payload) = decode_raw_payload(row.get(0)?, row.get(1)?) else {
+                continue;
+            };
+            let Ok(payload) = serde_json::from_str::<serde_json::Value>(&payload) else {
+                continue;
+            };
+            let Some(items) = payload.get("data").and_then(|value| value.as_array()) else {
+                continue;
+            };
+            for item in items {
+                let Some((date, device, bytes)) = legacy_minute_bytes(item) else {
+                    continue;
+                };
+                if !seen.insert((date, device)) {
+                    continue;
+                }
+                let worn = bytes
+                    .as_chunks::<BYTES_PER_MINUTE>()
+                    .0
+                    .iter()
+                    .filter(|m| m[0] != 0xFF && !matches!(m[0] & 0x0F, 3 | 6))
+                    .count();
+                if best.get(&date).is_none_or(|(kept, _)| worn > *kept) {
+                    best.insert(date, (worn, bytes));
+                }
+            }
+        }
+        Ok(best
+            .into_iter()
+            .map(|(date, (_, bytes))| (date, bytes))
             .collect())
     }
 

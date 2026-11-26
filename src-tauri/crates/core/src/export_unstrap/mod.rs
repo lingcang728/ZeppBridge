@@ -1,7 +1,8 @@
 //! 把本机的运动写成 unstrap（Helio Strap 的开源伴侣应用）备份能导入的 zip（Beta 实验室，计划 C3）。
 //!
-//! unstrap 的 `CsvImporter` 按文件名认表、按列名读，包里有它认识的表就收，其它表缺了不算错。
-//! 这里只写两张：`workout.csv`（一次运动一行）和 `workout_hr.csv`（运动里的逐点心率）。
+//! unstrap 的 `CsvImporter` 按文件名认表、按列名读，包里有它认识的表就收，其它表缺了不算错；
+//! 恢复只补手机上没有的行，导几次都一样。运动写 `workout.csv`（一次运动一行）和
+//! `workout_hr.csv`（运动里的逐点心率）；健康数据（心率、HRV、睡眠、逐分钟活动……）见 [`health`]。
 //!
 //! 只写库里真有的值：没有的格子留空，绝不填 0（unstrap 读空格子是「没有」，读 0 是「0」）。
 //! Zepp 自己算的训练负荷、VO₂max、训练效果不写——那几列在 unstrap 里是带子自己的算法结果，
@@ -18,6 +19,7 @@ use crate::import::unstrap::unstrap_sport;
 use crate::models::error::{Result, ZeppBridgeError};
 use crate::storage::Database;
 
+mod health;
 #[cfg(test)]
 mod tests;
 
@@ -35,6 +37,8 @@ pub struct UnstrapExport {
     pub bytes: Vec<u8>,
     pub workouts: usize,
     pub heart_rate_points: usize,
+    /// 健康表各写了多少行（表名, 行数），没有行的表不在包里。
+    pub tables: Vec<(&'static str, usize)>,
 }
 
 /// 运动目录 key → unstrap 的编号。同一个 key 有几个编号时取带子现在用的那个
@@ -134,11 +138,21 @@ pub fn build_unstrap_export(db: &Database, since: Option<DateTime<Utc>>) -> Resu
         zip.start_file(name, options).map_err(zip_error)?;
         zip.write_all(text.as_bytes())?;
     }
+    let mut tables = Vec::new();
+    for table in health::health_tables(db, since)? {
+        if table.rows == 0 {
+            continue;
+        }
+        zip.start_file(table.name, options).map_err(zip_error)?;
+        zip.write_all(table.text.as_bytes())?;
+        tables.push((table.name, table.rows));
+    }
     let bytes = zip.finish().map_err(zip_error)?.into_inner();
     Ok(UnstrapExport {
         bytes,
         workouts,
         heart_rate_points,
+        tables,
     })
 }
 

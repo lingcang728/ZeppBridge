@@ -45,7 +45,20 @@ Beta 实验室「从 unstrap 导入」读的是 unstrap（Helio Strap 的开源�
 
 ## 导出给 unstrap
 
-反方向（`export_unstrap/`）只写 `workout.csv` 和 `workout_hr.csv`：起止、运动类型（按 unstrap 的编号，认不出写通用「活动」223）、运动时长、热量、平均 / 最大 / 最低心率、步数、逐秒心率。没有的格子留空；Zepp 的训练负荷、VO₂max、训练效果不写——那几列在 unstrap 里是带子自己的算法结果。
+反方向（`export_unstrap/`）写成 unstrap「恢复」能直接吃的包：它只补手机上没有的行，导几次都一样。没有的格子留空，不填 0；同一时刻 / 同一天几台设备都有时只写一条（unstrap 按时刻 / 日为键），日值取总览显示的那条。按天的表写 `date` 列，零点那一列按本机时区。
+
+| 表 | 来自 | 口径 |
+|---|---|---|
+| `workout.csv` + `workout_hr.csv` | 运动 | 起止、运动类型（按 unstrap 的编号，认不出写通用「活动」223）、运动时长、热量、平均 / 最大 / 最低心率、步数、逐秒心率。Zepp 的训练负荷、VO₂max、训练效果不写——那几列在 unstrap 里是带子自己的算法结果。 |
+| `heart_rate.csv` | `heart_rate` 样本 | `source = 0`（带子存的历史）。 |
+| `hrv.csv` / `hrv_sdnn.csv` | `hrv_rmssd` / `hrv` 样本 | RMSSD 进 `hrv`（unstrap 的恢复用它），SDNN 进 `hrv_sdnn`，两种统计量不混。 |
+| `stress.csv` / `spo2.csv` | `stress` / `spo2` 样本 | 原值。 |
+| `activity_minute.csv` | 旧通道逐分钟明细（`band_data:detail` 报文） | 和带子的类型 1 是同一种 8 字节记录，原样换列：步数、强度、类型（低 4 位）、心率（30–220 以外留空）。全 0xFF 的填充分钟跳过。几块表同一天都有时取戴着的分钟最多的那块。 |
+| `resting_hr.csv` / `daily_max_hr.csv` | `resting_hr` / `device_max_hr` 日值 | |
+| `sleep_session.csv` + `sleep_stage.csv` | 睡眠和分期、小睡分期 | 同一晚几条重叠时留最长的那条（unstrap 也不收重叠的）。小睡是主睡上挂的小睡分期，间隔不到 5 分钟的并成一次，各阶段分钟数从分期加。主睡算醒来那天，小睡算开始那天。 |
+| `breath_rate.csv` | `respiratory_rate` 日值 | Zepp 一晚一个值；unstrap 取睡眠里的样本求平均，所以记在那晚主睡的正中间。 |
+| `pai.csv` | `pai_daily` `pai_total` `device_resting_hr` `device_max_hr` | 记在当天最后一分钟（unstrap 取一天里最后一条）；四个值缺一个就不写。 |
+| `strap_readiness.csv` | `readiness` 和四项分（HRV / 静息心率 / 皮温 / 呼吸紊乱）、`sleep_hrv` `sleep_rhr` | Zepp 的准备度就是带子自己那套，正好对上 unstrap 留给带子准备度的表；`algorithm_version` 写 `zepp`。 |
 
 ## 还没用真实备份核对的
 
