@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { ATTACHMENT_BUDGET_BYTES, ATTACHMENT_MAX_BYTES, ATTACHMENTS_PER_DAY, ATTACHMENTS_PER_REPLY, SAMPLE_FORMAT, SAMPLE_MAX_BYTES, installHash, isStructureSample, onRequestPost, sniffImage } from '../functions/api/letters/[action].js';
+import { ATTACHMENT_BUDGET_BYTES, ATTACHMENT_MAX_BYTES, ATTACHMENTS_PER_DAY, ATTACHMENTS_PER_REPLY, SAMPLE_FORMAT, SAMPLE_MAX_BYTES, SAMPLES_PER_REPLY, installHash, isStructureSample, onRequestPost, sniffImage } from '../functions/api/letters/[action].js';
 
 const INSTALL = '3f2b8c1e-9d4a-4c6b-8e2f-1a2b3c4d5e6f';
 const OTHER_INSTALL = '9a8b7c6d-5e4f-4a3b-9c2d-1e0f2a3b4c5d';
@@ -160,13 +160,16 @@ test('a full bucket or a busy day postpones uploads instead of growing the bill'
 
 const sampleBytes = (extra = {}) => new TextEncoder().encode(JSON.stringify({ format: SAMPLE_FORMAT, appVersion: '9.9.9', parts: [], ...extra }));
 
-test('a workout structure sample is accepted once per reply, next to up to three images', async () => {
+test('a reply takes up to SAMPLES_PER_REPLY workout structure samples, next to up to three images', async () => {
   const { env, attachments, objects } = await fakeEnv();
   const first = await upload(env, sampleBytes(), { type: 'application/json' });
   assert.equal(first.status, 201);
   assert.equal(attachments[0].content_type, 'application/json');
   assert.match([...objects.keys()][0], /\.json$/);
-  assert.equal((await upload(env, sampleBytes({ appVersion: '9.9.8' }), { type: 'application/json' })).status, 409);
+  for (let index = 1; index < SAMPLES_PER_REPLY; index += 1) {
+    assert.equal((await upload(env, sampleBytes({ appVersion: `9.9.${index}` }), { type: 'application/json' })).status, 201);
+  }
+  assert.equal((await upload(env, sampleBytes({ appVersion: '9.8.0' }), { type: 'application/json' })).status, 409);
   for (let index = 0; index < ATTACHMENTS_PER_REPLY; index += 1) {
     assert.equal((await upload(env, jpeg(index + 2))).status, 201);
   }

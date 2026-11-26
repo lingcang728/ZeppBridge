@@ -169,16 +169,17 @@ async function receipts(context, body) {
  *   体：图片原始字节。客户端已经重新编码过（去掉 EXIF / 定位），这里只认文件头、限大小。
  * 只给寄出 7 天内的回信补图。图存在私有 R2 桶里，只有作者能取；30 天后连同记录一起删。
  * 除了图，还收一种 JSON：应用生成的运动结构样本（content-type = application/json，
- * format = zeppbridge.workout-structure-sample.v1，一封信最多一份）。样本在应用里已经脱敏
+ * format = zeppbridge.workout-structure-sample.v1，一封信最多 SAMPLES_PER_REPLY 份）。样本在应用里已经脱敏
  * （健康数值换成占位值、坐标和标识删掉、时间平移），这里只认格式、限大小。
  * 总量闸：桶里留存的图合计到 2 GB、或当天全站收满 300 张就先不收（507，客户端退避重试），
  * 留在 R2 免费额度（10 GB 存储、每月 100 万次写入）以内。桶上另有 31 天过期的生命周期规则兜底。
  */
 export const ATTACHMENT_MAX_BYTES = 1024 * 1024;
 export const ATTACHMENTS_PER_REPLY = 3;
-/** 运动结构样本：一封信一份，上限和应用里的 STRUCTURE_SAMPLE_MAX_BYTES 一致。2 小时带轨迹的跑步约 340 KB。 */
+/** 运动结构样本：每份的上限和应用里的 STRUCTURE_SAMPLE_MAX_BYTES 一致。2 小时带轨迹的跑步约 340 KB。 */
 export const SAMPLE_MAX_BYTES = 1024 * 1024;
-export const SAMPLES_PER_REPLY = 1;
+/** 一封信最多几份样本（几次运动）。和应用里的 LETTER_SAMPLES_MAX 一致。 */
+export const SAMPLES_PER_REPLY = 3;
 export const SAMPLE_FORMAT = 'zeppbridge.workout-structure-sample.v1';
 const SAMPLE_TYPE = 'application/json';
 const ATTACHMENT_REPLY_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;

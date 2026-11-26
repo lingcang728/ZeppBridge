@@ -212,8 +212,14 @@ useSectionTour('devices');
 <style scoped>
 .compact-btn { min-height: 30px; padding: 4px 12px; font-size: var(--fs-xs); }
 .write-author { justify-self: start; text-decoration: none; }
-.device-row { color: inherit; text-decoration: none; transition: background var(--dur-fast) ease; }
-a.device-row:hover { background: color-mix(in srgb, var(--ink) 4%, transparent); }
+/* 悬停高亮是行里面一块圆角的底（四周留几像素），不是撞到边的直角矩形：以前右边硬截在「隐藏」前面、
+   左边被外框圆角切掉一角，看着像断了角的选择框。只淡入淡出这层，不动布局。 */
+.device-row { position: relative; isolation: isolate; color: inherit; text-decoration: none; }
+.device-row::before {
+  content: ''; position: absolute; inset: 4px 0 4px 4px; z-index: -1; border-radius: 14px; pointer-events: none;
+  background: color-mix(in srgb, var(--ink) 5%, transparent); opacity: 0; transition: opacity var(--dur-fast) ease;
+}
+a.device-row:hover::before, a.device-row:focus-visible::before { opacity: 1; }
 a.device-row:hover .row-chevron { color: var(--ink); transform: translateX(2px); }
 .device-art {
   display: grid;

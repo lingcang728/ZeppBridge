@@ -39,6 +39,8 @@
 .is-opening .edge-t { opacity: 0; }
 .seal-hint { margin: 0; color: rgb(255 255 255 / .82); font-size: var(--fs-xs); text-align: center; text-shadow: 0 1px 2px rgb(0 0 0 / .25); transition: opacity 200ms ease; }
 .is-opening .seal-hint { opacity: 0; }
+/* 关掉时信封飞回信匣：底下这行提示不跟着缩小飞回去（会压在信匣的标题上，像一层叠影）。 */
+.homing .seal-hint { opacity: 0; transition: none; }
 /* 拆信时信封怎么沉、怎么退远，由 lib/letters/unfold.ts 的时间线用 WAAPI 放（和信纸共用一个时钟）。 */
 .is-opening .envelope-wrap { pointer-events: none; will-change: transform, opacity; }
 

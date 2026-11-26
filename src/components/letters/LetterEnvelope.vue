@@ -37,6 +37,7 @@ import { useLetterEnvelope, type CustomLetter, type Sheet } from '../../composab
 import { lessMotion } from '../../lib/motion/lessMotion';
 import { whenDialogLanded } from '../../lib/motion/dialogFlight';
 import { whenFramesSteady } from '../../lib/motion/steady';
+import { paced } from '../../lib/motion/timing';
 import { playPaperSlide } from '../../lib/letters/sound';
 import { planUnfold } from '../../lib/letters/unfold';
 import { receivedDate, receivedOn } from '../../services/letters';
@@ -302,7 +303,8 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKey));
  *   整只信封沿飞出来的那条路飞回按钮（dialogFlight：开的那一段倒着放），遮罩和它同一刻散掉。
  *   信封还没拆 → 直接交给弹窗飞回去。
  */
-const FOLD_RATE = 2;
+/* 倒放比拆信稍快一点就够：两倍速时信纸一下就缩没了，看着急。 */
+const FOLD_RATE = 1.2;
 /*
  * 把拆信的一段改成从正向时刻 `at`（默认终点）倒着放。用 direction: 'reverse' + 正速率，不用负速率：
  * 收到一半弹窗就卸载、节点被摘下再挂回 body（ModalDialog → dialogFlight），负速率的动画这时 Chromium 合成器会跳回时间 0——
@@ -358,8 +360,38 @@ const foldBack = async () => {
   // 先闪一帧「信已经塞回信封」，主线程一卡就停在那帧上（2026-11-12 录屏）。
   const longest = refolding.value ? total : Math.max(0, ...moves.map((move) => Number(move.currentTime) || 0));
   moves = moves.map((move) => rewind(move, refolding.value ? undefined : Number(move.currentTime) || 0));
-  // 收到一半多（信纸大半进了信封）就起飞：和收信封重叠，不一段一段地顿。
-  await new Promise((resolve) => { window.setTimeout(resolve, Math.min(longest, total) / FOLD_RATE * 0.4); });
+  // 信纸大半进了信封再起飞：和收信封重叠一段，不一段一段地顿；起飞太早信纸还露着一大截就被带走了。
+  // 按动画自己的时钟等（不按墙钟）：主线程一卡、或动画被放慢时，信纸还没收进去就被带着飞走了。
+  const clock = moves[0];
+  const from = Number(clock?.currentTime) || 0;
+  const need = Math.min(longest, total) * 0.6;
+  const started = performance.now();
+  await new Promise<void>((resolve) => {
+    const look = () => {
+      const gone = (Number(clock?.currentTime) || 0) - from;
+      if (!clock || clock.playState !== 'running' || gone >= need || performance.now() - started > need * 4) resolve();
+      else requestAnimationFrame(look);
+    };
+    look();
+  });
+};
+
+/*
+ * 飞回信匣：信匣里那只信封是正面朝上的话，信封在飞回去的路上翻回正面（中途往人这边抬一点，和点正面翻过去是同一个动作倒过来），
+ * 落地时和那只是同一张脸——不然背面（掀开的封盖、裂开的火漆）会半透明地叠在正面朝上的那只上，像两只信封。
+ * 只在弹窗飞行那一段里放完（形状落定前），不改 phase，界面不重画。
+ */
+const TURN_HOME_MS = paced(420);
+const turnFaceUp = () => {
+  const el = flipper.value;
+  if (!el || lessMotion() || faceOf(turn.value.y) === 'front' || !props.origin?.querySelector('.envelope.face-front')) return;
+  const { x, y } = turn.value;
+  motion?.cancel();
+  el.animate([
+    { transform: orbit(x, y, 0) },
+    { transform: orbit(0, y + 90, 60), offset: 0.5 },
+    { transform: orbit(0, y + 180, 0) },
+  ], { duration: TURN_HOME_MS, easing: 'cubic-bezier(.3, .1, .3, 1)', fill: 'forwards' });
 };
 
 const closing = ref(false);
@@ -378,6 +410,7 @@ const acknowledge = async (event?: MouseEvent) => {
       await ashDissolve(panel, { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }, panel.closest<HTMLElement>('.dialog-backdrop'), sheet ? [sheet] : []);
     } else {
       await foldBack();
+      turnFaceUp();
     }
   } catch { /* 动画出错不能卡住关信 */ }
   emit('done');
@@ -387,9 +420,9 @@ const acknowledge = async (event?: MouseEvent) => {
 <template>
   <ModalDialog bare labelledby="letter-envelope-title" :origin="origin" :max-width="680" @close="mustFinish || acknowledge()">
     <h2 id="letter-envelope-title" class="sr-only">{{ custom ? custom.title : t.letterHead(newest) }}</h2>
-    <div ref="stage" :class="['letter-stage', `is-${phase}`, { reread: opened, inked, folded: foldH > 0 }]">
-      <div v-if="phase !== 'reading'" class="envelope-wrap" data-flight-subject>
-        <div ref="flipper" class="flipper" :style="flipperStyle"
+    <div ref="stage" :class="['letter-stage', `is-${phase}`, { reread: opened, inked, folded: foldH > 0, homing: closing }]">
+      <div v-if="phase !== 'reading'" class="envelope-wrap">
+        <div ref="flipper" class="flipper" data-flight-subject :style="flipperStyle"
           @pointerdown="dragDown" @pointermove="dragMove" @pointerup="dragUp" @pointercancel="dragUp">
           <!-- 信封的四条纸边（有厚度，转到侧面不再是一条线）。 -->
           <i class="edge edge-l" aria-hidden="true"></i><i class="edge edge-r" aria-hidden="true"></i>

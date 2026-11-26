@@ -16,8 +16,8 @@ export type AuthorComposePreset = 'device' | 'report' | { sampleWorkoutId: strin
 const writing = shallowRef<{ origin: HTMLElement | null } | null>(null);
 const attach = ref(false);
 const category = ref<ReportCategory>('other');
-/** 附上的运动结构样本：哪一次运动。`null` 是没附。 */
-const sample = ref<{ workoutId: string } | null>(null);
+/** 附上的运动结构样本：哪几次运动（按选的先后，最多 LETTER_SAMPLES_MAX 次）。`null` 是没附。 */
+const sample = ref<{ workoutIds: string[] } | null>(null);
 /** 每寄出一封加一：信匣据此切到「我的回信」。 */
 const sent = ref(0);
 
@@ -25,7 +25,7 @@ const sent = ref(0);
 export function openAuthorCompose(origin: HTMLElement | null, preset?: AuthorComposePreset): void {
   if (writing.value) return;
   if (typeof preset === 'object') {
-    sample.value = { workoutId: preset.sampleWorkoutId };
+    sample.value = { workoutIds: [preset.sampleWorkoutId] };
   } else if (preset) {
     attach.value = true;
     category.value = preset === 'device' ? 'device' : 'other';

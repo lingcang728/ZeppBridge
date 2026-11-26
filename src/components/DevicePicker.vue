@@ -9,6 +9,8 @@
  * 这里选出来的结果会被如实标注成「你指认的型号」，不会伪装成自动识别。
  */
 import { computed, ref, watch } from 'vue';
+import { paced } from '../lib/motion/timing';
+import { lessMotion } from '../lib/motion/lessMotion';
 import GlyphTile from './GlyphTile.vue';
 import CapsuleWheel from './CapsuleWheel.vue';
 import DeviceVisual from './DeviceVisual.vue';
@@ -141,9 +143,14 @@ const neighbours = computed(() => {
   };
 });
 
+/* 这一次换型号是往哪边翻：1 = 下一个（新的从右边进），-1 = 上一个，0 = 搜索 / 筛选 / 打开时停到已指认的那台
+   （原地淡入，没有方向可言）。 */
+const dir = ref(0);
+
 const step = (delta: number) => {
   const total = entries.value.length;
   if (!total) return;
+  dir.value = delta > 0 ? 1 : -1;
   if (index.value < 0) {
     index.value = delta > 0 ? 0 : total - 1;
     return;
@@ -152,14 +159,59 @@ const step = (delta: number) => {
 };
 
 /* 筛选变了就回到「还没选」，否则会停在一个已经被过滤掉的位置上；搜了关键词就直接停在第一个结果。 */
-watch([kind, query], () => { index.value = query.value.trim() ? 0 : -1; });
+watch([kind, query], () => { dir.value = 0; index.value = query.value.trim() ? 0 : -1; });
 
 /* 打开时先停在已经指认过的那台上，而不是从头翻。 */
 watch(() => props.modelValue, (value) => {
   if (!value) return;
   const found = entries.value.findIndex((entry) => catalogEntryMatchesId(entry, value));
-  if (found >= 0) index.value = found;
+  if (found >= 0) { dir.value = 0; index.value = found; }
 }, { immediate: true });
+
+/* 左右两张先在后台解码好：产品图最大 900px，以前翻到哪张才在那一帧同步解码，翻页会顿一下。 */
+const decoded = new Set<string>();
+watch(() => [neighbours.value.prev?.src, neighbours.value.next?.src], (sources) => {
+  for (const src of sources) {
+    if (!src || decoded.has(src)) continue;
+    decoded.add(src);
+    const image = new Image();
+    image.src = src;
+    image.decode().catch(() => decoded.delete(src));
+  }
+}, { immediate: true });
+
+/* 翻页：旧的一张往反方向滑走淡掉，新的一张从翻的方向滑进来；两张叠在同一格里，框的大小不变。
+   先后交接、不交叉：旧的那张差不多淡完了新的才开始显（字在同一个位置，同时半透明就是叠影）。
+   只动 transform / opacity。连点时正在进场的那张从它此刻的样子退场，不先跳回原位。 */
+const SLIDE_PX = 44;
+const PEEK_PX = 16;
+const shiftOf = (el: Element) => (el.classList.contains('peek') ? PEEK_PX : SLIDE_PX);
+const slideIn = (el: Element, done: () => void) => {
+  if (lessMotion()) { done(); return; }
+  const d = dir.value;
+  const move = d ? `translateX(${d * shiftOf(el)}px)` : 'scale(.95)';
+  const animation = (el as HTMLElement).animate(
+    [{ opacity: 0, transform: move }, { opacity: 1, transform: 'none' }],
+    { duration: paced(320), delay: paced(165), easing: 'cubic-bezier(.2, .7, .2, 1)', fill: 'backwards' },
+  );
+  animation.onfinish = () => done();
+  animation.oncancel = () => done();
+};
+const slideOut = (el: Element, done: () => void) => {
+  const node = el as HTMLElement;
+  if (lessMotion()) { done(); return; }
+  const style = getComputedStyle(node);
+  const from = { opacity: style.opacity, transform: style.transform };
+  for (const running of node.getAnimations()) running.cancel();
+  const d = dir.value;
+  const move = d ? `translateX(${-d * shiftOf(el)}px)` : 'scale(1.03)';
+  const animation = node.animate(
+    [from, { opacity: 0, transform: move }],
+    { duration: paced(170), easing: 'cubic-bezier(.4, 0, .6, 1)', fill: 'forwards' },
+  );
+  animation.onfinish = () => done();
+  animation.oncancel = () => done();
+};
 
 const isCurrentAssigned = computed(() => Boolean(
   current.value && catalogEntryMatchesId(current.value, props.modelValue),
@@ -221,34 +273,44 @@ const heroSub = computed(() => (current.value && current.value.canonical_name !=
       ><GlyphTile name="chevron-right" :size="20" class="flip" /></button>
 
       <div class="picker-frame">
-        <DeviceVisual
-          v-if="neighbours.prev?.src"
-          class="peek left"
-          :src="neighbours.prev.src"
-          :alt="neighbours.prev.entry.canonical_name"
-          :kind="neighbours.prev.entry.kind"
-        />
-        <div class="picker-hero">
+        <Transition :css="false" @enter="slideIn" @leave="slideOut">
           <DeviceVisual
-            v-if="currentImage"
-            :key="current!.catalog_id"
-            class="hero-visual"
-            :src="currentImage"
-            :alt="current!.canonical_name"
-            :kind="current!.kind"
+            v-if="neighbours.prev?.src"
+            :key="neighbours.prev.entry.catalog_id"
+            class="peek left"
+            :src="neighbours.prev.src"
+            :alt="neighbours.prev.entry.canonical_name"
+            :kind="neighbours.prev.entry.kind"
           />
-          <p v-if="current" class="hero-name">{{ heroName }}</p>
-          <p v-else class="hero-name hero-prompt">{{ t.pickPrompt }}</p>
-          <p v-if="heroSub" class="hero-sub">{{ heroSub }}</p>
+        </Transition>
+        <div class="picker-hero">
+          <div class="hero-slides">
+            <Transition :css="false" @enter="slideIn" @leave="slideOut">
+              <div :key="current?.catalog_id ?? '-'" class="hero-slide">
+                <!-- 图位固定大小：没有产品图的型号（或图没加载出来）留一个虚线空位，框不跟着塌。 -->
+                <span class="hero-spot">
+                  <DeviceVisual v-if="currentImage" class="hero-visual" :src="currentImage" :alt="current!.canonical_name" :kind="current!.kind" />
+                  <span v-else class="hero-blank" aria-hidden="true"></span>
+                </span>
+                <p v-if="current" class="hero-name">{{ heroName }}</p>
+                <p v-else class="hero-name hero-prompt">{{ t.pickPrompt }}</p>
+                <!-- 副标题那一行一直占着：有的型号有、有的没有，以前翻页时框高一下矮一下。 -->
+                <p class="hero-sub">{{ heroSub }}</p>
+              </div>
+            </Transition>
+          </div>
           <p class="hero-count">{{ current ? index + 1 : '—' }} / {{ entries.length }}</p>
         </div>
-        <DeviceVisual
-          v-if="neighbours.next?.src"
-          class="peek right"
-          :src="neighbours.next.src"
-          :alt="neighbours.next.entry.canonical_name"
-          :kind="neighbours.next.entry.kind"
-        />
+        <Transition :css="false" @enter="slideIn" @leave="slideOut">
+          <DeviceVisual
+            v-if="neighbours.next?.src"
+            :key="neighbours.next.entry.catalog_id"
+            class="peek right"
+            :src="neighbours.next.src"
+            :alt="neighbours.next.entry.canonical_name"
+            :kind="neighbours.next.entry.kind"
+          />
+        </Transition>
       </div>
 
       <button
@@ -313,26 +375,25 @@ const heroSub = computed(() => (current.value && current.value.canonical_name !=
   background: var(--mat-inset);
   overflow: hidden; box-shadow: var(--mat-inset-shadow);
 }
-.peek { width: 56px; height: 56px; flex-basis: 56px; border: 0; background: transparent; opacity: .28; }
+.peek { width: 56px; height: 56px; flex-basis: 56px; border: 0; background: transparent; box-shadow: none; opacity: .28; }
 .peek.left { grid-column: 1; grid-row: 1; justify-self: end; }
 .peek.right { grid-column: 3; grid-row: 1; justify-self: start; }
+/* 两边露出的小图是装饰，翻页途中别挡住点击。 */
+.peek { pointer-events: none; }
 
-.picker-hero { grid-column: 2; grid-row: 1; display: grid; justify-items: center; gap: 2px; text-align: center; }
+.picker-hero { grid-column: 2; grid-row: 1; display: grid; justify-items: center; gap: 2px; min-width: 0; text-align: center; }
+/* 进场和退场的两张叠在同一格里。 */
+.hero-slides { display: grid; justify-items: center; min-width: 0; }
+.hero-slide { grid-area: 1 / 1; display: grid; justify-items: center; gap: 2px; min-width: 0; }
 /* 主图给足高度：竖长的表身在正方框里会被上下切掉。 */
-.picker-hero .hero-visual { width: 132px; height: 150px; flex-basis: 150px; border: 0; background: transparent; }
+.hero-spot { display: grid; place-items: center; width: 132px; height: 150px; }
+.picker-hero .hero-visual { width: 132px; height: 150px; flex-basis: 150px; border: 0; background: transparent; box-shadow: none; }
+.hero-blank { width: 84px; height: 104px; border: 1.5px dashed var(--mat-line); border-radius: 24px; }
 .hero-name { margin: 6px 0 0; color: var(--ink); font-size: var(--fs-lg); font-weight: 600; }
-.hero-sub { margin: 0; color: var(--subtle); font-size: var(--fs-xs); }
+.hero-sub { min-height: 1.5em; margin: 0; color: var(--subtle); font-size: var(--fs-xs); line-height: 1.5; }
 .hero-count { margin: 4px 0 0; color: var(--muted); font-size: var(--fs-xs); font-family: var(--font-mono); }
 
 .picker-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .hero-prompt { color: var(--subtle); font-weight: 500; }
 .picker-note { margin: 0; color: var(--subtle); font-size: var(--fs-xs); line-height: 1.55; }
-
-@media (prefers-reduced-motion: no-preference) {
-  .picker-hero img { animation: picker-in 180ms ease-out; }
-}
-@keyframes picker-in {
-  from { opacity: 0; transform: translateY(4px); }
-  to { opacity: 1; transform: none; }
-}
 </style>

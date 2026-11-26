@@ -120,15 +120,38 @@ type Box = { left: number; top: number; width: number; height: number };
 /**
  * 物件（信封）从按钮里长出来的起点：面板绕自己的中心缩放，让面板里的那样东西（`subject`）的中心落在按钮中心、
  * 宽度等于按钮宽度（纯函数，方便测）。按钮比物件还宽时不放大（上限 1）。
+ * 来处自己斜着摆（信匣里的信封各歪一点，`angle` 度）：物件也转同样的角度，宽度按摆正后的宽算（包围盒被转大了一圈），
+ * 落地时和来处严丝合缝，淡掉那几帧不出现两只错开的信封。
  */
-export const objectTransform = (from: Box, panel: Box, subject: Box = panel): string => {
-  const scale = Math.min(1, Math.max(0.04, from.width / Math.max(1, subject.width)));
+export const objectTransform = (from: Box, panel: Box, subject: Box = panel, angle = 0): string => {
+  const rad = (angle * Math.PI) / 180;
+  const cos = Math.cos(rad), sin = Math.abs(Math.sin(rad));
+  const upright = angle && cos * cos - sin * sin > 0.5 ? (from.width * cos - from.height * sin) / (cos * cos - sin * sin) : from.width;
+  const scale = Math.min(1, Math.max(0.04, upright / Math.max(1, subject.width)));
   const c = { x: panel.left + panel.width / 2, y: panel.top + panel.height / 2 };
   const q = { x: subject.left + subject.width / 2, y: subject.top + subject.height / 2 };
   const o = { x: from.left + from.width / 2, y: from.top + from.height / 2 };
-  const dx = o.x - c.x - scale * (q.x - c.x);
-  const dy = o.y - c.y - scale * (q.y - c.y);
-  return `translate(${dx.toFixed(1)}px, ${dy.toFixed(1)}px) scale(${scale.toFixed(3)})`;
+  // 绕面板中心：先缩放再转，物件中心落到 c + R·s·(q − c)，差的那一截由平移补上。
+  const ux = scale * (q.x - c.x), uy = scale * (q.y - c.y);
+  const rx = ux * Math.cos(rad) - uy * Math.sin(rad), ry = ux * Math.sin(rad) + uy * Math.cos(rad);
+  const dx = o.x - c.x - rx;
+  const dy = o.y - c.y - ry;
+  const turn = angle ? ` rotate(${Number(angle.toFixed(2))}deg)` : '';
+  return `translate(${dx.toFixed(1)}px, ${dy.toFixed(1)}px)${turn} scale(${scale.toFixed(3)})`;
+};
+
+/** 元素自己转了多少度（transform 和 rotate 两处都算；拿不到就当 0）。 */
+const tiltOf = (el: HTMLElement | null | undefined): number => {
+  if (!el) return 0;
+  const style = getComputedStyle(el);
+  let deg = 0;
+  if (style.transform && style.transform !== 'none') {
+    const m = new DOMMatrixReadOnly(style.transform);
+    deg += (Math.atan2(m.b, m.a) * 180) / Math.PI;
+  }
+  const rotate = /^(-?[\d.]+)deg$/.exec(style.rotate);
+  if (rotate) deg += Number(rotate[1]);
+  return Math.abs(deg) < 0.05 || Math.abs(deg) > 30 ? 0 : deg;
 };
 
 /** 来处比面板宽 / 高时，飞行期间面板的底（.dialog-glass、::after）在哪个方向上撑大了（见 build 里的 --flight-w / --flight-h）。 */
@@ -251,11 +274,30 @@ const detachAsPicture = (backdrop: HTMLElement, panel: HTMLElement) => {
   document.body.appendChild(backdrop);
 };
 
-/** 物件（信封）在面板里的那一块：缩放按它算。 */
+/**
+ * 物件（信封）在面板里的那一块：缩放按它算。量的是它排版上的位置（不算它自己和祖先身上的动画）：
+ * 读着信关掉时信封正沿拆信那一段倒着退回原位，这一刻量包围盒会量到半路的样子，飞回去落点就偏大、偏左上，
+ * 和按钮上那只信封叠成两只。按排版位置算，信封退回原位的那一刻正好落在按钮上。
+ */
 const subjectOf = (panel: HTMLElement): Box => {
+  const own = panel.getBoundingClientRect();
   const el = panel.querySelector<HTMLElement>('[data-flight-subject]');
-  const box = (el ?? panel).getBoundingClientRect();
-  return box.width && box.height ? box : panel.getBoundingClientRect();
+  if (!el || !panel.offsetWidth) return own;
+  const ratio = own.width / panel.offsetWidth;
+  let left = 0, top = 0;
+  let node: HTMLElement | null = el;
+  while (node && node !== panel) {
+    left += node.offsetLeft;
+    top += node.offsetTop;
+    const parent = node.offsetParent as HTMLElement | null;
+    if (parent && parent !== panel) { left += parent.clientLeft; top += parent.clientTop; }
+    node = parent;
+  }
+  if (node !== panel || !el.offsetWidth || !el.offsetHeight) {
+    const box = el.getBoundingClientRect();
+    return box.width && box.height ? box : own;
+  }
+  return { left: own.left + (panel.clientLeft + left) * ratio, top: own.top + (panel.clientTop + top) * ratio, width: el.offsetWidth * ratio, height: el.offsetHeight * ratio };
 };
 
 /**
@@ -263,14 +305,34 @@ const subjectOf = (panel: HTMLElement): Box => {
  * 面板比那一行窄时，收回落地那几帧窗口的形状 = 面板的白底 ∪ 替身；替身透明就露出底下（真行藏着），
  * 看起来右下角被切掉一块（2026-11-13 用户录屏）。替身有了底，整块来处都是实的。
  */
+/*
+ * 底按层往外叠，直到一层实色：来处自己只带一层淡淡的底色（信纸上「已附 1 份结构样本」那枚标签，6% 的墨水色）时，
+ * 以前把它当成「有底」、替身就不铺了——标签几乎是透明的，飞行时露出面板的深色实底，开头和落地都是一块深色药丸压在信纸上，
+ * 而不是标签本身。现在：来处自己的半透明底色在最上，往外每层的半透明底色、铺满自己盒子的底图依次垫在下面，
+ * 碰到第一层实色为止（信纸是一层渐变图，不透明）。按格子重复的底图（信纸横线）不跟着搬：换到替身的盒子上会错位。
+ */
+/** 计算后的颜色的透明度：rgba(r, g, b, a)，或 color-mix() 算出来的 color(srgb r g b / a) 这类带斜杠的写法。 */
+const alphaOf = (color: string): number => {
+  if (!color || color === 'transparent') return 0;
+  const match = /\/\s*([\d.]+)(%?)\s*\)\s*$/.exec(color) ?? /^rgba\([^,]+,[^,]+,[^,]+,\s*([\d.]+)(%?)\s*\)$/.exec(color);
+  if (!match) return 1;
+  return Number.parseFloat(match[1]!) * (match[2] ? 0.01 : 1);
+};
 const fillBehind = (source: HTMLElement): string | null => {
-  const opaque = (style: CSSStyleDeclaration) => style.backgroundImage !== 'none' || !/^(transparent|rgba\(.*,\s*0\))$/.test(style.backgroundColor);
-  if (opaque(getComputedStyle(source))) return null;
-  for (let el = source.parentElement; el && el !== document.body; el = el.parentElement) {
+  const own = getComputedStyle(source);
+  if (own.backgroundImage !== 'none' || alphaOf(own.backgroundColor) >= 0.98) return null;
+  const layers: string[] = [];
+  const tint = (color: string) => `linear-gradient(${color}, ${color})`;
+  if (alphaOf(own.backgroundColor) > 0) layers.push(tint(own.backgroundColor));
+  for (let el = source.parentElement; el && el !== document.documentElement; el = el.parentElement) {
     const style = getComputedStyle(el);
-    if (opaque(style)) return `${style.backgroundImage === 'none' ? '' : `${style.backgroundImage}, `}${style.backgroundColor}`;
+    const covers = /^(auto|auto auto|100% 100%|cover)$/.test(style.backgroundSize.trim());
+    if (style.backgroundImage !== 'none' && covers) layers.push(style.backgroundImage);
+    const alpha = alphaOf(style.backgroundColor);
+    if (alpha >= 0.98) return [...layers, style.backgroundColor].join(', ');
+    if (alpha > 0) layers.push(tint(style.backgroundColor));
   }
-  return null;
+  return layers.length ? layers.join(', ') : null;
 };
 
 const radiusFor = (origin: FlightOrigin | null, panel: HTMLElement) => {
@@ -312,10 +374,18 @@ function build(backdrop: HTMLElement, panel: HTMLElement, origin: FlightOrigin |
   // 关：落地前整块面板淡掉，不在按钮上停一下再一帧消失。
   if (closing && from) flight.add(panel, [{ opacity: NEARLY_HIDDEN }, { opacity: 1, offset: CLOSE_FADE }, { opacity: 1 }]);
   if (objectMode) {
-    const start = from ? objectTransform(from, final, subjectOf(panel)) : 'scale(.96)';
+    const start = from ? objectTransform(from, final, subjectOf(panel), tiltOf(origin?.el)) : 'scale(.96)';
     flight.add(panel, [{ transform: start }, { transform: 'none' }], { easing: shapeEase, hold: closing ? LAND_HOLD : 0 });
     // 没有来处（键盘打开、来处没了）：原地浮现。有来处时第一帧就看得见（在按钮那里）。
     if (!from) flight.add(panel, [{ opacity: NEARLY_HIDDEN }, { opacity: 1, offset: 0.4 }, { opacity: 1 }]);
+    // 来处（信匣里那只信封）在物件飞着、开着的时候藏起来：飞出去的就是它，不在原处再留一只，飞回来时也不叠成两只。
+    // 关：面板落到按钮上停住的那一刻它在底下亮起来（面板还不透明、整个盖着它），面板再淡掉——先后交替，不同时半透明。
+    const source = from && origin?.el?.isConnected ? origin.el : null;
+    hideSource(backdrop, source);
+    if (closing && source) {
+      source.setAttribute('data-dialog-source', 'fading');
+      flight.add(source, [{ opacity: 1 }, { opacity: 1, offset: CLOSE_FADE }, { opacity: 0, offset: LAND_HOLD }, { opacity: 0 }]);
+    }
   } else {
     const start = from ?? { left: target.left + target.width / 2 - 20, top: target.top + target.height / 2 - 20, width: 40, height: 40 };
     if (!bare) {
@@ -333,15 +403,28 @@ function build(backdrop: HTMLElement, panel: HTMLElement, origin: FlightOrigin |
       : panel.querySelector<HTMLElement>(':scope > .dialog-scroll');
     // 替身（那张卡的拷贝）先从被藏着的状态里拷出来，再藏真卡：同一帧，规则 4。
     const replica = source ? whileShown(source, () => cardReplica(source).el) : null;
+    /** 替身和垫在它底下的那层底：一起淡入淡出。 */
+    const replicaLayers: HTMLElement[] = [];
     if (replica) {
       replica.querySelectorAll('[data-dialog-source]').forEach((node) => node.removeAttribute('data-dialog-source'));
       replica.dataset.dialogReplica = '';
       // 来处顶上那截在顶栏底下、窗口从顶栏下沿长出来（belowLine）：拷贝往上挪同样多，字留在原处，被窗口裁掉的是顶栏底下那截。
       const cut = from ? Math.max(0, from.top - source!.getBoundingClientRect().top) : 0;
       Object.assign(replica.style, { position: 'absolute', left: '0', top: `${-Math.round(cut * 10) / 10}px`, zIndex: '4', pointerEvents: 'none' });
+      // 来处的底铺满整个飞行窗口（替身底下一层，和替身同进同出）：窗口比来处大的那几帧露出的也是来处所在的那块底（信纸），
+      // 不是面板自己的实底——来处是信纸上一枚小标签时，以前飞着的是一块深色（浅色下是白色）的方块，落地前在标签上压成一颗深色药丸。
+      // 替身自己的样式（类名带的淡底色、圆角）不动，画在这层上面。
       const fill = source ? fillBehind(source) : null;
-      if (fill) replica.style.background = fill;
+      if (fill) {
+        const backing = document.createElement('div');
+        Object.assign(backing.style, { position: 'absolute', left: '0', top: '0', width: 'var(--flight-w, 100%)', height: 'var(--flight-h, 100%)', zIndex: '3', borderRadius: 'inherit', background: fill, pointerEvents: 'none' });
+        panel.appendChild(backing);
+        flight.own(() => backing.remove());
+        flight.add(backing, [{ opacity: 1 }, { opacity: 1 }]);
+        replicaLayers.push(backing);
+      }
       panel.appendChild(replica);
+      replicaLayers.push(replica);
       // 拷贝里的 CSS 入场动画（描线、条形长出来）别从头再放（settle.ts）。
       settleCssAnimations(replica);
       flight.own(() => replica.remove());
@@ -378,11 +461,15 @@ function build(backdrop: HTMLElement, panel: HTMLElement, origin: FlightOrigin |
     if (closing) {
       // 关：倒着放。内容在回程前段淡掉，替身接着亮起来（CLOSE_CONTENT_OUT / CLOSE_REPLICA_IN 上面的说明）。
       if (content) flight.add(content, [{ opacity: NEARLY_HIDDEN }, { opacity: NEARLY_HIDDEN, offset: onShape(CLOSE_CONTENT_OUT[0]) }, { opacity: 1, offset: onShape(CLOSE_CONTENT_OUT[1]) }, { opacity: 1 }]);
-      if (replica) flight.add(replica, [{ opacity: 1 }, { opacity: 1, offset: onShape(CLOSE_REPLICA_IN[0]) }, { opacity: 0, offset: onShape(CLOSE_REPLICA_IN[1]) }, { opacity: 0 }]);
+      // 底层比替身早亮：内容一开始淡就铺上来源那块底（盖在淡掉的内容上），不留面板自己的深色实底在中间露一下。
+      for (const layer of replicaLayers) {
+        const [at, until] = layer === replica ? CLOSE_REPLICA_IN : [CLOSE_CONTENT_OUT[0] + 0.06, CLOSE_CONTENT_OUT[1]];
+        flight.add(layer, [{ opacity: 1 }, { opacity: 1, offset: onShape(at) }, { opacity: 0, offset: onShape(until) }, { opacity: 0 }]);
+      }
     } else {
       // 开：内容画好了（下一帧以后）才和替身换手，最早在 earliest。
       requestAnimationFrame(() => requestAnimationFrame(() => {
-        if (flight.running()) flight.handoff({ show: content ? [content] : [], hide: replica ? [replica] : [] }, earliest);
+        if (flight.running()) flight.handoff({ show: content ? [content] : [], hide: replicaLayers }, earliest);
       }));
     }
   }

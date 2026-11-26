@@ -1,20 +1,20 @@
 <script setup lang="ts">
 /**
  * 结构样本的预览：从信纸上那枚标签里长出来的玻璃面板（ModalDialog，关时原路缩回标签）。
- * 上面一排是最近几次运动，点一次就换成那一次；下面是将要寄出的那份样本原文（太长只显示前面一段，寄出的是完整一份）。
- * 「附上这一份」记下运动编号，「不附了」去掉样本。Esc、点遮罩、× 都是关掉不改。
+ * 上面一排是最近几次运动，点一下勾上 / 取消（最多 LETTER_SAMPLES_MAX 次），刚点的那次在下面显示将要寄出的样本原文
+ * （太长只显示前面一段，寄出的是完整一份）。「附上这 N 份」记下运动编号，「不附了」去掉样本。Esc、点遮罩、× 都是关掉不改。
  */
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, ref, shallowReactive, watch } from 'vue';
 import ModalDialog from '../ModalDialog.vue';
 import GlyphTile from '../GlyphTile.vue';
 import { backend } from '../../lib/bridge';
 import { formatDate } from '../../lib/format';
 import { workoutLabel } from '../../lib/labels';
-import type { StructureSample } from '../../types/letters';
+import { LETTER_SAMPLES_MAX, type StructureSample } from '../../types/letters';
 import { useSampleText } from './sample.i18n';
 
-const props = defineProps<{ origin: HTMLElement | null; workoutId: string | null }>();
-const emit = defineEmits<{ (event: 'pick', workoutId: string): void; (event: 'remove'): void; (event: 'close'): void }>();
+const props = defineProps<{ origin: HTMLElement | null; workoutIds: string[] }>();
+const emit = defineEmits<{ (event: 'pick', workoutIds: string[]): void; (event: 'remove'): void; (event: 'close'): void }>();
 const t = useSampleText();
 
 /** 预览里最多显示这么多字：几十万字的 pre 排版会卡一下。 */
@@ -23,10 +23,14 @@ const RECENT = 8;
 
 interface Choice { id: string; label: string }
 const choices = ref<Choice[]>([]);
-const selected = ref<string | null>(props.workoutId);
+/** 勾上的那几次（按勾的先后）。 */
+const picked = ref<string[]>(props.workoutIds.slice(0, LETTER_SAMPLES_MAX));
+/** 下面正显示哪一次的样本：刚点的那次。 */
+const selected = ref<string | null>(picked.value[picked.value.length - 1] ?? null);
 const sample = ref<StructureSample | null>(null);
 const state = ref<'loading' | 'ready' | 'missing' | 'none'>('loading');
-const cache = new Map<string, StructureSample | null>();
+/* 浅响应：「附上这 N 份」要跟着哪几次查出来没存原始报文而变；样本本身不用深层代理。 */
+const cache = shallowReactive(new Map<string, StructureSample | null>());
 
 const choiceLabel = (start: string, type: string) => `${formatDate(start, 'short')} · ${workoutLabel(type)}`;
 
@@ -40,7 +44,10 @@ const load = async (id: string | null) => {
   }
   if (id !== selected.value && !(id === null && selected.value === null)) return;
   sample.value = result;
-  if (result && !selected.value) selected.value = result.workout_id;
+  if (result && !selected.value) {
+    selected.value = result.workout_id;
+    if (!picked.value.length) picked.value = [result.workout_id];
+  }
   state.value = result ? 'ready' : 'missing';
 };
 
@@ -63,9 +70,23 @@ const preview = computed(() => sample.value?.json.slice(0, PREVIEW_CHARS) ?? '')
 const truncated = computed(() => (sample.value?.json.length ?? 0) > PREVIEW_CHARS);
 const kb = computed(() => (sample.value ? (sample.value.bytes / 1024).toFixed(sample.value.bytes < 10_240 ? 1 : 0) : '0'));
 
+/* 点一次运动：没勾就勾上（满了就只看看），勾着又正看着它就取消。 */
+const full = computed(() => picked.value.length >= LETTER_SAMPLES_MAX);
+const toggle = (id: string) => {
+  const on = picked.value.includes(id);
+  if (on && selected.value === id) {
+    picked.value = picked.value.filter((other) => other !== id);
+    return;
+  }
+  if (!on && !full.value) picked.value = [...picked.value, id];
+  selected.value = id;
+};
+/* 要寄的：勾着的、而且不是已经知道没存原始报文的那几次。 */
+const sendable = computed(() => picked.value.filter((id) => cache.get(id) !== null));
+const keepLabel = computed(() => (sendable.value.length > 1 ? t.value.keepMany(sendable.value.length) : t.value.keep));
 const keep = () => {
-  if (state.value !== 'ready' || !sample.value) return;
-  emit('pick', sample.value.workout_id);
+  if (!sendable.value.length) return;
+  emit('pick', sendable.value);
   emit('close');
 };
 const cancel = () => { emit('remove'); emit('close'); };
@@ -79,9 +100,10 @@ const cancel = () => { emit('remove'); emit('close'); };
         <h2 id="sample-preview-title">{{ t.title }}</h2>
         <button type="button" class="x" :aria-label="t.close" @click="emit('close')">×</button>
       </header>
-      <div v-if="choices.length" class="choices" role="radiogroup" :aria-label="t.pick">
-        <button v-for="choice in choices" :key="choice.id" type="button" role="radio" :aria-checked="choice.id === selected"
-          :class="['choice', { on: choice.id === selected }]" @click="selected = choice.id">{{ choice.label }}</button>
+      <div v-if="choices.length" class="choices" role="group" :aria-label="t.pickSome(LETTER_SAMPLES_MAX)">
+        <button v-for="choice in choices" :key="choice.id" type="button" role="checkbox" :aria-checked="picked.includes(choice.id)"
+          :class="['choice', { on: picked.includes(choice.id), shown: choice.id === selected, spare: full && !picked.includes(choice.id) }]"
+          @click="toggle(choice.id)">{{ choice.label }}</button>
       </div>
       <div v-if="state === 'ready' && sample" class="facts">
         <span class="fact">{{ t.dropped(sample.dropped_fields.length) }}</span>
@@ -96,7 +118,7 @@ const cancel = () => { emit('remove'); emit('close'); };
       </div>
       <footer>
         <button type="button" class="button secondary" @click="cancel">{{ t.cancel }}</button>
-        <button type="button" class="button primary" :disabled="state !== 'ready'" @click="keep">{{ t.keep }}</button>
+        <button type="button" class="button primary" :disabled="!sendable.length || state === 'loading'" @click="keep">{{ keepLabel }}</button>
       </footer>
     </div>
   </ModalDialog>
@@ -119,6 +141,9 @@ h2 { flex: 1 1 auto; min-width: 0; margin: 0; font-size: var(--fs-lg); font-weig
 }
 .choice:hover { color: var(--ink); }
 .choice.on { color: var(--ink); border-color: color-mix(in srgb, var(--accent) 60%, transparent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
+/* 正在下面显示的那次：多一圈内描边（勾着没勾着都看得出是哪一份）。满了以后没勾的那几次淡一点：点了只看、不勾。 */
+.choice.shown { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 70%, transparent); }
+.choice.spare { opacity: .55; }
 .facts { display: flex; flex-wrap: wrap; gap: 6px 12px; }
 .fact { color: var(--muted); font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }
 .fact + .fact::before { content: '·'; margin-inline-end: 12px; color: var(--subtle); }

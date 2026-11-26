@@ -73,8 +73,15 @@ const pushMark = computed(() => {
   return now.enabled ? { tone: 'ok', text: pushText.value.statusOn } : { tone: 'idle', text: pushText.value.statusOff };
 });
 
-const activeId = computed<SettingsCardId | null>(() =>
-  (isSettingsCardId(route.params.card) ? route.params.card : null));
+/* 展开的是哪张卡：只跟着自己的路由（/settings/:card）走。从卡里点进别的页（账号与设备里的一台设备）时，
+   这页还要在形变背后再画一会儿、淡出，那时全局路由已经是设备页、没有 card 参数——以前跟着变成「没展开」，
+   展开的卡当场收回成卡叠、底下几张冒出来，形变背后整块背景一下子换掉（闪一下）。离开期间停在离开时那张。 */
+const onSettings = () => route.name === 'Settings';
+const ownCard = ref<SettingsCardId | null>(isSettingsCardId(route.params.card) ? route.params.card : null);
+watch(() => [route.name, route.params.card], () => {
+  if (onSettings()) ownCard.value = isSettingsCardId(route.params.card) ? route.params.card : null;
+});
+const activeId = computed<SettingsCardId | null>(() => ownCard.value);
 
 const exportFormat = ref(readDefaultExportFormat());
 watch(activeId, () => { exportFormat.value = readDefaultExportFormat(); });
@@ -144,6 +151,7 @@ const changeCard = async (id: string, done: () => void) => {
 
 /* 旧链接（数据健康页的「去重新连接」等）指向 #connection，重新连接的按钮在「账号与设备」卡上。 */
 const redirectLegacy = () => {
+  if (!onSettings()) return;
   const target = legacySettingsTarget(route.hash, route.query.focus);
   if (target) void router.replace(`/settings/${target}`);
   else if (route.params.card && !activeId.value) void router.replace('/settings');

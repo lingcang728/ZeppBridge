@@ -16,7 +16,7 @@ use zeppbridge_core::letters::{
     is_letter_version, is_report_id, normalize_also_hit, normalize_locale, random_install_bytes,
     sample_file_name, sanitize_reply, sniff_image, LetterBoxState, LetterReceipt,
     PendingAttachment, PendingReply, SentReply, LETTER_ATTACHMENTS_MAX,
-    LETTER_ATTACHMENT_MAX_ATTEMPTS, LETTER_ATTACHMENT_MAX_BYTES,
+    LETTER_ATTACHMENT_MAX_ATTEMPTS, LETTER_ATTACHMENT_MAX_BYTES, LETTER_SAMPLES_MAX,
 };
 
 const REPLY_ENDPOINT: &str = "https://zeppbridge.com/api/letters/reply";
@@ -270,6 +270,7 @@ fn store_attachments(
 fn store_sample(
     data_dir: &Path,
     local_id: &str,
+    index: usize,
     sample: &StructureSample,
 ) -> Result<String, AppError> {
     if sample.bytes > STRUCTURE_SAMPLE_MAX_BYTES {
@@ -280,7 +281,7 @@ fn store_sample(
     }
     let dir = attachments_dir(data_dir);
     std::fs::create_dir_all(&dir).map_err(|_| save_error())?;
-    let file = sample_file_name(local_id);
+    let file = sample_file_name(local_id, index);
     std::fs::write(dir.join(&file), sample.json.as_bytes()).map_err(|_| save_error())?;
     Ok(file)
 }
@@ -372,7 +373,7 @@ pub async fn letters_send_reply(
     also_hit: Vec<String>,
     report_id: Option<String>,
     attachments: Option<Vec<String>>,
-    sample_workout_id: Option<String>,
+    sample_workout_ids: Option<Vec<String>>,
 ) -> std::result::Result<LetterSendResult, AppError> {
     // 只收 /api/feedback 发的那种编号（小写 UUID），别的一律不带，免得把奇怪的东西寄出去。
     let report_id = report_id.filter(|id| is_report_id(id));
@@ -393,27 +394,39 @@ pub async fn letters_send_reply(
     if text.is_empty() && also_hit.is_empty() {
         return Err(AppError::new("err.letters.empty", "回信是空的，写几句再寄"));
     }
-    // 样本在后端按运动编号现做，不收界面交来的内容：寄出去的只能是脱敏规则产出的那一份。
-    let sample = match sample_workout_id {
-        Some(id) => Some(
-            spawn_independent_read(state.data_dir.clone(), move |db| {
-                db.workout_structure_sample(Some(&id), env!("CARGO_PKG_VERSION"))
-            })
-            .await?
-            .ok_or_else(|| {
+    // 样本在后端按运动编号现做，不收界面交来的内容：寄出去的只能是脱敏规则产出的那几份。
+    // 同一次运动只做一份，最多 LETTER_SAMPLES_MAX 份（界面也只让勾这么多）。
+    let mut ids: Vec<String> = Vec::new();
+    for id in sample_workout_ids.unwrap_or_default() {
+        if ids.len() < LETTER_SAMPLES_MAX && !ids.contains(&id) {
+            ids.push(id);
+        }
+    }
+    let samples = if ids.is_empty() {
+        Vec::new()
+    } else {
+        spawn_independent_read(state.data_dir.clone(), move |db| {
+            ids.iter()
+                .map(|id| db.workout_structure_sample(Some(id), env!("CARGO_PKG_VERSION")))
+                .collect::<Result<Vec<_>, _>>()
+        })
+        .await?
+        .into_iter()
+        .map(|sample| {
+            sample.ok_or_else(|| {
                 AppError::new(
                     "err.letters.sample_missing",
                     "这次运动没有存原始报文，附不了结构样本",
                 )
-            })?,
-        ),
-        None => None,
+            })
+        })
+        .collect::<Result<Vec<_>, _>>()?
     };
     let _guard = LETTERS_LOCK.lock().await;
     let mut attachments =
         store_attachments(&state.data_dir, &local_id, &attachments.unwrap_or_default())?;
-    if let Some(sample) = &sample {
-        attachments.push(store_sample(&state.data_dir, &local_id, sample)?);
+    for (index, sample) in samples.iter().enumerate() {
+        attachments.push(store_sample(&state.data_dir, &local_id, index, sample)?);
     }
     let mut letters = LetterBoxState::load(&state.data_dir);
     letters.ensure_install_id(random_install_bytes());

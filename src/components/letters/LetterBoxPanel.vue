@@ -13,7 +13,7 @@
  */
 import './paper.css';
 import './letterRail.css';
-import { computed, nextTick, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { mailState } from '../../services/mailState';
 import PageHeader from '../PageHeader.vue';
 import SegmentTrack from '../SegmentTrack.vue';
@@ -33,6 +33,7 @@ import { locale } from '../../i18n';
 import type { CustomLetter } from '../../composables/useLetterEnvelope';
 import type { LetterReceipt, PendingLetterReply, SentLetterReply } from '../../types/letters';
 import { wheelPan } from '../../lib/wheelPan';
+import { lessMotion } from '../../lib/motion/lessMotion';
 const vWheelPan = wheelPan;
 
 type Tab = 'letters' | 'mine' | 'replies' | 'stamps';
@@ -141,10 +142,86 @@ onMounted(openFromQuery);
 // 信匣里那只空信封随时会被点：信纸那块代码先取回来，点下去第一帧就飞（顶栏的笔是悬停时取）。
 onMounted(prefetchAuthorCompose);
 watch(() => props.write, openFromQuery);
+
+/* 换分栏时整块面板的高度跟着平滑变：各栏高矮差得多（「你的信」有一排明信片），以前旧的淡掉、新的一挂上，
+   面板（浮层的底板也跟着它）一下撑高或缩矮，淡入淡出被这一跳盖住，看着像硬切、像闪了一下。
+   旧的淡出时按住此刻的高度，新的挂上后从旧高度平滑过渡到它的高度，只在过渡途中裁掉溢出的部分。
+   新的那栏可能挂上以后才读到数据、再长高（「你的信」）：高度一直跟着它走（ResizeObserver），每变一次就从此刻的高度接着滑过去，
+   不在挂上那一刻把终点量死——否则读到的那几排一直被裁在外面，过渡一完才整块冒出来。 */
+const panel = ref<HTMLElement | null>(null);
+const GROW_MS = 380;
+const GROW_EASE = 'cubic-bezier(.32, .72, .24, 1)';
+/* 新栏挂上后跟多久：数据一般很快就到，超过这段就不再管（之后的变化照常撑开面板）。 */
+const FOLLOW_MS = 1200;
+let heldHeight = 0;
+let sizing: Animation | null = null;
+let watcher: ResizeObserver | null = null;
+let followUntil = 0;
+/* 每换一次分栏加一：上一次留下的计时器不能去放开这一次按住的高度。 */
+let round = 0;
+const releasePanel = () => {
+  sizing = null;
+  watcher?.disconnect();
+  watcher = null;
+  if (!panel.value) return;
+  panel.value.style.height = '';
+  panel.value.style.overflow = '';
+};
+const holdPanel = () => {
+  const el = panel.value;
+  if (!el || lessMotion()) return;
+  round += 1;
+  sizing?.cancel();
+  watcher?.disconnect();
+  watcher = null;
+  heldHeight = el.getBoundingClientRect().height;
+  el.style.height = `${heldHeight}px`;
+};
+/* 面板本来该多高：进场那一栏的底边 + 面板自己的下内边距（面板的高度被动画按着，不能直接量它）。 */
+const naturalHeight = (el: HTMLElement, section: Element) => {
+  const pad = Number.parseFloat(getComputedStyle(el).paddingBottom) || 0;
+  const margin = Number.parseFloat(getComputedStyle(section).marginBottom) || 0;
+  return section.getBoundingClientRect().bottom + margin + pad - el.getBoundingClientRect().top;
+};
+const slideTo = (el: HTMLElement, from: number, to: number, ms: number) => {
+  sizing?.cancel();
+  const grow = el.animate([{ height: `${from}px` }, { height: `${to}px` }], { duration: ms, easing: GROW_EASE, fill: 'forwards' });
+  sizing = grow;
+  void grow.finished.then(() => {
+    if (sizing !== grow) return;
+    if (performance.now() < followUntil) { el.style.height = `${to}px`; grow.cancel(); sizing = null; return; }
+    releasePanel();
+  }, () => undefined);
+};
+const growPanel = (section: Element) => {
+  const el = panel.value;
+  const from = heldHeight;
+  heldHeight = 0;
+  if (!el || !from) return;
+  const mine = round;
+  el.style.overflow = 'clip';
+  let target = naturalHeight(el, section);
+  if (Math.abs(target - from) < 1) { el.style.height = `${target}px`; } else slideTo(el, from, target, GROW_MS);
+  followUntil = performance.now() + FOLLOW_MS;
+  watcher?.disconnect();
+  watcher = new ResizeObserver(() => {
+    const next = naturalHeight(el, section);
+    if (Math.abs(next - target) < 1) return;
+    target = next;
+    slideTo(el, el.getBoundingClientRect().height, next, Math.round(GROW_MS * 0.8));
+  });
+  watcher.observe(section);
+  window.setTimeout(() => {
+    if (mine !== round) return;
+    followUntil = 0;
+    if (!sizing) releasePanel();
+  }, FOLLOW_MS);
+};
+onBeforeUnmount(() => { round += 1; watcher?.disconnect(); watcher = null; });
 </script>
 
 <template>
-  <div class="letter-box-panel">
+  <div ref="panel" class="letter-box-panel">
     <PageHeader :title-id="titleId" :title="t.boxTitle" :intro="t.boxSub">
       <SegmentTrack v-model="tab" :items="tabs" :aria-label="t.boxTitle" data-tour="letter-tabs">
         <template #default="{ item }">
@@ -155,7 +232,7 @@ watch(() => props.write, openFromQuery);
     </PageHeader>
 
     <!-- 换分栏：旧的淡出、淡完新的淡入，不位移（2026-10-29 用户：以前是硬切）。 -->
-    <Transition name="box-swap" mode="out-in">
+    <Transition name="box-swap" mode="out-in" @before-leave="holdPanel" @enter="growPanel">
     <section v-if="tab === 'letters'" key="letters" class="box-section">
       <p v-if="!versions.length" class="box-empty">{{ t.emptyLetters }}</p>
       <ul v-else v-wheel-pan class="letter-rail">
@@ -229,6 +306,7 @@ watch(() => props.write, openFromQuery);
 </template>
 
 <style scoped>
+.letter-box-panel { overflow-clip-margin: 28px; }
 .box-section { display: grid; gap: 14px; margin-top: 14px; }
 .box-empty { margin: 0; color: var(--muted); font-size: var(--fs-sm); }
 .tab-dot { width: 6px; height: 6px; flex: 0 0 6px; margin-inline-start: 6px; border-radius: 50%; background: #a82c24; }

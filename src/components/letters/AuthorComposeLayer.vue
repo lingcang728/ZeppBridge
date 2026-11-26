@@ -99,11 +99,11 @@ const send = async () => {
       }
     }
     if (!sameDraft()) return;
-    const sampleWorkoutId = sample.value?.workoutId;
+    const sampleWorkoutIds = sample.value?.workoutIds ?? [];
     const result = await sendLetterReply({
       localId, letterVersion: BUNDLED_VERSION, locale: sendLocale, text: text.trim(),
       allowQuote: false, alsoHit: [], ...(reportId ? { reportId } : {}), ...imagePayload(),
-      ...(sampleWorkoutId ? { sampleWorkoutId } : {}),
+      ...(sampleWorkoutIds.length ? { sampleWorkoutIds } : {}),
     });
     if (!sameDraft()) return;
     // 先拷信纸起飞（拷的是此刻的字和附图），再清草稿：附图的 blob 地址一清就失效，拷贝里的图会变成破图。

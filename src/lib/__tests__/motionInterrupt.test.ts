@@ -78,6 +78,23 @@ describe('dialog flight', () => {
     expect(c.y + s * (q.y - c.y) + dy).toBeCloseTo(38, 0);
   });
 
+  it('a tilted origin: the object turns with it, sized by the upright width', () => {
+    const panel = { left: 0, top: 0, width: 800, height: 600 };
+    const subject = { left: 150, top: 100, width: 500, height: 320 };
+    const deg = -0.8, rad = (deg * Math.PI) / 180;
+    // 300 × 192 的信封转 -0.8° 以后的包围盒。
+    const w = 300 * Math.cos(rad) + 192 * Math.abs(Math.sin(rad)), h = 300 * Math.abs(Math.sin(rad)) + 192 * Math.cos(rad);
+    const from = { left: 20 - (w - 300) / 2, top: 200 - (h - 192) / 2, width: w, height: h };
+    const t = objectTransform(from, panel, subject, deg);
+    const [, dx, dy, r, s] = /translate\((-?[\d.]+)px, (-?[\d.]+)px\) rotate\((-?[\d.]+)deg\) scale\(([\d.]+)\)/.exec(t)!.map(Number);
+    expect(r).toBeCloseTo(deg, 2);
+    expect(s).toBeCloseTo(300 / 500, 3);
+    const c = { x: 400, y: 300 }, q = { x: 400, y: 260 };
+    const ux = s * (q.x - c.x), uy = s * (q.y - c.y);
+    expect(c.x + ux * Math.cos(rad) - uy * Math.sin(rad) + dx).toBeCloseTo(170, 0);
+    expect(c.y + ux * Math.sin(rad) + uy * Math.cos(rad) + dy).toBeCloseTo(296, 0);
+  });
+
   it('never enlarges past the real size', () => {
     const panel = { left: 0, top: 0, width: 100, height: 100 };
     expect(objectTransform({ left: 0, top: 0, width: 400, height: 400 }, panel)).toContain('scale(1.000)');

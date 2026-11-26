@@ -28,13 +28,13 @@ const CATEGORIES: ReportCategory[] = ['device', 'workout', 'data', 'other'];
 const props = withDefaults(defineProps<{
   text: string; attach: boolean; category: ReportCategory; busy: boolean; error: string;
   images?: ReplyImage[]; preparing?: boolean; attachFailed?: boolean;
-  sample?: { workoutId: string } | null;
+  sample?: { workoutIds: string[] } | null;
 }>(), { images: () => [], sample: null });
 const emit = defineEmits<{
   (event: 'update:text', text: string): void;
   (event: 'update:attach', attach: boolean): void;
   (event: 'update:category', category: ReportCategory): void;
-  (event: 'update:sample', sample: { workoutId: string } | null): void;
+  (event: 'update:sample', sample: { workoutIds: string[] } | null): void;
   (event: 'send'): void;
   (event: 'addImages', files: File[]): void;
   (event: 'removeImage', id: string): void;

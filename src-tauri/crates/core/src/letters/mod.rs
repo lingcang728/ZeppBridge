@@ -30,6 +30,8 @@ pub const LETTER_OUTBOX_MAX: usize = 20;
 pub const LETTER_SENT_MAX: usize = 200;
 /// 一封回信最多附几张图。和服务端 `ATTACHMENTS_PER_REPLY` 一致。
 pub const LETTER_ATTACHMENTS_MAX: usize = 3;
+/// 一封回信最多附几份运动结构样本。和服务端 `SAMPLES_PER_REPLY`、界面的 `LETTER_SAMPLES_MAX` 一致。
+pub const LETTER_SAMPLES_MAX: usize = 3;
 /// 一张附图的上限（界面压缩后的字节数）。和服务端 `ATTACHMENT_MAX_BYTES` 一致。
 pub const LETTER_ATTACHMENT_MAX_BYTES: usize = 1024 * 1024;
 /// 一张附图最多试传几次。服务端没开图片存储时会一直说「稍后再试」，不能无限攒着。
@@ -154,9 +156,14 @@ pub fn attachment_file_name(local_id: &str, index: usize, content_type: &str) ->
     format!("{local_id}-{index}.{ext}")
 }
 
-/// 随信附上的运动结构样本的本机文件名：`<回信本机编号>-sample.json`（一封信最多一份）。
-pub fn sample_file_name(local_id: &str) -> String {
-    format!("{local_id}-sample.json")
+/// 随信附上的第 `index` 份（从 0 起）运动结构样本的本机文件名：第一份是 `<回信本机编号>-sample.json`，
+/// 之后是 `<回信本机编号>-<index>-sample.json`（第一份沿用一封信只能附一份时的名字，待寄出里的旧信照样认得）。
+pub fn sample_file_name(local_id: &str, index: usize) -> String {
+    if index == 0 {
+        format!("{local_id}-sample.json")
+    } else {
+        format!("{local_id}-{index}-sample.json")
+    }
 }
 
 /// 状态文件里记的附件名只能是 `attachment_file_name` / `sample_file_name` 造出来的那种：

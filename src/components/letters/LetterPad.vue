@@ -2,7 +2,7 @@
 /**
  * 一沓信纸，一次读最上面那张（批次 6；2026-10-21 用户：翻页别把纸飞走，要像读真信——读完一张叠到最后）。
  *
- * 整沓按「离最上面几张」排：最上面那张正着放，下面两张各错开一点、转一点角，露出纸边；更深的和第三张叠在一起。
+ * 整沓按「离最上面几张」排：最上面那张正着放，下面两张正着往下各错开一点，底边露出两道纸边；更深的和第三张叠在一起。
  * 往后翻：最上面那张整张往左抽出来（抽到和整沓完全错开），再从后面滑回去、落到整沓底下——
  * 换层次的那一刻它和别的纸没有重叠，所以看不出「一跳」（2026-10-21 录屏：只抽出一半就换层，被压住的半张闪一下，用户说一顿一卡）。
  * 下一张本来就在下面，跟着慢慢浮上来摆正。往前翻反过来：最底下那张从后面往左抽出来，再盖到最上面。
@@ -28,8 +28,9 @@ const dragging = ref(false);
 let start: { x: number; y: number; id: number; t: number } | null = null;
 let horizontal = false;
 
-/* 每一层的摆法：0 最上面，1、2 往下错开；更深的都摆成 2。 */
-const POSE: Pose[] = [{ x: 0, y: 0, r: 0 }, { x: 4, y: 5, r: 0.8 }, { x: -5, y: 9, r: -1 }];
+/* 每一层的摆法：0 最上面，1、2 正着往下各错开一点，只在底边露出两道纸边；更深的都摆成 2。
+   以前左右错开、各转一点角，底下那张从左边斜着露出来，看着像没对齐。 */
+const POSE: Pose[] = [{ x: 0, y: 0, r: 0 }, { x: 0, y: 5, r: 0 }, { x: 0, y: 10, r: 0 }];
 const TURN_MS = 980;
 
 const depth = (i: number) => (i - props.index + props.count) % props.count;
@@ -160,10 +161,10 @@ const leafStyle = (i: number) => {
 /* 透明度那条给拆信用：展开时底下几张先藏着，展开完淡出来。 */
 .leaf { position: absolute; inset: 0; transform-origin: 50% 60%; will-change: transform; transition: transform 620ms 120ms cubic-bezier(.3, .7, .25, 1), opacity 420ms ease; }
 .leaf > :deep(*) { height: 100%; }
-/* 下面的纸：一层淡淡的影子，翻上来时退掉。 */
+/* 下面的纸：整张匀匀地暗一点点（像压在上面那张的影子里），翻上来时退掉。以前是从左往右变淡的一道，左边露出来的纸边像蒙了一块脏影子。 */
 .leaf:not(.current)::after {
   content: ''; position: absolute; inset: 0; border-radius: 3px; pointer-events: none;
-  background: linear-gradient(100deg, rgb(0 0 0 / .08), rgb(0 0 0 / .02) 60%, transparent);
+  background: rgb(0 0 0 / .035);
 }
 /* 拖着抽出来时影子更深。 */
 .dragging .leaf.current > :deep(.paper) { box-shadow: 0 34px 60px -24px rgb(0 0 0 / .6), 0 4px 10px rgb(0 0 0 / .18); }
