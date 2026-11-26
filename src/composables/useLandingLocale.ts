@@ -18,11 +18,11 @@ import type { LandingCopy } from '../views/landing/types';
  */
 export type LandingLocale =
   | 'zh' | 'en' | 'es'
-  | 'nl' | 'pt-BR' | 'pt-PT' | 'de' | 'ru' | 'hi-IN' | 'fr' | 'it' | 'pl' | 'zh-TW';
+  | 'nl' | 'pt-BR' | 'pt-PT' | 'de' | 'ru' | 'hi-IN' | 'fr' | 'it' | 'pl' | 'ko' | 'zh-TW';
 
 /** 语言下拉按这个顺序排，与应用内 LOCALES 一致：先内联的 zh/en，再懒加载语言包。 */
 export const LANDING_LOCALES: readonly LandingLocale[] = [
-  'zh', 'en', 'es', 'nl', 'pt-BR', 'pt-PT', 'de', 'ru', 'hi-IN', 'fr', 'it', 'pl', 'zh-TW',
+  'zh', 'en', 'es', 'nl', 'pt-BR', 'pt-PT', 'de', 'ru', 'hi-IN', 'fr', 'it', 'pl', 'ko', 'zh-TW',
 ];
 
 /** 每种语言在菜单里用自己的名字，不翻译。 */
@@ -39,6 +39,7 @@ export const LOCALE_LABELS: Record<LandingLocale, string> = {
   fr: 'Français',
   it: 'Italiano',
   pl: 'Polski',
+  ko: '한국어',
   'zh-TW': '繁',
 };
 
@@ -56,6 +57,7 @@ const HTML_LANG: Record<LandingLocale, string> = {
   fr: 'fr',
   it: 'it',
   pl: 'pl',
+  ko: 'ko',
   'zh-TW': 'zh-Hant',
 };
 
@@ -73,6 +75,7 @@ const OG_LOCALE: Record<LandingLocale, string> = {
   fr: 'fr_FR',
   it: 'it_IT',
   pl: 'pl_PL',
+  ko: 'ko_KR',
   'zh-TW': 'zh_TW',
 };
 
@@ -130,6 +133,7 @@ const BASE_LANGUAGE: Record<string, LandingLocale> = {
   fr: 'fr',
   it: 'it',
   pl: 'pl',
+  ko: 'ko',
 };
 
 const EXACT_LOCALE = new Map<string, LandingLocale>([

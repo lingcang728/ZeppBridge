@@ -29,6 +29,8 @@ const COPY: Record<LandingLocale, ReelCopy> = {
     pause: '暂停',
     play: '播放',
   },
+  // 韩语待翻译，先用英文占位。
+  ko: { preparing: 'Preparing demo', failed: 'The demo could not continue', retry: 'Retry', replay: 'Replay', pause: 'Pause', play: 'Play' },
   en: {
     preparing: 'Preparing demo',
     failed: 'The demo could not continue',

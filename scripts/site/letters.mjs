@@ -14,7 +14,7 @@ export const LETTER_LANGUAGES = [
   ['en', 'en', 'English'], ['zh', 'zh-CN', '简'], ['es', 'es', 'Español'], ['nl', 'nl', 'Nederlands'],
   ['pt-BR', 'pt-BR', 'Português (Brasil)'], ['pt-PT', 'pt-PT', 'Português (Portugal)'], ['de', 'de', 'Deutsch'],
   ['ru', 'ru', 'Русский'], ['hi-IN', 'hi-IN', 'हिन्दी'], ['fr', 'fr', 'Français'], ['it', 'it', 'Italiano'], ['pl', 'pl', 'Polski'],
-  ['zh-TW', 'zh-Hant', '繁'],
+  ['ko', 'ko', '한국어'], ['zh-TW', 'zh-Hant', '繁'],
 ];
 
 const VERSION = /^\d+\.\d+\.\d+$/;

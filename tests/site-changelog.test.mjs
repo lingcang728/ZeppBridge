@@ -9,7 +9,7 @@ test('only tagged versions reach the changelog, newest first', () => {
     ['3.1.1', { en: '- Added: unreleased' }],
   ]);
   const files = renderChangelog(notes, new Map([['3.0.9', '2026-10-20'], ['3.1.0', '2026-10-29']]));
-  assert.equal(files.size, 13);
+  assert.equal(files.size, 14);
   const en = files.get('changelog/index.html');
   assert.ok(!en.includes('unreleased'));
   assert.ok(en.indexOf('id="v3.1.0"') < en.indexOf('id="v3.0.9"'));
@@ -18,6 +18,7 @@ test('only tagged versions reach the changelog, newest first', () => {
   // 繁体缺稿先落简体，其余语言缺稿落英文并标出段落语言。
   assert.match(files.get('changelog/zh-TW.html'), /<section class="release" id="v3.1.0" lang="zh-CN">.*新的/);
   assert.match(files.get('changelog/de.html'), /<section class="release" id="v3.1.0" lang="en">/);
+  assert.match(files.get('changelog/ko.html'), /<html lang="ko">.*<section class="release" id="v3.1.0" lang="en">/s);
 });
 
 test('notes group like the in-app dialog and the 3.0.1 single file splits by language', () => {

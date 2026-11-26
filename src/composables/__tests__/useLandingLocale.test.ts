@@ -75,6 +75,8 @@ describe('browser-language detection', () => {
     [['zh-TW'], 'zh-TW'],
     [['zh-HK'], 'zh-TW'],
     [['zh-Hant-MO'], 'zh-TW'],
+    [['ko-KR'], 'ko'],
+    [['ko'], 'ko'],
     [['zh-SG'], 'zh'],
     [['zh-Hans-CN'], 'zh'],
     [['es-MX'], 'es'],
@@ -95,7 +97,7 @@ describe('browser-language detection', () => {
     [['pl_PL'], 'pl'],
     [['PL'], 'pl'],
     [['ja-JP'], 'en'],
-    [['ko', 'de'], 'de'],
+    [['ja', 'de'], 'de'],
     [[], 'en'],
   ] as const)('navigator.languages %j → %s', async (languages, expected) => {
     vi.stubGlobal('window', {

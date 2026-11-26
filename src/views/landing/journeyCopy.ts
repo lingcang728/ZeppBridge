@@ -353,6 +353,8 @@ export const JOURNEY: Record<LandingLocale, JourneyCopy> = {
   }) satisfies JourneyCopy,
   zh, en,
   // 繁體中文（台灣）文案。
+  // 韩语待翻译，先用英文占位。
+  ko: en,
   'zh-TW': zhTW,
   es: pack({
     title: ['Todo lo que recuerda tu muñeca.', 'Tuyo para siempre.'],

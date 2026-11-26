@@ -29,7 +29,8 @@ test('an echo is optional, but once written every language carries the same #ids
   assert.match(problems, /缺上期回音 .*echo\/pl\.md/);
 });
 
-test('from 3.1.1 every release ships 13 languages, Traditional Chinese included', () => {
-  assert.equal(NOTE_LOCALES.length, 13);
+test('from 3.3.0 every release ships 14 languages, Traditional Chinese and Korean included', () => {
+  assert.equal(NOTE_LOCALES.length, 14);
   assert.ok(NOTE_LOCALES.includes('zh-TW'));
+  assert.ok(NOTE_LOCALES.includes('ko'));
 });
