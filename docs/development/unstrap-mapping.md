@@ -11,7 +11,7 @@ Beta 实验室「从 unstrap 导入」读的是 unstrap（Helio Strap 的开源�
 - **一次导入一批**（`import_batches`，来源 `unstrap`）。健康样本行带 `import_batch_id`（迁移 v51），运动页「导入记录」里撤销这一批时，运动和健康样本一起删。
 - **保留期清理不删导入的数据**（和导入的运动一样：那是用户自己带进来的）。重放只按 `raw_record_id` 删，导入的行没有报文，重放不碰。
 - **导入的不算「云端拉到哪了」**：各流的「最新样本」（`stream_freshness`）跳过 `import_batch_id` 非空的行。同步前的探测拿本机最新心率去问云端有没有更新的；备份里比 Zepp 新的心率要是算进去，同步会被误判成「云端没有新数据」。
-- **时间**：CSV 里的 `epoch` 是 UTC 秒；按天的表用它自己的 `date` 列（unstrap 记下的本地日），**没有 `date` 列的老备份那张表整张跳过**，不拿时区去猜是哪一天。
+- **时间**：CSV 里的 `epoch` 是 UTC 秒；按天的表用它自己的 `date` 列（unstrap 记下的本地日），**没有 `date` 列的老备份那张表整张跳过**，不拿时区去猜是哪一天。逐分钟步数是例外：合计是本机自己加出来的，归日按本机时区，和界面上的逐分钟样本一个口径。
 - **不编数据**：空格子是没有；超出生理范围的值丢掉（心率 25–250 bpm、血氧 50–100%）；读不懂的行照实计入「读不出」。
 - **三条禁令照守**：官方 / 第三方的 HRV 分不清统计量就不进 SDNN / RMSSD 列；Charge / 准备度这类分数不拿别的东西顶；不从稀疏血氧反算 ODI。unstrap 自己算的分数一律不导入，不顶替 Zepp 的。
 
@@ -24,6 +24,7 @@ Beta 实验室「从 unstrap 导入」读的是 unstrap（Helio Strap 的开源�
 | `heart_rate.csv` | `epoch` `bpm` `source` | `metric_samples`：`heart_rate`，bpm | 只收 `source = 0`（带子存的历史，一分钟一条）；`1` 是运动时手机实时收到的，运动导入已经带了。 |
 | `spo2.csv` | `epoch` `percent` | `metric_samples`：`spo2`，% | 带子测的单点血氧。夜间连续血氧 `sleep_spo2.csv` 不收（见下）。 |
 | `hrv.csv` | `epoch` `milliseconds` | `metric_samples`：`hrv_rmssd`，ms | 夜间 HRV。unstrap 的 `hrv` 表只从带子的 RMSSD 记录（GDSP 类型 73）写入，SDNN 另在 `hrv_sdnn.csv`，所以统计量是确定的 RMSSD，和云端夜间 RMSSD 是同一个指标。有效范围 1–400 ms，和解码云端的口径一致。 |
+| `activity_minute.csv` | `epoch` `steps` | `metric_samples`：`steps_hourly`，steps（记在那个小时开头）；`daily_metrics`：`steps`，steps | 带子的逐分钟记录和 Zepp 旧通道明细是同一种硬件记录（每分钟 8 字节、第 3 字节是步数），本机的每小时步数本来就是那份明细按小时加出来的、逐日等于当天总步数，所以加总是同一个口径，不是派生。按本机时区归小时、归日（和界面上所有逐分钟样本一样）。255 是带子还没写的分钟（填充值），算读不出。只收落在数据首尾之间的整天：备份第一条之前、最后一条之后带子可能还在记，半截的合计落库后会被「本机已有就不收」永远钉住；每小时只收这些整天里的。合计是 0 的小时 / 天不收（没戴不等于没走）。哪天本机已经有步数（Zepp 的），那天的总数和每小时都不收，每小时加起来才和当天总数对得上。 |
 | `resting_hr.csv` | `date` `bpm` | `daily_metrics`：`resting_hr`，bpm | 按 `date` 列落本地日。 |
 | `sleep_session.csv` + `sleep_stage.csv` + `sleep_edit.csv` | 起止、`nap`、`deep_min` `light_min` `rem_min` `awake_min` `wake_count`；阶段 `session_start_epoch` `start` `end` `stage`（0 清醒 1 浅 2 深 3 REM） | `sleep_sessions` + `sleep_stages`，id `unstrap:<起点秒>` | 小睡（`nap = true`）不收：本机小睡另有一套，一期不接。`score` 不收（不顶替 Zepp 的睡眠分）。用户在 unstrap 里删掉的（`sleep_edit.deleted`）不收，改过起止的用改过的。分钟数照表里的，空就是没有；阶段条按表里的顺序，不按总量拼。 |
 
@@ -35,7 +36,7 @@ Beta 实验室「从 unstrap 导入」读的是 unstrap（Helio Strap 的开源�
 | `stress.csv` | 本机的全天压力是按天的最小 / 平均 / 最大，逐条压力没有对应的列；从逐条值算日均是派生，不做。 |
 | `breath_rate.csv` | 本机呼吸率是按晚的一个值，逐条均值是派生。 |
 | `skin_temperature.csv` | 本机没有皮温样本指标。 |
-| `activity_minute.csv` / `activity_extended.csv` | 逐分钟步数 / 热量；本机的日步数、日热量以 Zepp 为准，按分钟加总是派生。 |
+| `activity_extended.csv` | 逐分钟热量、距离、站立等；没核对过和 Zepp 的日热量、日距离是不是同一个口径，加总当派生，不做。 |
 | `pai.csv` | 分数，不顶替 Zepp 的 PAI。 |
 | `sleep_spo2.csv` / `osa_result.csv` / `osa_event.csv` | 禁令：不从稀疏血氧反算 ODI；OSA 结果是 unstrap / 带子的算法分数。 |
 | `strap_readiness.csv` / `night_metrics.csv` / `habit_age_week.csv` / `daily_energy.csv` / `sport_effect.csv` / `recovery_hr.csv` | unstrap 自己算的。 |

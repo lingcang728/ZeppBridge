@@ -5096,7 +5096,7 @@ Regole:
     badge: 'Sperimentale',
     unstrapImportTitle: 'Importa allenamenti da unstrap',
     unstrapImportSub:
-      'Scegli un file zip di backup di unstrap: gli allenamenti registrati dalla fascia e dal telefono (frequenza cardiaca, percorso, pause) vengono importati, uno per sessione, insieme a tutti i dati di frequenza cardiaca, SpO₂, HRV, frequenza a riposo e sonno non ancora presenti su questo computer. Nessun dato sincronizzato da Zepp viene modificato. I punteggi calcolati da unstrap non vengono importati. Gli elementi importati compaiono nella pagina Allenamenti, dove ognuno può essere annullato.',
+      'Scegli un file zip di backup di unstrap: gli allenamenti registrati dalla fascia e dal telefono (frequenza cardiaca, percorso, pause) vengono importati, uno per sessione, insieme a tutti i dati di frequenza cardiaca, SpO₂, HRV, passi, frequenza a riposo e sonno non ancora presenti su questo computer. Nessun dato sincronizzato da Zepp viene modificato. I punteggi calcolati da unstrap non vengono importati. Gli elementi importati compaiono nella pagina Allenamenti, dove ognuno può essere annullato.',
     unstrapImportButton: 'Scegli backup',
     unstrapExportTitle: 'Esporta per unstrap',
     unstrapExportSub:

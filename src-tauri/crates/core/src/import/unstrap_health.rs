@@ -1,13 +1,13 @@
 //! unstrap 备份里的健康样本（计划 C2 二期）。逐表的口径见 `docs/development/unstrap-mapping.md`。
 //!
 //! 只读、只挑：心率（带子存的历史，一分钟一条）、单点血氧、夜间 HRV（RMSSD）、
-//! 静息心率（按 unstrap 记的本地日）、睡眠（不含小睡、不含分数）。这里只管把表读成结构，「本机已有就不收」在落库那边做
+//! 步数（逐分钟加成每小时 / 每天）、静息心率（按 unstrap 记的本地日）、睡眠（不含小睡、不含分数）。这里只管把表读成结构，「本机已有就不收」在落库那边做
 //! （`storage::import_health`）。
 
 use std::collections::{BTreeMap, HashMap};
 use std::io::{Read, Seek};
 
-use chrono::{DateTime, NaiveDate, Utc};
+use chrono::{DateTime, Duration, Local, NaiveDate, TimeZone, Timelike, Utc};
 
 use super::strava::entry_name;
 use super::unstrap::{epoch, read_table, Table};
@@ -109,6 +109,64 @@ fn instant(text: Option<&str>) -> Option<DateTime<Utc>> {
         .map(|t| t.with_timezone(&Utc))
 }
 
+/// 逐分钟步数 → 每小时合计（`steps_hourly`，记在那个小时开头）+ 每天合计（`steps`）。
+///
+/// 带子的逐分钟记录和 Zepp 旧通道明细是同一种硬件记录（每分钟 8 字节、第 3 字节是步数），
+/// 本机的每小时步数本来就是那份明细按小时加出来的、逐日等于当天总步数，所以这里同一个口径。
+/// 归哪一天、哪个小时按 `tz`（导入时是本机时区，和界面上所有逐分钟样本归日一样）。
+///
+/// 只收落在数据首尾之间的**完整**天（第一条在当天零点或更早、最后一条已经到了后面的日子）：
+/// 之前之后带子可能还在记，只是不在这份备份里；半截的合计一旦落库，「本机已有就不收」会把它
+/// 永远钉住。每小时只收这些整天里的。合计是 0 的不收——没戴不等于没走。
+pub(crate) fn steps_from_minutes<Tz: TimeZone>(
+    minutes: &[(DateTime<Utc>, u32)],
+    tz: &Tz,
+) -> (Vec<HealthSample>, Vec<HealthDaily>) {
+    let (Some(first), Some(last)) = (
+        minutes.iter().map(|(t, _)| *t).min(),
+        minutes.iter().map(|(t, _)| *t).max(),
+    ) else {
+        return (Vec::new(), Vec::new());
+    };
+    let last_day = last.with_timezone(tz).date_naive();
+    let mut hours: BTreeMap<DateTime<Utc>, (NaiveDate, u32)> = BTreeMap::new();
+    let mut days: BTreeMap<NaiveDate, (DateTime<Utc>, u32)> = BTreeMap::new();
+    for (time, steps) in minutes {
+        let local = time.with_timezone(tz);
+        let into_hour = i64::from(local.minute() * 60 + local.second());
+        hours
+            .entry(*time - Duration::seconds(into_hour))
+            .or_insert((local.date_naive(), 0))
+            .1 += steps;
+        let into_day = i64::from(local.num_seconds_from_midnight());
+        days.entry(local.date_naive())
+            .or_insert((*time - Duration::seconds(into_day), 0))
+            .1 += steps;
+    }
+    days.retain(|date, (start, steps)| *steps > 0 && *start >= first && *date < last_day);
+    // 小时只跟着整天走：每小时加起来要等于当天总数，首页和二级页才对得上。
+    let samples = hours
+        .into_iter()
+        .filter(|(_, (date, steps))| *steps > 0 && days.contains_key(date))
+        .map(|(timestamp, (_, steps))| HealthSample {
+            metric: "steps_hourly",
+            unit: "steps",
+            timestamp,
+            value: f64::from(steps),
+        })
+        .collect();
+    let daily = days
+        .into_iter()
+        .map(|(date, (_, steps))| HealthDaily {
+            metric: "steps",
+            unit: "steps",
+            date: date.format("%Y-%m-%d").to_string(),
+            value: f64::from(steps),
+        })
+        .collect();
+    (samples, daily)
+}
+
 /// 读备份里的健康样本。返回读出来的和读不出的行数。
 pub fn parse_unstrap_health<R: Read + Seek>(
     archive: &mut zip::ZipArchive<R>,
@@ -150,6 +208,25 @@ pub fn parse_unstrap_health<R: Read + Seek>(
         |_, _| true,
         &mut health.samples,
     );
+
+    // 步数：逐分钟记录加成每小时 / 每天。255 是带子还没写的分钟（填充值），不是步数。
+    if let Some(t) = load(archive, "activity_minute.csv", &mut unreadable) {
+        let mut minutes = Vec::with_capacity(t.rows.len());
+        for row in &t.rows {
+            let time = t.int(row, "epoch").and_then(epoch);
+            let steps = t
+                .int(row, "steps")
+                .filter(|s| (0..=254).contains(s))
+                .and_then(|s| u32::try_from(s).ok());
+            match (time, steps) {
+                (Some(time), Some(steps)) => minutes.push((time, steps)),
+                _ => unreadable += 1,
+            }
+        }
+        let (hourly, daily) = steps_from_minutes(&minutes, &Local);
+        health.samples.extend(hourly);
+        health.daily.extend(daily);
+    }
 
     // 静息心率：按 unstrap 自己记的本地日；没有 date 列的老备份整张跳过，不拿时区猜。
     if let Some(t) = load(archive, "resting_hr.csv", &mut unreadable) {

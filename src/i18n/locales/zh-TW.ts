@@ -4606,7 +4606,7 @@ export default {
       unstrapExportTitle: '匯出給 unstrap',
       unstrapExported: (workouts: number) => `已完成：${workouts} 場運動`,
       unstrapImportButton: '選取備份檔案',
-      unstrapImportSub: '選取 unstrap 的備份 zip：讀取其中由心率帶與手機記錄的運動（心率、軌跡、暫停），同一場次僅保留一筆；並補入本機尚未具備的心率、血氧、HRV、靜息心率與睡眠，Zepp 同步過來的資料維持原樣不變。unstrap 自行計算的評分不予匯入。匯入紀錄位於運動頁面，可整批復原。',
+      unstrapImportSub: '選取 unstrap 的備份 zip：讀取其中由心率帶與手機記錄的運動（心率、軌跡、暫停），同一場次僅保留一筆；並補入本機尚未具備的心率、血氧、HRV、步數、靜息心率與睡眠，Zepp 同步過來的資料維持原樣不變。unstrap 自行計算的評分不予匯入。匯入紀錄位於運動頁面，可整批復原。',
       unstrapImportTitle: '從 unstrap 匯入運動',
       unstrapRange: '範圍',
       unstrapRangeAll: '全部',

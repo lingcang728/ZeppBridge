@@ -3069,7 +3069,7 @@ export default {
           lead: '여기에 있는 기능은 모두 실험 단계이며 변경되거나 제거될 수 있습니다. 문제가 생기면 편지함에서 작성자에게 알려 주세요.',
           badge: '실험 기능',
           unstrapImportTitle: 'unstrap에서 운동 가져오기',
-          unstrapImportSub: 'unstrap 백업 ZIP을 선택하세요. 밴드와 휴대폰이 기록한 운동(심박수, 경로, 일시 정지)을 세션마다 하나씩 가져옵니다. 이 기기에 없는 심박수, SpO₂, HRV, 안정 시 심박수, 수면 데이터도 추가합니다. Zepp에서 동기화한 기록은 변경하지 않습니다. unstrap이 계산한 점수는 가져오지 않습니다. 가져온 항목은 운동 페이지에서 확인하고 일괄 취소할 수 있습니다.',
+          unstrapImportSub: 'unstrap 백업 ZIP을 선택하세요. 밴드와 휴대폰이 기록한 운동(심박수, 경로, 일시 정지)을 세션마다 하나씩 가져옵니다. 이 기기에 없는 심박수, SpO₂, HRV, 걸음 수, 안정 시 심박수, 수면 데이터도 추가합니다. Zepp에서 동기화한 기록은 변경하지 않습니다. unstrap이 계산한 점수는 가져오지 않습니다. 가져온 항목은 운동 페이지에서 확인하고 일괄 취소할 수 있습니다.',
           unstrapImportButton: '백업 파일 선택',
           unstrapExportTitle: 'unstrap용으로 내보내기',
           unstrapExportSub: '이 기기의 운동 요약과 심박수를 unstrap에서 가져올 수 있는 ZIP으로 저장합니다. unstrap의 백업 복원에서 선택하세요. 없는 값은 0으로 채우지 않고 비워 둡니다. Zepp의 훈련 부하와 VO₂max는 포함하지 않습니다.',

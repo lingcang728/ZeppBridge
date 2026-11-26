@@ -309,3 +309,67 @@ fn imported_heart_rate_does_not_count_as_the_newest_cloud_sample() {
         .clone();
     assert_eq!(newest, Some(ts().to_rfc3339()));
 }
+
+#[test]
+fn imported_hourly_steps_stay_out_of_days_that_already_have_steps() {
+    use crate::import::unstrap_health::{HealthDaily, HealthSample, ParsedHealth};
+    let db = Database::in_memory().unwrap();
+    // 11-15 本机已有 Zepp 的总步数；11-16 没有。正午取样，换哪个时区都还是同一天。
+    db.conn
+        .execute(
+            "INSERT INTO daily_metrics(date, metric, value, unit, source_scope, device_id)
+             VALUES('2023-11-15', 'steps', 8000, 'steps', 'user_fused', NULL)",
+            [],
+        )
+        .unwrap();
+    let noon = |day: u32| Utc.with_ymd_and_hms(2023, 11, day, 12, 0, 0).unwrap();
+    let hour = |day, value| HealthSample {
+        metric: "steps_hourly",
+        unit: "steps",
+        timestamp: noon(day),
+        value,
+    };
+    let total = |date: &str, value| HealthDaily {
+        metric: "steps",
+        unit: "steps",
+        date: date.into(),
+        value,
+    };
+    let parsed = ParsedFile {
+        health: Some(ParsedHealth {
+            samples: vec![hour(15, 600.0), hour(16, 700.0)],
+            daily: vec![total("2023-11-15", 7000.0), total("2023-11-16", 7100.0)],
+            ..Default::default()
+        }),
+        ..Default::default()
+    };
+    let report = db
+        .import_activities(ImportSource::Unstrap, None, parsed, noon(20))
+        .unwrap();
+    // 只有 11-16 的一个小时和一天进来；11-15 的总数和小时都让给 Zepp。
+    assert_eq!(report.health_added, 2);
+    let steps: Vec<(String, f64)> = db
+        .conn
+        .prepare("SELECT date, value FROM daily_metrics WHERE metric = 'steps' ORDER BY date")
+        .unwrap()
+        .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))
+        .unwrap()
+        .collect::<std::result::Result<_, _>>()
+        .unwrap();
+    assert_eq!(
+        steps,
+        [
+            ("2023-11-15".to_string(), 8000.0),
+            ("2023-11-16".to_string(), 7100.0)
+        ]
+    );
+    let hours: Vec<String> = db
+        .conn
+        .prepare("SELECT timestamp FROM metric_samples WHERE metric = 'steps_hourly'")
+        .unwrap()
+        .query_map([], |r| r.get(0))
+        .unwrap()
+        .collect::<std::result::Result<_, _>>()
+        .unwrap();
+    assert_eq!(hours, [noon(16).to_rfc3339()]);
+}

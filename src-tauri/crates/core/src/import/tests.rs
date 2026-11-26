@@ -396,6 +396,72 @@ x,1714521600,55
     }
 
     #[test]
+    fn minute_steps_add_up_to_whole_local_days_and_their_hours_only() {
+        use super::super::unstrap_health::steps_from_minutes;
+        use chrono::{Duration, FixedOffset, TimeZone, Utc};
+        // 半小时时区：小时、日都按当地切，不按 UTC 整点。
+        let tz = FixedOffset::east_opt(5 * 3600 + 1800).unwrap();
+        let local_midnight = tz.with_ymd_and_hms(2024, 5, 1, 0, 0, 0).unwrap();
+        // 从 4-30 23:00 记到 5-02 00:10：4-30、5-02 都是半截，只有 5-01 是整天。
+        let first = local_midnight - Duration::hours(1);
+        let minutes: Vec<_> = (0..(25 * 60 + 11))
+            .map(|i| {
+                let time = (first + Duration::minutes(i)).with_timezone(&Utc);
+                // 5-01 10 点那一小时没走（没戴），不算 0 步的一小时。
+                let local_hour = (i / 60 - 1).rem_euclid(24);
+                (time, if i >= 60 && local_hour == 10 { 0 } else { 1 })
+            })
+            .collect();
+        let (hourly, daily) = steps_from_minutes(&minutes, &tz);
+        assert_eq!(daily.len(), 1);
+        assert_eq!(
+            (daily[0].date.as_str(), daily[0].value),
+            ("2024-05-01", 1380.0)
+        );
+        assert_eq!(hourly.len(), 23);
+        assert!(hourly.iter().all(|h| h.value == 60.0));
+        assert_eq!(hourly[0].timestamp, local_midnight.with_timezone(&Utc));
+        assert_eq!(hourly.iter().map(|h| h.value).sum::<f64>(), daily[0].value);
+    }
+
+    #[test]
+    fn activity_minutes_become_steps_and_padding_is_not_a_step_count() {
+        use chrono::Local;
+        // 四天、每分钟 1 步，外加一条带子还没写的填充分钟（255）和一条坏行。
+        let mut csv = String::from("time,epoch,steps,intensity,kind,heart_rate\n");
+        for i in 0..(4 * 1440) {
+            csv.push_str(&format!("x,{},1,0,0,\n", T0 + i * 60));
+        }
+        csv.push_str(&format!("x,{},255,0,0,\nx,,3,0,0,\n", T0 + 4 * 1440 * 60));
+        let bytes = zip_of(&[
+            ("workout.csv", b"start_epoch,end_epoch,sport_type\n"),
+            ("activity_minute.csv", csv.as_bytes()),
+        ]);
+        let file = parse_unstrap_archive(Cursor::new(bytes)).unwrap();
+        assert_eq!(file.unreadable, 2);
+        let health = file.health.unwrap();
+        // 不管跑测试的机器在哪个时区，中间总有整天；每一天的小时加起来就是那天的总数。
+        assert!(!health.daily.is_empty());
+        for day in &health.daily {
+            assert_eq!(day.metric, "steps");
+            let hours: f64 = health
+                .samples
+                .iter()
+                .filter(|s| {
+                    s.metric == "steps_hourly"
+                        && s.timestamp
+                            .with_timezone(&Local)
+                            .format("%Y-%m-%d")
+                            .to_string()
+                            == day.date
+                })
+                .map(|s| s.value)
+                .sum();
+            assert_eq!(hours, day.value);
+        }
+    }
+
+    #[test]
     fn phone_heart_rate_and_route_in_the_same_second_become_one_sample() {
         let app_workout = format!(
             "start_epoch,end_epoch,sport_type,distance_m,distance_from_steps\n{T0},{end},1,1000.0,false\n",

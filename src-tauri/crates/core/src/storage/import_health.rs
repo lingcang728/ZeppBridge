@@ -7,7 +7,7 @@
 
 use std::collections::HashSet;
 
-use chrono::{DateTime, Duration, Utc};
+use chrono::{DateTime, Duration, Local, Utc};
 use rusqlite::params;
 
 use super::Database;
@@ -48,6 +48,9 @@ impl Database {
         now: DateTime<Utc>,
     ) -> Result<HealthAdded> {
         let mut added = HealthAdded::default();
+        // 每小时步数跟着当天总数走：那天本机已经有步数（Zepp 的），带子的小时也不进来，
+        // 不然每小时加起来和当天总数对不上。
+        let step_days = self.days_with_metric("steps")?;
 
         let mut metrics: Vec<&'static str> = health.samples.iter().map(|s| s.metric).collect();
         metrics.sort_unstable();
@@ -69,6 +72,18 @@ impl Database {
                  VALUES (?1, ?2, ?3, ?4, 'device', ?5, NULL, ?6)",
             )?;
             for sample in of {
+                if metric == "steps_hourly"
+                    && step_days.contains(
+                        &sample
+                            .timestamp
+                            .with_timezone(&Local)
+                            .format("%Y-%m-%d")
+                            .to_string(),
+                    )
+                {
+                    added.skipped += 1;
+                    continue;
+                }
                 if !taken.insert(minute(sample.timestamp)) {
                     added.skipped += 1;
                     continue;
@@ -144,6 +159,16 @@ impl Database {
     }
 
     /// 本机某个指标在这段时间里已经有样本的分钟。时间按字符串范围先粗筛（多放一天），再逐条解析。
+    fn days_with_metric(&self, metric: &str) -> Result<HashSet<String>> {
+        let mut stmt = self
+            .conn
+            .prepare("SELECT DISTINCT date FROM daily_metrics WHERE metric = ?1")?;
+        let days = stmt
+            .query_map([metric], |row| row.get::<_, String>(0))?
+            .collect::<std::result::Result<_, _>>()?;
+        Ok(days)
+    }
+
     fn sample_minutes(
         &self,
         metric: &str,

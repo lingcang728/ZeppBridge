@@ -5645,7 +5645,7 @@ Zasady:
     badge: 'Eksperymentalne',
     unstrapImportTitle: 'Importuj treningi z unstrap',
     unstrapImportSub:
-      'Wybierz plik zip kopii zapasowej unstrap: treningi zarejestrowane przez pas i telefon (tętno, trasa, pauzy) zostaną zaimportowane, po jednym na sesję, wraz z wszelkimi danymi tętna, SpO₂, HRV, tętna spoczynkowego i snu, których jeszcze nie ma na tym komputerze. Żadne dane zsynchronizowane z Zepp nie zostaną zmienione. Wyniki obliczone przez unstrap nie są importowane. Importy znajdują się na stronie Treningi, gdzie każdy można cofnąć.',
+      'Wybierz plik zip kopii zapasowej unstrap: treningi zarejestrowane przez pas i telefon (tętno, trasa, pauzy) zostaną zaimportowane, po jednym na sesję, wraz z wszelkimi danymi tętna, SpO₂, HRV, kroków, tętna spoczynkowego i snu, których jeszcze nie ma na tym komputerze. Żadne dane zsynchronizowane z Zepp nie zostaną zmienione. Wyniki obliczone przez unstrap nie są importowane. Importy znajdują się na stronie Treningi, gdzie każdy można cofnąć.',
     unstrapImportButton: 'Wybierz kopię',
     unstrapExportTitle: 'Eksportuj dla unstrap',
     unstrapExportSub:

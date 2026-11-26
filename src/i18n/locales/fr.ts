@@ -4480,7 +4480,7 @@ Règles :
       badge: 'Expérimental',
       unstrapImportTitle: 'Importer des entraînements depuis unstrap',
       unstrapImportSub:
-        'Choisissez un zip de sauvegarde unstrap : les séances enregistrées par la ceinture et le téléphone (fréquence cardiaque, tracé, pauses) sont importées, une par session, ainsi que les données de fréquence cardiaque, SpO₂, HRV, fréquence au repos et sommeil qui ne sont pas encore sur cet ordinateur. Rien de ce qui est synchronisé depuis Zepp n’est modifié. Les scores calculés par unstrap ne sont pas importés. Les imports figurent sur la page Entraînements et peuvent être annulés un par un.',
+        'Choisissez un zip de sauvegarde unstrap : les séances enregistrées par la ceinture et le téléphone (fréquence cardiaque, tracé, pauses) sont importées, une par session, ainsi que les données de fréquence cardiaque, SpO₂, HRV, pas, fréquence au repos et sommeil qui ne sont pas encore sur cet ordinateur. Rien de ce qui est synchronisé depuis Zepp n’est modifié. Les scores calculés par unstrap ne sont pas importés. Les imports figurent sur la page Entraînements et peuvent être annulés un par un.',
       unstrapImportButton: 'Choisir la sauvegarde',
       unstrapExportTitle: 'Exporter pour unstrap',
       unstrapExportSub:
