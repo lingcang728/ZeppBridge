@@ -33,6 +33,7 @@ import { holdInPlace } from '../lib/motion/holdInPlace';
 import { pageQuery, sleepPageQueries } from '../lib/pageQueries';
 import { cached, peekAll } from '../lib/readCache';
 import { afterMotion } from '../lib/motion/budget';
+import { useRecordZoomOut } from '../composables/useRecordFocus';
 import { DEVELOP_DELAY_MS, DEVELOP_GUARD_MS, markDeveloped, shouldDevelop, type InkPhase } from '../lib/motion/develop';
 import { deviceNameText, undeterminedDevice } from '../lib/deviceName';
 
@@ -53,6 +54,8 @@ const device = ref<DeviceProfile>({});
 const loading = ref(true);
 const error = ref<string | null>(null);
 const sleepId = computed(() => String(route.params.sleepId || ''));
+/* 列表缩放的第四档：Ctrl + 滚轮往外退回睡眠列表的日档、停在这一晚上（lib/album/recordZoom.ts）。 */
+useRecordZoomOut({ kind: 'sleep', listName: 'SleepList', listPath: '/sleep', id: () => sleepId.value, day: () => (session.value ? localDay(session.value.start_time) : null) });
 // 从概览的睡眠卡点进来之前，这一条多半已经预先读好了（lib/pageQueries.ts）：第一帧就是它，不放「加载中」。
 const preloaded = isTauri() && sleepId.value ? peekAll(sleepPageQueries(sleepId.value)) : null;
 if (preloaded) {

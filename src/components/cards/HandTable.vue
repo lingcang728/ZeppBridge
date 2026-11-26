@@ -21,7 +21,7 @@ import { handFace } from './handFace';
 import { drawOut, swapIn, type Hand, type HandCard } from '../../lib/cards/hands';
 import type { HandLines } from '../../types/hands';
 import {
-  animateFromNow, CARD_RETURN_MS, dealCards, receive, reducedMotion, relay, returnStack, stackAndReturnMs, stackCards, type Landing,
+  animateFromNow, CARD_RETURN_MS, dealCards, DRAW_TIMING, receive, reducedMotion, relay, returnStack, stackAndReturnMs, stackCards, type Landing,
 } from '../../lib/motion/cards';
 import { CLOSE_EASE, OPEN_EASE, paced } from '../../lib/motion/timing';
 import { onMotionEscape } from '../../lib/motion/interrupt';
@@ -101,13 +101,18 @@ const allCards = (): HTMLElement[] => [...(stage.value?.querySelectorAll<HTMLEle
 const deal = async (id: number) => {
   await nextTick();
   const cards = allCards();
-  if (!reducedMotion() && props.anchor instanceof HTMLElement && anchorLanding()) releaseAnchor = holdSource(props.anchor);
   const before = new Set(cards.flatMap((card) => card.getAnimations()));
   const dealt = dealCards(cards, anchorLanding(), { track: seq.track });
   // 先停在第一帧，等挂载、光栅化这几帧过去再放（和挑日子的牌桌一样，免得第一帧卡住、放出来跳一截）。
   const fresh = cards.flatMap((card) => card.getAnimations()).filter((animation) => !before.has(animation));
   for (const animation of fresh) animation.pause();
   await whenFramesSteady();
+  // 第一帧的牌是透明的：等的这几帧扇牌照常露着；牌开始动的同一帧才按住扇牌，并且跟着牌淡入同步淡出（交叉溶解）。
+  // 以前一点开就把扇牌藏掉，牌又还透明着，卡面右边空了几帧。
+  if (!reducedMotion() && props.anchor instanceof HTMLElement && props.anchor.isConnected && seq.live(id)) {
+    releaseAnchor = holdSource(props.anchor);
+    fadeSourceIn(props.anchor, [{ opacity: 1 }, { opacity: 0, offset: DRAW_TIMING.opaqueAt }, { opacity: 0 }], { duration: DRAW_TIMING.ms, easing: 'linear' });
+  }
   for (const animation of fresh) if (animation.playState === 'paused') animation.play();
   await dealt;
   if (!seq.live(id)) return;
@@ -282,8 +287,7 @@ const onCardCancel = () => {
 const fadeChrome = (to: number, duration: number) => [benchHead.value, foot.value]
   .filter((el): el is HTMLElement => !!el)
   .map((el) => animateFromNow(el, { opacity: to }, { duration, easing: to ? OPEN_EASE : CLOSE_EASE, fill: 'forwards' }, ['opacity']));
-/** `quiet`：落定时不亮那一圈（来处紧接着还要飞走，比如今日一问缩成胶囊：留下的光圈会悬在原地）。 */
-const close = async (used = false, quiet = false) => {
+const close = async (used = false) => {
   if (closing.value) return;
   onCardCancel();
   const id = seq.handoff();
@@ -299,8 +303,8 @@ const close = async (used = false, quiet = false) => {
   await Promise.all([returnStack(cards, landing), ...fades.map((a) => a.finished.catch(() => undefined))]);
   if (!seq.live(id)) { receiver.cancel(); return; }
   releaseAnchor();
-  if (quiet) receiver.cancel();
-  else receiver.land('var(--accent)');
+  // 落定时不再顶一下、亮一圈：卡面那把扇牌外面亮起的方框看着像选中框，意义不明。
+  receiver.cancel();
   emit('close', used);
   returnFocus?.focus({ preventScroll: true });
 };
@@ -327,7 +331,7 @@ onBeforeUnmount(() => {
   resize?.disconnect();
   stopListening();
 });
-defineExpose({ close: (options: { quiet?: boolean } = {}) => close(false, !!options.quiet), isClosing: () => closing.value });
+defineExpose({ close: (_options: { quiet?: boolean } = {}) => close(false), isClosing: () => closing.value });
 </script>
 
 <template>

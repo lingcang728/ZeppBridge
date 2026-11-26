@@ -43,10 +43,13 @@ const toggle = (code: BedtimeCode) => {
 </template>
 
 <style scoped>
-.last-night { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; padding: 10px 12px; border-radius: 16px;
-  background: color-mix(in srgb, var(--ink) 5%, transparent); }
-.ln-who { display: inline-flex; align-items: center; gap: 7px; color: var(--ink); font-size: var(--fs-sm); font-weight: 700; white-space: nowrap; }
-.ln-who :deep(svg) { color: var(--sleep); }
+/* 一张小卡（和牌桌上的牌同一种质感）：睡眠的蓝从左边晕开，描边 + 一层柔和的投影，不是一块灰底框。 */
+.last-night { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding: 12px 16px 12px 12px; border-radius: 20px;
+  background: linear-gradient(100deg, color-mix(in srgb, var(--sleep) 13%, transparent), transparent 46%), var(--mat-raised);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sleep) 22%, var(--mat-line)), 0 12px 24px -20px rgb(0 0 0 / .5); }
+.ln-who { display: inline-flex; align-items: center; gap: 9px; color: var(--ink); font-size: var(--fs-sm); font-weight: 700; white-space: nowrap; }
+.ln-who :deep(svg) { box-sizing: content-box; padding: 7px; border-radius: 50%; color: var(--sleep);
+  background: color-mix(in srgb, var(--sleep) 16%, transparent); }
 .ln-sep { width: 1px; height: 22px; background: var(--mat-line); }
 .ln-tags { flex: 1 1 260px; }
 .ln-tags :deep(.tag-chip) { min-height: 30px; padding-block: 3px; background: var(--mat-card); }

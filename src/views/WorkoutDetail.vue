@@ -44,6 +44,8 @@ import { useStrengthDetail } from '../composables/useStrengthDetail';
 import type { StrengthWorkoutDetail } from '../types';
 import { useMessages } from '../i18n';
 import { holdInPlace } from '../lib/motion/holdInPlace';
+import { useRecordZoomOut } from '../composables/useRecordFocus';
+import { localDay } from '../lib/album/album';
 import { workoutDetailMessages as messages } from './WorkoutDetail.i18n';
 
 defineOptions({ name: 'WorkoutDetail' });
@@ -63,6 +65,8 @@ const {
 } = useWorkoutDetail(workoutId);
 /* reactive 包一层：模板里不用写 .value，状态（刚才那句提示）跟着卡走。 */
 const fit = reactive(useWorkoutFitCorrection(workoutId));
+/* 列表缩放的第四档：Ctrl + 滚轮往外退回运动列表的日档、停在这一次上（lib/album/recordZoom.ts）。 */
+useRecordZoomOut({ kind: 'workouts', listName: 'WorkoutList', listPath: '/workouts', id: () => workoutId.value, day: () => (workout.value ? localDay(workout.value.start_time) : null) });
 
 const {
   durationMinutes, formatClock, workoutArt, deviceName, deviceImage, deviceKind,

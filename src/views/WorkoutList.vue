@@ -34,6 +34,7 @@ import GlyphTile from '../components/GlyphTile.vue';
 import JournalBody from '../components/journal/JournalBody.vue';
 import { useRecordAlbum } from '../composables/useRecordAlbum';
 import { useAlbumNav } from '../composables/useAlbumNav';
+import { useRecordFocusLanding } from '../composables/useRecordFocus';
 import { useAnnualRings } from '../composables/useAnnualRings';
 import { useLogbook } from '../composables/useLogbook';
 import { isAlbumZoom, localDay, type AlbumTile, type AlbumZoom } from '../lib/album/album';
@@ -261,6 +262,8 @@ const { go } = useAlbumNav({
   ensureDay: (day) => ensureMonth(day.slice(0, 7)),
 });
 const goZoom = (next: AlbumZoom) => { void go(next); };
+/* 从某一次运动的详情页往外缩回来（第四档 → 日档）：停在那一次上。 */
+useRecordFocusLanding({ kind: 'workouts', zoom, stage, ready: () => !loading.value && workouts.value.length > 0, ensureDay: (day) => ensureMonth(day.slice(0, 7)) });
 /* 履历最上面的全年日历点了某一天：放大回日档、滚到那天。 */
 const openDay = (day: string) => { void go('day', { day }); };
 /* 从 /journal 旧链接、概览的履历卡、生活事件「管理」进来（?zoom=year）：页面在缓存里时也跟着换档。 */

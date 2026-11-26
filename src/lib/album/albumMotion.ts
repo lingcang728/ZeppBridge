@@ -97,6 +97,13 @@ export const freeze = (body: HTMLElement): Ghost => {
   };
 };
 
+/** 元素在滚动区内容里的版面高度（offsetTop 一路加上去，不含 transform）。 */
+const layoutTop = (el: HTMLElement, root: HTMLElement): number => {
+  let y = 0;
+  for (let node: HTMLElement | null = el; node && node !== root && root.contains(node); node = node.offsetParent as HTMLElement | null) y += node.offsetTop;
+  return y;
+};
+
 /** 条目的「大小」：面积开方（行是扁长的、方块是方的，按宽或按高比都会反）。 */
 const sizeOf = (r: DOMRect | WindowRect) => Math.sqrt(Math.max(1, r.width * r.height));
 
@@ -106,7 +113,17 @@ export const ZOOM_MS = paced(420);
  * 换一档密度：`swap` 换排版（Vue 渲染完再返回），`find` 在新排版里找回指针下那一条。
  * 旧画面冻成幽灵板朝新尺寸缩、淡出；新画面从旧尺寸缩回 1、淡入；锚点那一条前后钉在一处。
  */
-export async function zoomSwap(body: HTMLElement, anchor: HTMLElement | null, swap: () => Promise<void>, find: () => HTMLElement | null, body2: () => HTMLElement | null): Promise<void> {
+export interface ZoomSwapOptions {
+  /** 往粗（日 → 月 → 年）是 1，往细是 -1：锚点两头对不上时（运动的月 ↔ 年履历）按方向给一个默认的缩放比，照样就地变密 / 变疏。 */
+  dir?: 1 | -1;
+  /** 新排版里锚点那一条要落到的屏幕高度（它的上沿）。不给就钉在原来的高度（中线对中线）。 */
+  pinTop?: (target: HTMLElement) => number;
+}
+
+/** 两头锚点对不上时的默认缩放比（往粗 = 旧画面缩小、新画面从大一圈落到 1）。 */
+const FALLBACK_ZOOM = 1.3;
+
+export async function zoomSwap(body: HTMLElement, anchor: HTMLElement | null, swap: () => Promise<void>, find: () => HTMLElement | null, body2: () => HTMLElement | null, options: ZoomSwapOptions = {}): Promise<void> {
   if (lessMotion()) { await swap(); return; }
   const main = scroller();
   const before = main?.scrollTop ?? 0;
@@ -118,20 +135,40 @@ export async function zoomSwap(body: HTMLElement, anchor: HTMLElement | null, sw
   const next = body2();
   const target = find();
   if (!next) { ghost.remove(); return; }
-  if (old && target && main) {
+  let followed = before;
+  const keepGhost = () => { const top = main?.scrollTop ?? 0; ghost.follow(top - followed); followed = top; };
+  if (target && main && options.pinTop) {
+    // 新排版里没画过的行按 content-visibility 的估计高度占位，滚过去以后它们才按真高度排开，那一条又被往下推一截。
+    // 新画面先藏着（动画本来就从透明起），等一两帧排稳了再钉一次，钉准了才起飞；幽灵板一直跟着滚动留在原处。
+    next.style.opacity = '0';
+    for (let round = 0; round < 4; round += 1) {
+      const delta = target.getBoundingClientRect().top - options.pinTop(target);
+      if (round > 0 && Math.abs(delta) < 1) break;
+      main.scrollTop += delta;
+      keepGhost();
+      await new Promise((resolve) => { requestAnimationFrame(resolve); });
+    }
+    next.style.removeProperty('opacity');
+  } else if (old && target && main) {
     const now = target.getBoundingClientRect();
     main.scrollTop += now.top + now.height / 2 - (old.top + old.height / 2);
   }
-  ghost.follow((main?.scrollTop ?? 0) - before);
+  keepGhost();
   const now = target?.getBoundingClientRect() ?? null;
   const timing = { duration: ZOOM_MS, easing: OPEN_EASE };
   const anims: Animation[] = [];
-  if (old && now) {
-    const k = Math.min(3, Math.max(1 / 3, sizeOf(old) / sizeOf(now)));
+  // 锚点两头都在：按它前后的大小比缩放、从旧位置挪到新位置。对不上（年档履历里没有那一条）：绕视口正中、按方向给一个默认比。
+  const view = viewportBox();
+  const center = view.top + view.height / 2;
+  const pair = old && now ? { old, now } : options.dir ? { old: null, now: null } : null;
+  if (pair) {
+    const k = pair.old && pair.now
+      ? Math.min(3, Math.max(1 / 3, sizeOf(pair.old) / sizeOf(pair.now)))
+      : (options.dir === 1 ? FALLBACK_ZOOM : 1 / FALLBACK_ZOOM);
     const gbox = ghost.el.getBoundingClientRect();
     const nbox = next.getBoundingClientRect();
-    const oc = { x: gbox.left + gbox.width / 2, y: old.top + old.height / 2 };
-    const nc = { x: nbox.left + nbox.width / 2, y: now.top + now.height / 2 };
+    const oc = { x: gbox.left + gbox.width / 2, y: pair.old ? pair.old.top + pair.old.height / 2 : center };
+    const nc = { x: nbox.left + nbox.width / 2, y: pair.now ? pair.now.top + pair.now.height / 2 : center };
     ghost.el.style.transformOrigin = `${oc.x - gbox.left}px ${oc.y - gbox.top}px`;
     next.style.transformOrigin = `${nc.x - nbox.left}px ${nc.y - nbox.top}px`;
     const startScale = ghost.el.style.transform.match(/scale\(([\d.]+)\)/)?.[1];
@@ -145,7 +182,20 @@ export async function zoomSwap(body: HTMLElement, anchor: HTMLElement | null, sw
     ghost.el.animate([{ opacity: 1 }, { opacity: 0, offset: 0.7 }, { opacity: 0 }], { ...timing, easing: 'linear', fill: 'forwards' }),
     next.animate([{ opacity: 0 }, { opacity: 0, offset: 0.12 }, { opacity: 1, offset: 0.7 }, { opacity: 1 }], { ...timing, easing: 'linear' }),
   );
+  // 新画面一开始是缩小的，原先屏幕外、没画过的行 / 月份这时进了视口，按真高度排开（content-visibility 的估计高度不准），
+  // 锚点那一条在版面里被往下推。每帧按它的版面位置（不含变换）补滚动，它就一直停在要落的地方，落地不再差一截。
+  let tracking = Boolean(target && main);
+  let laid = target && main ? layoutTop(target, main) : 0;
+  const track = () => {
+    if (!tracking || !target || !main) return;
+    const now = layoutTop(target, main);
+    if (Math.abs(now - laid) >= 0.5) { main.scrollTop += now - laid; keepGhost(); laid = now; }
+    requestAnimationFrame(track);
+  };
+  requestAnimationFrame(track);
   await Promise.allSettled(anims.map((a) => a.finished));
+  tracking = false;
+  track();
   ghost.remove();
   next.style.removeProperty('transform-origin');
 }

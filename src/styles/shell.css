@@ -166,6 +166,9 @@
 /* 卡 ↔ 页形变里那张卡的拷贝（lib/motion/replica.ts）：它是卡此刻的样子，里面的入场动画、过渡一概不放——
    不然拷贝里嵌着的卡片会从透明重新浮一遍，和真卡对不上。 */
 .window-replica, .window-replica * { animation: none !important; transition: none !important; }
+/* 拷贝里的祖先空壳和卡本身照抄了类名，content-visibility: auto（月档的 .tile-month、日档的行）也跟着来了：
+   形变途中浏览器按「离视口多远」跳过这些壳的内容，收回时小格里的分期环只画出上半圈，落地才突然补全。拷贝一律照画。 */
+.window-replica, .window-replica * { content-visibility: visible !important; }
 /* 形变途中（lib/motion/budget.ts 挂的 html[data-motion]）：动着的那一页不接指针，来处页上的模糊层把指针接住。
    指针不动、内容在它底下滑过时，一行接一行地换悬停样式、放悬停底色 / 位移过渡，每帧都要整页重画重分层
    （2026-11-12 第四轮实测：睡眠列表收回每帧分层 14ms）。落地即撤（holdMotion 释放）。

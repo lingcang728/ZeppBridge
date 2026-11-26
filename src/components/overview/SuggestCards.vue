@@ -17,7 +17,7 @@
  * - 去交给 AI 细调：从卡面这一块长成那一页，返回时落回这里（卡展开时整张几乎一屏高，从它长出来看不出在动）。
  *   离开概览时牌桌就地收掉，回来时卡是合上的：返回形变落回的就是整张卡，不会只落回上半截、牌还摊在下面。
  */
-import { computed, defineAsyncComponent, nextTick, onDeactivated, onMounted, ref, shallowRef, watch, type ComponentPublicInstance } from 'vue';
+import { computed, defineAsyncComponent, nextTick, onActivated, onDeactivated, onMounted, ref, shallowRef, watch, type ComponentPublicInstance } from 'vue';
 import { useRouter } from 'vue-router';
 import Icon, { type IconName } from '../Icon.vue';
 import { useSuggestText } from './suggest.i18n';
@@ -253,8 +253,32 @@ const toggle = async () => {
     opening = false;
   }
 };
-/** 牌开始往回飞：卡同时收回卡面那么高。 */
-const onReturning = () => { if (faceEl.value) resize(faceEl.value.offsetHeight, CARD_RETURN_MS, CLOSE_EASE); };
+/**
+ * 扇牌接住飞回来的那一叠：小牌先合成一叠（摆正、挪到扇面正中）等着，那一叠落定后再慢慢摊回扇形。
+ * 以前扇牌直接以摊开的样子淡出来，一叠牌「啪」地变成一把扇，看着是跳的。只动 translate / rotate。
+ */
+const SPREAD_MS = paced(560);
+const gatherThenSpread = () => {
+  const fan = stack.value;
+  if (!fan || instant) return;
+  const center = fan.offsetWidth / 2;
+  const hold = CARD_RETURN_MS * 0.95;
+  const total = hold + SPREAD_MS;
+  for (const mini of fan.querySelectorAll<HTMLElement>('.ask-mini')) {
+    const rotate = getComputedStyle(mini).rotate;
+    const dx = center - (mini.offsetLeft + mini.offsetWidth / 2);
+    mini.animate([
+      { translate: `${dx.toFixed(1)}px 0px`, rotate: '0deg' },
+      { translate: `${dx.toFixed(1)}px 0px`, rotate: '0deg', offset: hold / total, easing: OPEN_EASE },
+      { translate: '0px 0px', rotate: rotate === 'none' ? '0deg' : rotate },
+    ], { duration: total });
+  }
+};
+/** 牌开始往回飞：卡同时收回卡面那么高；扇牌先合成一叠接住。 */
+const onReturning = () => {
+  if (faceEl.value) resize(faceEl.value.offsetHeight, CARD_RETURN_MS, CLOSE_EASE);
+  gatherThenSpread();
+};
 const onChange = (next: Hand) => { hand.value = next; };
 const onClose = async () => {
   open.value = false;
@@ -419,11 +443,24 @@ watch(root, (el) => {
   });
 }, { flush: 'post' });
 /* 离开概览（去交给 AI 细调、切到别的页）：概览是缓存页，牌桌就地收掉，回来时卡是合上的。 */
+/* 失活的那一刻概览还在离场：卡 ↔ 页形变从卡面长出去时，底下这张展开的卡还露着。当场收掉，
+   牌桌在形变开头的一帧里「啪」地没了，看着就是硬切。所以等概览真的从文档里摘下去（keep-alive 收进缓存）再收。 */
+let away = false;
+onActivated(() => { away = false; });
 onDeactivated(() => {
+  away = true;
   if (!open.value) return;
-  open.value = false;
-  showBench.value = false;
-  releaseSize();
+  const el = root.value;
+  const started = performance.now();
+  const collapse = () => {
+    if (!away) return;
+    if (el?.isConnected && performance.now() - started < 3000) { requestAnimationFrame(collapse); return; }
+    if (!open.value) return;
+    open.value = false;
+    showBench.value = false;
+    releaseSize();
+  };
+  collapse();
 });
 </script>
 
@@ -505,8 +542,8 @@ onDeactivated(() => {
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ask-tone) 28%, transparent), 0 14px 24px -16px rgb(0 0 0 / .7);
   transform-origin: 50% 120%; rotate: calc((var(--i) - (var(--n) - 1) / 2) * 24deg / var(--n)); }
 /* 睡前牌：睡眠的蓝，右上角一个小点。 */
-.ask-mini.journal { background: linear-gradient(160deg, var(--mat-raised), color-mix(in srgb, var(--sleep) 12%, var(--mat-raised)));
-  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--sleep) 70%, transparent), 0 14px 24px -16px rgb(0 0 0 / .7); }
+.ask-mini.journal { background: linear-gradient(160deg, transparent 30%, color-mix(in srgb, var(--sleep) 16%, transparent)), var(--mat-raised);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sleep) 34%, transparent), 0 14px 24px -16px rgb(0 0 0 / .7); }
 .ask-mini.journal::after { content: ''; position: absolute; top: 7px; right: 7px; width: 7px; height: 7px; border-radius: 50%; background: var(--sleep); }
 .ask-tools { position: absolute; top: 12px; right: 12px; display: flex; gap: 4px; }
 .ask-tool { display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 50%;

@@ -300,6 +300,8 @@ html[data-theme="light"] {
     radial-gradient(760px 520px at 96% 8%, rgba(107, 127, 224, .08), transparent 70%),
     radial-gradient(900px 600px at 60% 110%, rgba(30, 150, 166, .06), transparent 70%);
   --mat-card: linear-gradient(160deg, #FFFFFF 0%, #FCFBF9 100%);
+  /* 牌桌候补那一叠「还没上桌」：白牌压亮度会成一叠灰黑，浅色只褪色、轻轻压一点（HandTable.css）。 */
+  --bench-dim: saturate(.55) brightness(.97);
   --mat-card-solid: #FFFFFF;
   --mat-card-frost: rgba(255, 255, 255, .9);
   --mat-line: rgba(28, 27, 25, .10);

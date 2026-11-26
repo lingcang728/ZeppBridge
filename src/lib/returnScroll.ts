@@ -24,6 +24,10 @@ let restoring: Promise<void> | null = null;
 let restored: (() => void) | null = null;
 const finishRestore = () => { restored?.(); restored = null; restoring = null; };
 export const whenScrollRestored = (): Promise<void> => restoring ?? Promise.resolve();
+/** 下一次后退不回到离开时的位置，而是滚到 `resolve()` 给的高度（返回 null 就照旧）：详情页往外缩回列表的日档时，
+    列表离开时停在月档的位置已经不对了，要停在那一条上（lib/album/recordZoom.ts）。只管下一次后退。 */
+let steer: (() => number | null) | null = null;
+export const steerReturnScroll = (resolve: () => number | null): void => { steer = resolve; };
 const positionOf = (): number | null => {
   const value = (window.history.state as { position?: unknown } | null)?.position;
   return typeof value === 'number' ? value : null;
@@ -61,6 +65,8 @@ export const installReturnScroll = (router: Router) => {
   router.afterEach((to, from, failure) => {
     if (failure) return;
     finishRestore();
+    const steering = steer;
+    steer = null;
     const arrived = positionOf();
     current = arrived;
     const saved = arrived !== null && leaving !== null && arrived < leaving ? memory.get(arrived) : undefined;
@@ -100,10 +106,30 @@ export const installReturnScroll = (router: Router) => {
         veil.style.top = `${(Number.parseFloat(veil.style.top) || 0) + delta}px`;
       }
     };
+    // 按某一行定位时（steering），没画过的行按估计高度占位、滚过去才按真高度排开，那一行会被挤开一截：
+    // 多钉几帧，直到连续两帧都不用再挪。
+    let steady = 0;
+    /* 能滚到哪：只按回场的这一页自己的高度算。离场的旧页（绝对定位、按离开时的滚动距离往下垫着）也撑着滚动区，
+       按 scrollHeight 算的话，回场页还没长到原来那么高时会被滚到它自己底下的空白里；旧页一撤，浏览器把滚动夹回去，
+       整页往下一跳（从概览底部的「管理」进设置再返回时就是这样）。 */
+    const ownMaxTop = () => {
+      const page = root.querySelector<HTMLElement>('.page-host > :not([class*="-leave"])');
+      if (!page) return root.scrollHeight - root.clientHeight;
+      const host = page.parentElement!;
+      const tail = (Number.parseFloat(getComputedStyle(root).paddingBottom) || 0)
+        + (Number.parseFloat(getComputedStyle(host).paddingBottom) || 0)
+        + (Number.parseFloat(getComputedStyle(page).marginBottom) || 0);
+      const bottom = page.getBoundingClientRect().bottom - root.getBoundingClientRect().top + root.scrollTop + tail;
+      return Math.min(root.scrollHeight, Math.ceil(bottom)) - root.clientHeight;
+    };
     const restore = () => {
-      const maxTop = root.scrollHeight - root.clientHeight;
-      scrollKeepingLeaving(Math.min(saved.top, Math.max(0, maxTop)));
-      if (maxTop < saved.top - 2 && performance.now() - started < 1500) {
+      const maxTop = ownMaxTop();
+      const goal = steering?.() ?? saved.top;
+      const before = root.scrollTop;
+      scrollKeepingLeaving(Math.min(goal, Math.max(0, maxTop)));
+      steady = Math.abs(root.scrollTop - before) < 1 ? steady + 1 : 0;
+      const unsettled = steering ? steady < 2 : false;
+      if ((maxTop < goal - 2 || unsettled) && performance.now() - started < 1500) {
         requestAnimationFrame(restore);
         return;
       }

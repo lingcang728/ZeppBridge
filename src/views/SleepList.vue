@@ -23,11 +23,13 @@ import SleepYearCard from '../components/album/SleepYearCard.vue';
 import SleepNightMark from '../components/album/SleepNightMark.vue';
 import BedtimeFactors from '../components/sleepJournal/BedtimeFactors.vue';
 import NightJournalMark from '../components/sleepJournal/NightJournalMark.vue';
+import MoodFace from '../components/sleepJournal/MoodFace.vue';
 import { useSleepJournal } from '../composables/useSleepJournal';
 import StageRing from '../components/album/StageRing.vue';
 import { albumMessages } from '../components/album/album.i18n';
 import { useRecordAlbum } from '../composables/useRecordAlbum';
 import { useAlbumNav } from '../composables/useAlbumNav';
+import { useRecordFocusLanding } from '../composables/useRecordFocus';
 import { localDay, sleepYearAnalysis, type AlbumTile, type AlbumZoom } from '../lib/album/album';
 import type { SleepMonth } from '../types/album';
 
@@ -142,6 +144,8 @@ const { go } = useAlbumNav({
   ensureDay: (day) => ensureMonth(day.slice(0, 7)),
 });
 const goZoom = (next: AlbumZoom) => { void go(next); };
+/* 从某一晚的详情页往外缩回来（第四档 → 日档）：停在那一晚上。 */
+useRecordFocusLanding({ kind: 'sleep', zoom, stage, ready: () => !loading.value && sessions.value.length > 0, ensureDay: (day) => ensureMonth(day.slice(0, 7)) });
 /* 年档热图上点某一天：放大回日档、滚到那一晚。 */
 const openDay = (day: string, cell: HTMLElement) => { void go('day', { day, anchor: cell }); };
 /* 小格和热图一次画全部（格子轻）；热图还接着在空闲时往下读，一屏能看好几个月。 */
@@ -201,6 +205,11 @@ useRevisionReload(() => { void loadList(); album.invalidate(); });
 const journal = useSleepJournal();
 const wakeDay = (session: SleepSession) => localDay(session.end_time);
 const isMainSleep = (session: SleepSession) => (session.duration_minutes ?? 0) >= 180;
+/* 月档小格右上角那张醒来的脸（只给主睡眠；没记就不占位）。 */
+const moodOf = (id: string) => {
+  const session = sessionById.value.get(id);
+  return session && isMainSleep(session) ? journal.entries.value.get(wakeDay(session))?.mood ?? null : null;
+};
 let journalSpan = '';
 const loadJournal = (force = false) => {
   const days = sessions.value.map(wakeDay).sort();
@@ -240,7 +249,7 @@ useSectionTour('sleep');
         <template #head="{ month }"><AlbumMonthHead kind="sleep" :month="month" :periods="periods" /></template>
         <!-- 时长在上，中间一枚分期环（和日档、详情页同一种画法），圈中是评分。 -->
         <template #tile="{ tile }">
-          <b class="tile-reading">{{ tile.reading }}</b>
+          <span class="tile-top"><b class="tile-reading">{{ tile.reading }}</b><MoodFace v-if="moodOf(tile.id)" class="tile-mood" :code="moodOf(tile.id)!" :size="20" /></span>
           <span class="tile-ring">
             <StageRing v-if="sessionById.get(tile.id)" :stages="stagesOf(sessionById.get(tile.id)!)" :value="scoreOf(tile.id)" :stroke="4.6"
               :label="scoreOf(tile.id) !== null ? albumText.scoreLabel(scoreOf(tile.id)!) : undefined" />
@@ -312,6 +321,8 @@ useSectionTour('sleep');
 .sleep-records :deep(.record-card strong) { font-size: var(--fs-lg, 1.15rem); font-variant-numeric: tabular-nums; }
 /* 小格：时长不折行（「7 小时 44 分」拆成两行就读不出来了），放不下就缩一号字；中间一枚分期环、圈中评分。 */
 .tile-reading { overflow: hidden; color: var(--ink); font-size: clamp(var(--fs-xs), 11cqi, var(--fs-lg, 1.15rem)); font-weight: 700; font-variant-numeric: tabular-nums; text-overflow: ellipsis; white-space: nowrap; }
+.tile-top { display: flex; align-items: center; justify-content: space-between; gap: 4px; min-width: 0; }
+.tile-mood { margin: -3px -3px -3px 0; }
 .tile-ring { display: grid; place-items: center; min-height: 0; grid-row: 2 / span 2; }
 .tile-ring :deep(.stage-ring) { width: min(60px, 70cqi); height: auto; aspect-ratio: 1; }
 </style>

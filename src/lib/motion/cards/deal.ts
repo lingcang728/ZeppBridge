@@ -19,6 +19,8 @@ import { reducedMotion, settled, SPRINGS, springCurve } from './spring';
 
 const STAGGER_MS = paced(34);
 const DRAW_MS = paced(120);
+/** 抽牌那一段（牌从来处淡入、往外抽）的时长和牌淡到全亮的位置：来处跟着它淡出，两份交叉溶解，不空一帧。 */
+export const DRAW_TIMING = { ms: DRAW_MS, opaqueAt: 0.45 } as const;
 const STACK_STAGGER_MS = paced(26);
 /** 理牌：~360ms 利落叠齐。弹簧的尾巴太长（叠好了还要再等三四百毫秒才算放完），这里用一条前快后稳的曲线。 */
 const STACK_MS = paced(320);
@@ -87,7 +89,7 @@ export const dealCards = async (cards: HTMLElement[], origin: Landing | null, op
     return;
   }
   const draws = cards.map((card, i) => card.animate(
-    [{ transform: start(rests[i]!, i), opacity: 0 }, { opacity: 1, offset: 0.45 }, { transform: pulled(rests[i]!, i), opacity: 1 }],
+    [{ transform: start(rests[i]!, i), opacity: 0 }, { opacity: 1, offset: DRAW_TIMING.opaqueAt }, { transform: pulled(rests[i]!, i), opacity: 1 }],
     { duration: DRAW_MS, easing: 'cubic-bezier(.2, .7, .3, 1)', fill: 'both' },
   ));
   track(draws);

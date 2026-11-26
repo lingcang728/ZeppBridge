@@ -22,8 +22,9 @@
 .bench-row .hslot:hover, .bench-row .hslot:focus-within { z-index: 30; }
 /* 刚换过去的那张：飞的途中和落定后都在同一叠最上面，鼠标停着的那张、后面的牌都盖不住它（指针离开候补、或下一次换牌时放下）。 */
 .hslot.is-fresh, .bench-row .hslot.is-fresh { z-index: 40; }
-/* 候补里的牌压暗一点，像还没上桌（用亮度不用透明度：叠着的牌半透明会透出底下那张，一叠看着一团乱）。 */
-.bench-row :deep(.pcard:not(:hover):not(:focus-visible) .pcard-face) { filter: brightness(.8); }
+/* 候补里的牌压暗一点，像还没上桌（用亮度不用透明度：叠着的牌半透明会透出底下那张，一叠看着一团乱）。
+   浅色下白牌一压暗就成了一叠灰黑，所以压多少走 token（tokens.css 的 --bench-dim：浅色只褪色、轻轻压一点）。 */
+.bench-row :deep(.pcard:not(:hover):not(:focus-visible) .pcard-face) { filter: var(--bench-dim, brightness(.8)); }
 .bench-label { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: var(--fs-xs); font-weight: 650; letter-spacing: .04em; }
 .bench-label b { min-width: 18px; padding: 0 5px; border-radius: 999px; background: color-mix(in srgb, var(--ink) 9%, transparent); color: var(--ink); font-size: var(--fs-2xs); text-align: center; }
 .hand-empty, .bench-empty { margin: 0; color: var(--muted); font-size: var(--fs-sm); text-align: center; }
