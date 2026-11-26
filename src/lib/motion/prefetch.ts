@@ -41,6 +41,8 @@ const IDLE_BUDGET = 12;
 /**
  * 当前页里看得见的和上下各一屏以内的站内链接，离视口越近越靠前，去重后最多 IDLE_BUDGET 个。
  * 空闲回调里读矩形：布局这时一般是干净的，只读不写，不会来回强制排版。
+ * 长列表的行是 content-visibility: auto（屏幕外的不排版）：先问 checkVisibility，被跳过的行里的链接不读矩形，
+ * 否则一读就逼着几百行全排一遍（运动列表曾因此在空闲时卡住一秒）。
  */
 const nearbyHrefs = (): string[] => {
   const scroller = main();
@@ -49,6 +51,7 @@ const nearbyHrefs = (): string[] => {
   const reach = Math.max(view.height, 1);
   const best = new Map<string, number>();
   for (const link of scroller.querySelectorAll<HTMLAnchorElement>('.page-host a[href^="/"]')) {
+    if (typeof link.checkVisibility === 'function' && !link.checkVisibility({ contentVisibilityAuto: true })) continue;
     const href = link.getAttribute('href') ?? '';
     const box = link.getBoundingClientRect();
     if (!box.width && !box.height) continue;

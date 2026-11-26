@@ -438,6 +438,9 @@ useSectionTour('workouts');
 .record-list.selecting .selectable-record { cursor: pointer; }
 .record-list.selecting .selectable-record:hover { background: color-mix(in srgb, var(--ink) 4%, transparent); }
 .selectable-record { position: relative; }
+/* 几百行一次排版会卡住进页（和睡眠列表一样）：屏幕外的行先不排、不画，滚到才排。多留 8px 不裁掉悬停右移和聚焦框；
+   勾选时关掉，连选的那道桥（::before 伸出上沿）要整段画出来。 */
+.record-list:not(.selecting) .selectable-record { content-visibility: auto; contain-intrinsic-size: auto 76px; overflow-clip-margin: 8px; }
 .record-list.selecting .selectable-record.selected { background: color-mix(in srgb, var(--accent) 12%, transparent); }
 /* 刚选上的那一行描一圈品牌色的光，随即褪掉（连成一块后中间不留边线）。 */
 .record-list.selecting .selectable-record.selected::after { position: absolute; inset: 0; content: ''; border-radius: inherit; animation: sel-glow 480ms ease-out forwards; pointer-events: none; }
