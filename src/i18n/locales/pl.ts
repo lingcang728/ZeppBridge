@@ -16,6 +16,10 @@ const day = (value: unknown): string => str(value);
 const activity = (value: unknown): string => str(value);
 
 export default {
+  errors: {
+    'err.letters.sample_missing': 'Nie zapisano surowych danych tego treningu, więc nie można dołączyć próbki struktury. Spróbuj wybrać inny trening.',
+    'err.letters.sample_too_large': 'Próbka struktury tego treningu jest zbyt duża i nie została wysłana. Spróbuj wybrać inny trening.',
+  },
   modules: {
     'components/CredentialRecovery': {
       title: 'Wybierz sposób zapisania danych logowania',
@@ -1196,8 +1200,43 @@ export default {
     attachReport: 'Dołącz zanonimizowany raport diagnostyczny',
     reportShort: 'Diagnostyka',
     removeReport: 'Usuń raport diagnostyczny',
-    attachHint: 'Tylko wersja aplikacji, struktura pól i nierozpoznane numery modeli — bez konta, danych zdrowotnych i lokalizacji',
+    attachHint: 'Tylko wersja aplikacji, struktury pól i nierozpoznane modele (numer i nazwa modelu) — bez konta, pseudonimu, danych zdrowotnych ani lokalizacji',
     reportFailedPlain: 'Nie udało się przesłać raportu diagnostycznego, został odłączony. Kliknij ponownie „Wyślij”, aby wysłać sam list.',
+  },
+
+  // Source: src/components/letters/sample.i18n.ts
+  'components/letters/sample': {
+    short: 'Próbka',
+    attached: 'Dołączono 1 próbkę struktury',
+    attach: 'Dołącz próbkę struktury tego treningu',
+    remove: 'Usuń próbkę struktury',
+    hint: 'Surowe dane jednego treningu: tylko nazwy pól, struktura i kody, takie jak styl pływania, dystans i czas trwania; tętno i inne wartości zdrowotne są zastępowane wartościami zastępczymi, a współrzędne i identyfikatory urządzenia oraz konta są usuwane',
+    title: 'Próbka struktury treningu',
+    pick: 'Który trening?',
+    dropped: (count: number) =>
+      plural(count, {
+        one: `Usunięto ${count} pole`,
+        few: `Usunięto ${count} pola`,
+        many: `Usunięto ${count} pól`,
+        other: `Usunięto ${count} pola`,
+      }),
+    masked: (count: number) =>
+      plural(count, {
+        one: `Zastąpiono ${count} wartość`,
+        few: `Zastąpiono ${count} wartości`,
+        many: `Zastąpiono ${count} wartości`,
+        other: `Zastąpiono ${count} wartości`,
+      }),
+    size: (kb: string) => `${kb} KB`,
+    truncated: 'Dalsza część poniżej — wysyłana jest cała próbka',
+    loading: 'Tworzenie próbki…',
+    missing: 'Nie zapisano surowych danych dla tego treningu — spróbuj wybrać inny',
+    none: 'W bibliotece nie ma jeszcze treningów',
+    keep: 'Dołącz tę próbkę',
+    cancel: 'Nie dołączaj',
+    close: 'Zamknij',
+    writeAuthor: 'Napisz do twórcy',
+    writeAuthorHint: 'Do listu zostanie dołączona próbka struktury tego treningu; przed wysłaniem możesz ją obejrzeć',
   },
 
   'components/letters/stamps': {
@@ -3910,7 +3949,7 @@ Kontynuować?`,
     reportDoneTitle: 'Otrzymano, dziękujemy',
     reportDoneLine: (id: string, at: string) => `Raport ${id}, wysłano ${at}.`,
     reportDoneNote: 'Wysłano dokładnie te typy pól, które wymieniono powyżej, oraz Twoją notatkę. Nic więcej.',
-    reportConfirm: 'Zostaną wysłane wyłącznie: wersja aplikacji, typ systemu, wersja parsera, struktury pól, wskazówki na poziomie produktu i numery modeli niezidentyfikowanych urządzeń (deviceSource — liczby całkowite opisujące „który to model”, a nie „który egzemplarz”), kody i liczba nieznanych treningów, numeryczny kod błędu ostatniego żądania odrzuconego przez chmurę (tylko numer, strumień i czas — bez zwracanego tekstu) oraz powyższa notatka (lokalne ścieżki, adresy e-mail i długie identyfikatory są usuwane). Nigdy Twoje konto Zepp, tokeny, numery seryjne, identyfikatory urządzeń, adresy MAC, GPS, wartości zdrowotne ani surowe odpowiedzi. Czy chcesz wysłać?',
+    reportConfirm: 'Zostaną wysłane wyłącznie: wersja aplikacji, typ systemu, wersja parsera, struktury pól, wskazówki na poziomie produktu, numery modeli niezidentyfikowanych urządzeń (deviceSource — liczby całkowite wskazujące wyłącznie model, a nie konkretny egzemplarz), kategoria urządzenia i fragment jego nazwy zawierający model (np. „Kasia’s T-Rex 3”: wysyłane jest tylko „T-Rex 3”, pseudonim nie jest wysyłany), kody i liczba nieznanych treningów, numeryczny kod błędu ostatniego żądania odrzuconego przez chmurę (tylko numer, strumień i czas — bez zwracanego tekstu) oraz powyższa notatka (lokalne ścieżki, adresy e-mail i długie identyfikatory są usuwane). Nigdy Twoje konto Zepp, tokeny, numery seryjne, identyfikatory urządzeń, adresy MAC, GPS, wartości zdrowotne ani surowe odpowiedzi. Czy chcesz wysłać?',
     reportFailed: 'Nie udało się wysłać raportu o błędzie',
 
     // ── Capability board ──
@@ -3980,7 +4019,7 @@ Kontynuować?`,
     privacyTelemetryTitle: 'Brak telemetrii i statystyk użytkowania',
     privacyTelemetryBody: 'Aplikacja sama z siebie nie przesyła żadnych danych o użytkowaniu. Jedynie naciśnięcie przycisku „Wyślij raport o błędzie” wysyła zanonimizowane pola wymienione poniżej.',
     privacyReportTitle: 'Urządzenie lub trening nie zostały rozpoznane?',
-    privacyReportBody: 'Bez konta GitHub i bez kopiowania danych. Po potwierdzeniu do prywatnego magazynu raportów ZeppBridge trafiają wyłącznie struktury pól na poziomie produktu, numery modeli niezidentyfikowanych urządzeń (liczby całkowite — wskazujące jedynie model) oraz kody i liczba nieznanych treningów. Nigdy dane konta, tokeny, numery seryjne, identyfikatory urządzeń, adresy MAC, GPS, wartości zdrowotne, surowe odpowiedzi ani lokalne ścieżki.',
+    privacyReportBody: 'Bez konta GitHub i bez kopiowania danych. Po potwierdzeniu do prywatnego magazynu raportów ZeppBridge trafiają wyłącznie struktury pól na poziomie produktu, numery modeli niezidentyfikowanych urządzeń (liczby całkowite — wskazujące jedynie model), fragmenty nazw urządzeń zawierające model (bez pseudonimu) oraz kody i liczba nieznanych treningów. Nigdy dane konta, tokeny, numery seryjne, identyfikatory urządzeń, adresy MAC, GPS, wartości zdrowotne, surowe odpowiedzi ani lokalne ścieżki.',
 
     // ── 5. MCP ──
     mcpBadge: 'Dane zdrowotne tylko do odczytu · nie nasłuchuje na żadnym porcie',

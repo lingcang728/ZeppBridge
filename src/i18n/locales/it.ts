@@ -469,6 +469,28 @@ export default {
     driftHrSpeed: (hr: number, pace: string) => `${hr} bpm · ${pace}`,
   },
 
+  'components/letters/sample': {
+    short: 'Campione',
+    attached: '1 campione strutturale allegato',
+    attach: 'Allega il campione strutturale di questo allenamento',
+    remove: 'Rimuovi il campione strutturale',
+    hint: 'I dati grezzi di un allenamento con solo i nomi dei campi, la struttura e codici come stile di nuoto, distanza e durata. La frequenza cardiaca e gli altri valori di salute vengono sostituiti con segnaposto; le coordinate, gli ID del dispositivo e dell’account vengono rimossi.',
+    title: 'Campione della struttura dell’allenamento',
+    pick: 'Scegli un allenamento',
+    dropped: (count: number) => plural(count, { one: `${count} campo rimosso`, other: `${count} campi rimossi` }),
+    masked: (count: number) => plural(count, { one: `${count} valore sostituito`, other: `${count} valori sostituiti` }),
+    size: (kb: string) => `${kb} KB`,
+    truncated: 'Continua sotto — verrà inviato il campione completo',
+    loading: 'Preparazione del campione…',
+    missing: 'Questo allenamento non ha dati grezzi salvati; prova con un altro',
+    none: 'Non hai ancora allenamenti nel tuo archivio',
+    keep: 'Allega questo campione',
+    cancel: 'Non allegare',
+    close: 'Chiudi',
+    writeAuthor: 'Scrivi all’autore',
+    writeAuthorHint: 'La lettera includerà il campione strutturale di questo allenamento; puoi leggerlo prima di inviarla',
+  },
+
   'components/letters/letters': {
     to: 'A: utente',
     toDeveloper: 'A: lo sviluppatore di ZeppBridge',
@@ -545,7 +567,7 @@ export default {
     removeReport: 'Rimuovi la relazione diagnostica',
     attachReport: 'Allega relazione diagnostica anonimizzata',
     attachHint:
-      'Solo versione dell’app, struttura dei campi e numeri di modello non riconosciuti — nessun account, valore di salute o posizione',
+      'Solo versione dell’app, struttura dei campi e numeri e nomi dei modelli non riconosciuti — nessun account, soprannome, dato sanitario o posizione',
     reportFailedPlain:
       'Impossibile inviare la relazione diagnostica, allegato rimosso. Premi di nuovo «Invia» per spedire solo la lettera.',
   },
@@ -3678,7 +3700,7 @@ export default {
     reportDoneLine: (id: string, at: string) => `Segnalazione ${id}, inviata il ${at}.`,
     reportDoneNote: 'Dati inviati: esattamente i campi elencati sopra, più la tua nota. Niente altro.',
     reportConfirm:
-      'Vengono inviati solo: versione dell’app, tipo di sistema, revisione del parser, struttura dei campi, indicazioni di prodotto e numeri di modello dei dispositivi non identificati (deviceSource: numeri interi che descrivono quale modello di orologio, non quale singola unità), codici e conteggi degli allenamenti sconosciuti, codice di errore numerico dell’ultima richiesta rifiutata dal cloud (solo numero, flusso e orario; mai il testo restituito) e la nota inserita (percorsi locali, email e identificatori lunghi rimossi automaticamente). Non vengono mai inviati l’account Zepp, token, numeri di serie, ID dispositivo, indirizzi MAC, GPS, dati sanitari o risposte grezze. Confermi l’invio?',
+      'Vengono inviati solo: versione dell’app, tipo di sistema, revisione del parser, struttura dei campi, indicazioni di prodotto, numeri di modello, categoria del dispositivo e parte del nome del dispositivo che indica il modello per i dispositivi non identificati (deviceSource: numeri interi che indicano quale modello di orologio, non quale singolo esemplare; ad esempio, da «Marco’s T-Rex 3» viene inviato solo «T-Rex 3», mai il soprannome), codici e conteggi degli allenamenti sconosciuti, codice di errore numerico dell’ultima richiesta rifiutata dal cloud (solo numero, flusso e orario; mai il testo restituito) e la nota inserita (percorsi locali, email e identificatori lunghi rimossi automaticamente). Non vengono mai inviati l’account Zepp, token, numeri di serie, ID dispositivo, indirizzi MAC, GPS, dati sanitari o risposte grezze. Confermi l’invio?',
     reportFailed: 'Impossibile inviare la segnalazione di errore',
     lampOn: (count: number) => plural(count, { one: `${count} recuperato`, other: `${count} recuperati` }),
     lampPending: (count: number) => plural(count, { one: `Presente nel cloud, non in locale: ${count}`, other: `Presente nel cloud, non in locale: ${count}` }),
@@ -3719,7 +3741,7 @@ export default {
     privacyTelemetryBody: 'L’applicazione non invia automaticamente alcuna informazione sulle tue abitudini d’uso. Invia i campi anonimizzati indicati sotto solo se premi esplicitamente «Invia segnalazione di errore».',
     privacyReportTitle: 'Dispositivo o allenamento non riconosciuto?',
     privacyReportBody:
-      'Nessun account GitHub, nessun dato da copiare. Dopo la conferma, vengono inviati all’archivio privato delle segnalazioni di ZeppBridge solo la struttura dei campi a livello di prodotto, i numeri di modello dei dispositivi non identificati (interi — indicano solo quale modello di orologio) e i codici di allenamento sconosciuti con il relativo conteggio; mai account, token, numeri di serie, ID dispositivo, MAC, GPS, dati sanitari, risposte grezze o percorsi locali.',
+      'Nessun account GitHub, nessun dato da copiare. Dopo la conferma, vengono inviati all’archivio privato delle segnalazioni di ZeppBridge solo la struttura dei campi a livello di prodotto, i numeri di modello dei dispositivi non identificati (interi — indicano solo quale modello di orologio), la parte del nome del dispositivo che indica il modello (il soprannome non viene inviato) e i codici di allenamento sconosciuti con il relativo conteggio; mai account, token, numeri di serie, ID dispositivo, MAC, GPS, dati sanitari, risposte grezze o percorsi locali.',
     mcpBadge: 'Dati sanitari di sola lettura · nessuna porta in ascolto',
     mcpCopyPrompt: 'Copia per chiedere alla tua IA',
     mcpCopyConfig: 'Copia solo il frammento di configurazione',
@@ -5200,6 +5222,10 @@ Regole:
     'Non è stato possibile salvare la tua risposta su questo computer. Controlla lo spazio su disco e riprova.',
   'err.letters.attachment_invalid':
     'Una delle immagini non è leggibile o è troppo grande. Prova con un’altra.',
+  'err.letters.sample_missing':
+    'Non sono stati salvati dati grezzi per questo allenamento, quindi non è possibile allegare il campione strutturale. Prova con un altro allenamento.',
+  'err.letters.sample_too_large':
+    'Il campione strutturale di questo allenamento è troppo grande e non è stato inviato. Prova con un altro allenamento.',
   'err.letters.invalid':
     'Questa risposta fa riferimento a una versione errata e non è stata inviata.',
   'err.letters.empty':

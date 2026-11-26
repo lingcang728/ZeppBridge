@@ -1866,7 +1866,7 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
       privacyPoint5Title: '5. Overal open source: ',
       privacyReportTitle: 'Een apparaat of training niet herkend?',
       privacyReportBody:
-        'Geen GitHub-account, geen gegevens kopiëren. Na bevestiging gaan alleen veldstructuren op productniveau, modelnummers van niet-herkende apparaten (gehele getallen — alleen welk model) en onbekende trainingscodes met hun aantallen naar de privé-rapportopslag van ZeppBridge. Nooit account, tokens, serienummers, apparaat-id\'s, MAC, GPS, gezondheidswaarden, ruwe antwoorden of lokale paden.',
+        'Geen GitHub-account, geen gegevens kopiëren. Na bevestiging gaan alleen veldstructuren op productniveau, modelnummers van niet-herkende apparaten (gehele getallen — alleen welk model), het modelgedeelte uit hun apparaatnaam (alleen het model, nooit de bijnaam) en onbekende trainingscodes met hun aantallen naar de privé-rapportopslag van ZeppBridge. Nooit account, tokens, serienummers, apparaat-id\'s, MAC, GPS, gezondheidswaarden, ruwe antwoorden of lokale paden.',
       privacyTelemetryBody:
         'De app meldt zelf geen gebruiksgedrag. Alleen als jij zelf ‘Een foutrapport versturen’ indrukt, verstuurt het de geanonimiseerde velden die hieronder staan.',
       privacyTelemetryTitle: 'Geen telemetrie, geen gebruiksstatistieken',
@@ -1915,7 +1915,7 @@ Als je iets van mij nodig hebt (welke client ik gebruik, waar het bestand staat)
         'Verstuurd zijn precies de veldtypen hierboven plus je notitie — verder niets.',
       reportDoneTitle: 'Ontvangen, bedankt',
       reportConfirm:
-        'Er wordt alleen verzonden: app-versie, systeemtype, parserrevisie, veldstructuren, producthints en modelnummers van niet-herkende apparaten (deviceSource — gehele getallen die beschrijven welk model, niet welk exemplaar), onbekende trainingscodes en aantallen, de numerieke foutcode van het meest recente door de cloud geweigerde verzoek (alleen het nummer, welke stroom en tijd — nooit de geretourneerde tekst), en je toelichting (lokale paden, e-mailadressen en lange identificaties automatisch verwijderd). Nooit je Zepp-account, tokens, serienummers, apparaat-id\'s, MAC-adressen, GPS, gezondheidswaarden of ruwe antwoorden. Versturen?',
+        'Er wordt alleen verzonden: app-versie, systeemtype, parserrevisie, veldstructuren, producthints, modelnummers, de apparaatcategorie en het modelgedeelte uit de apparaatnaam van niet-herkende apparaten (deviceSource — gehele getallen die alleen aangeven om welk model het gaat, niet om welk exemplaar; uit “Daan’s T-Rex 3” wordt alleen “T-Rex 3” verzonden, nooit de bijnaam), onbekende trainingscodes en aantallen, de numerieke foutcode van het meest recente door de cloud geweigerde verzoek (alleen het nummer, welke stroom en tijd — nooit de geretourneerde tekst), en je toelichting (lokale paden, e-mailadressen en lange identificaties worden automatisch verwijderd). Nooit je Zepp-account, tokens, serienummers, apparaat-id\'s, MAC-adressen, GPS, gezondheidswaarden of ruwe antwoorden. Versturen?',
       reportFailed: 'Het foutrapport kon niet worden verstuurd',
       reportNote: 'Extra toelichting',
       reportNoteCounter: (used: number, max: number) =>
@@ -4332,9 +4332,30 @@ Regels:
       reportShort: 'Diagnoserapport',
       removeReport: 'Diagnoserapport verwijderen',
       attachHint:
-        'Alleen app-versie, veldstructuren en niet-herkende modelnummers — geen account, gezondheidswaarden of locatie',
+        'Alleen app-versie, veldstructuren en niet-herkende modellen (modelnummer en modelnaam) — geen account, bijnaam, gezondheidswaarden of locatie',
       reportFailedPlain:
         'Diagnoserapport kon niet worden verzonden en is ontkoppeld. Klik opnieuw op ‘Verzenden’ om alleen de brief te sturen.',
+    },
+    'components/letters/sample': {
+      short: 'Voorbeeld',
+      attached: '1 structuurvoorbeeld bijgevoegd',
+      attach: 'Structuurvoorbeeld van deze training bijvoegen',
+      remove: 'Structuurvoorbeeld verwijderen',
+      hint: 'Ruwe gegevens van één training met alleen veldnamen, structuur en codes zoals zwemslag, afstand en duur. Hartslag en andere gezondheidswaarden worden vervangen door plaatsaanduidingen; coördinaten, apparaat- en account-ID\'s worden verwijderd',
+      title: 'Structuurvoorbeeld van een training',
+      pick: 'Welke training',
+      dropped: (count: number) => `${count} ${count === 1 ? 'veld' : 'velden'} verwijderd`,
+      masked: (count: number) => `${count} ${count === 1 ? 'waarde' : 'waarden'} vervangen`,
+      size: (kb: string) => `${kb} KB`,
+      truncated: 'Er staat hieronder meer — bij verzending wordt het volledige voorbeeld meegestuurd',
+      loading: 'Voorbeeld wordt samengesteld…',
+      missing: 'Voor deze training zijn geen ruwe gegevens opgeslagen — probeer een andere training',
+      none: 'Er staan nog geen trainingen in je bibliotheek',
+      keep: 'Deze bijvoegen',
+      cancel: 'Niet bijvoegen',
+      close: 'Sluiten',
+      writeAuthor: 'Schrijf naar de auteur',
+      writeAuthorHint: 'Bij de brief wordt het structuurvoorbeeld van deze training gevoegd; je kunt de volledige inhoud bekijken voordat je de brief verstuurt',
     },
     'components/letters/stamps': {
       kind: {
@@ -5057,6 +5078,10 @@ Regels:
       'Deze reactie verwijst naar de verkeerde versie en is niet verzonden.',
     'err.letters.attachment_invalid':
       'Een van de afbeeldingen kan niet worden gelezen of is te groot. Probeer een andere afbeelding.',
+    'err.letters.sample_missing':
+      'Voor deze training zijn geen ruwe gegevens opgeslagen, dus het structuurvoorbeeld kan niet worden bijgevoegd. Probeer een andere training.',
+    'err.letters.sample_too_large':
+      'Het structuurvoorbeeld van deze training is te groot en is niet verzonden. Probeer een andere training.',
     'err.letters.empty': 'De reactie is leeg — schrijf eerst een paar woorden.',
     'err.letters.rejected':
       'De server heeft deze reactie niet geaccepteerd. Mogelijk moet je de app bijwerken.',

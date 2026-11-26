@@ -302,6 +302,10 @@ export default {
       'Deine Antwort konnte auf diesem Computer nicht gespeichert werden. Prüfe den freien Speicherplatz und versuche es erneut.',
     'err.letters.attachment_invalid':
       'Eines der Bilder lässt sich nicht öffnen oder ist zu groß. Bitte wähle ein anderes und versuche es erneut.',
+    'err.letters.sample_missing':
+      'Für dieses Training wurden keine Rohdaten gespeichert, daher kann keine Strukturprobe angehängt werden. Probiere ein anderes Training.',
+    'err.letters.sample_too_large':
+      'Die Strukturprobe dieses Trainings ist zu groß und wurde nicht gesendet. Probiere ein anderes Training.',
     'err.letters.invalid': 'Diese Antwort verweist auf die falsche Version und wurde nicht gesendet.',
     'err.letters.empty': 'Deine Antwort ist leer – schreibe zuerst ein paar Worte.',
     'err.letters.rejected':
@@ -518,9 +522,34 @@ export default {
       attachReport: 'Anonymisierten Diagnosebericht anhängen',
       reportShort: 'Diagnostik',
       removeReport: 'Diagnosebericht entfernen',
-      attachHint: 'Nur App-Version, Feldstrukturen und nicht erkannte Modellnummern – keine Konten, Gesundheitswerte oder Standorte',
+      attachHint: 'Nur App-Version, Feldstrukturen sowie Modellnummern und Modellnamen nicht erkannter Geräte – keine Konten, Spitznamen, Gesundheitswerte oder Standorte',
       reportFailedPlain: 'Diagnosebericht konnte nicht gesendet werden und wurde entfernt. Tippe erneut auf „Absenden“, um nur den Brief zu verschicken.',
       close: 'Schließen',
+    },
+    'components/letters/sample': {
+      short: 'Stichprobe',
+      attached: '1 Strukturprobe angehängt',
+      attach: 'Strukturprobe dieses Trainings anhängen',
+      remove: 'Strukturprobe entfernen',
+      hint:
+        'Rohdaten eines Trainings mit nur Feldnamen, Struktur und Codes wie Schwimmstil, Distanz und Dauer. Herzfrequenz und andere Gesundheitswerte werden durch Platzhalter ersetzt; Koordinaten sowie Geräte- und Konto-IDs werden entfernt',
+      title: 'Strukturprobe eines Trainings',
+      pick: 'Welches Training?',
+      dropped: (count: number) =>
+        plural(count, { one: '1 Feld entfernt', other: `${count} Felder entfernt` }),
+      masked: (count: number) =>
+        plural(count, { one: '1 Wert ersetzt', other: `${count} Werte ersetzt` }),
+      size: (kb: string) => `${kb} KB`,
+      truncated: 'Weiter unten folgt mehr – gesendet wird die vollständige Strukturprobe',
+      loading: 'Strukturprobe wird erstellt…',
+      missing: 'Für dieses Training wurden keine Rohdaten gespeichert – probiere ein anderes Training',
+      none: 'Noch keine Trainings in deiner Bibliothek',
+      keep: 'Diese Strukturprobe anhängen',
+      cancel: 'Nicht anhängen',
+      close: 'Schließen',
+      writeAuthor: 'Dem Autor schreiben',
+      writeAuthorHint:
+        'Der Brief enthält die Strukturprobe dieses Trainings; du kannst sie vor dem Senden ansehen',
     },
     'components/letters/stamps': {
       kind: {
@@ -681,7 +710,7 @@ export default {
       reportSubmitting: 'Wird gesendet…',
       reportSubmit: 'Fehlerbericht senden',
       reportConfirm:
-        'Es werden nur gesendet: App-Version, Betriebssystemtyp, Parser-Revision, Feldstrukturen, Hinweise auf Produktebene und Modellnummern nicht identifizierter Geräte (deviceSource – Ganzzahlen, die beschreiben, welches Modell, nicht welches einzelne Gerät), unbekannte Trainingscodes samt Anzahl, der numerische Fehlercode der letzten von der Cloud abgelehnten Anfrage (nur Nummer, Datenstrom und Uhrzeit – niemals der zurückgegebene Text) sowie deine obige Notiz (lokale Pfade, E-Mails und lange Kennungen werden automatisch entfernt). Niemals dein Zepp-Konto, Tokens, Seriennummern, Geräte-IDs, MAC-Adressen, GPS, Gesundheitswerte oder Rohantworten. Absenden?',
+        'Es werden nur gesendet: App-Version, Betriebssystemtyp, Parser-Revision, Feldstrukturen, Hinweise auf Produktebene, Modellnummern nicht identifizierter Geräte (deviceSource – Ganzzahlen, die das Modell beschreiben, nicht das einzelne Gerät), Geräteklasse und der Modellteil des Gerätenamens nicht identifizierter Geräte (bei „Lena’s T-Rex 3“ wird nur „T-Rex 3“ gesendet; der Spitzname wird nicht übermittelt), unbekannte Trainingscodes samt Anzahl, der numerische Fehlercode der letzten von der Cloud abgelehnten Anfrage (nur Nummer, Datenstrom und Uhrzeit – niemals der zurückgegebene Text) sowie deine obige Notiz (lokale Pfade, E-Mails und lange Kennungen werden automatisch entfernt). Niemals dein Zepp-Konto, Tokens, Seriennummern, Geräte-IDs, MAC-Adressen, GPS, Gesundheitswerte oder Rohantworten. Absenden?',
       reportDoneTitle: 'Angekommen, danke',
       reportDoneLine: (id: string, at: string) => `Bericht ${id}, gesendet ${at}.`,
       reportDoneNote:
@@ -736,7 +765,7 @@ export default {
         'ZeppBridge überträgt keine Nutzungsstatistiken. Nur bei manuellem Klick auf „Fehlerbericht senden" gehen die ausgewählten anonymisierten Diagnosedaten raus.',
       privacyReportTitle: 'Ein Gerät oder Training nicht erkannt?',
       privacyReportBody:
-        'Kein GitHub-Konto, kein Kopieren von Daten nötig. Nach der Bestätigung werden nur Feldstrukturen auf Produktebene, Modellnummern nicht identifizierter Geräte (Ganzzahlen – nur welches Uhrenmodell) sowie unbekannte Trainingscodes samt Anzahl an den privaten Berichtsspeicher von ZeppBridge übertragen. Niemals Konto, Tokens, Seriennummern, Geräte-IDs, MAC-Adressen, GPS, Gesundheitswerte, Rohantworten oder lokale Pfade.',
+        'Kein GitHub-Konto, kein Kopieren von Daten nötig. Nach der Bestätigung werden nur Feldstrukturen auf Produktebene, Modellnummern nicht identifizierter Geräte (Ganzzahlen, die nur das Uhrenmodell angeben), der Modellteil ihres Gerätenamens (ohne Spitznamen) sowie unbekannte Trainingscodes samt Anzahl an den privaten Berichtsspeicher von ZeppBridge übertragen. Niemals Konto, Tokens, Seriennummern, Geräte-IDs, MAC-Adressen, GPS, Gesundheitswerte, Rohantworten oder lokale Pfade.',
 
       // ── 5. MCP ──
       mcpBadge: 'Gesundheitsdaten nur lesend · kein offener Port',

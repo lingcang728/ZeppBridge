@@ -345,7 +345,7 @@ export default {
       reportDoneNote:
         'Apenas os campos indicados acima e a tua nota foram enviados. Nada mais.',
       reportConfirm:
-        'Só envia: versão da app, tipo de sistema, revisão do interpretador, estrutura dos campos, pistas de produto e números de modelo dos dispositivos não identificados (deviceSource: apenas números inteiros, que descrevem «que modelo de relógio», não «que unidade»), códigos de treino desconhecidos e contagens, o código numérico do último pedido recusado pela nuvem (só o número, fluxo e hora, sem o texto devolvido) e a tua nota (caminhos locais, e-mails e identificadores longos removidos automaticamente). Nunca a tua conta Zepp, tokens, números de série, IDs de dispositivo, endereços MAC, GPS, valores de saúde nem respostas originais. Enviar?',
+        'Só são enviados: versão da app, tipo de sistema, revisão do interpretador, estrutura dos campos, pistas de produto, números de modelo, tipo de dispositivo e o parte do nome do dispositivo que identifica o modelo dos dispositivos não identificados (deviceSource: apenas números inteiros que indicam qual o modelo de relógio, não qual a unidade; por exemplo, de «Rui’s T-Rex 3» só é enviado «T-Rex 3»; a alcunha «Rui» nunca é enviada), códigos de treino desconhecidos e respetivas contagens, o código numérico do último pedido recusado pela nuvem (apenas o número, o fluxo e a hora; nunca o texto devolvido) e a tua nota (os caminhos locais, e-mails e identificadores longos são removidos automaticamente). Nunca a tua conta Zepp, os teus tokens, números de série, IDs de dispositivo, endereços MAC, GPS, valores de saúde ou respostas originais. Enviar?',
       reportFailed: 'Não foi possível enviar o relatório de erro',
       lampOn: (count: number) => `Obtidos ${count}`,
       lampPending: (count: number) => `Na nuvem, sem cópia local ${count}`,
@@ -394,7 +394,7 @@ export default {
         'A app não envia telemetria. Apenas ao clicares em «Enviar relatório de erro» é que os dados anónimos descritos são transmitidos.',
       privacyReportTitle: 'Dispositivo ou treino não reconhecido?',
       privacyReportBody:
-        'Sem conta GitHub nem cópia de dados. Ao confirmar, vão apenas para o repositório privado de relatórios do ZeppBridge a estrutura de campos a nível de produto, os números de modelo dos dispositivos não identificados (números inteiros — apenas que modelo de relógio) e os códigos de treino desconhecidos com a respetiva contagem. Nunca conta, tokens, números de série, IDs de dispositivo, MAC, GPS, valores de saúde, respostas originais nem caminhos locais.',
+        'Sem conta do GitHub nem cópia de dados. Ao confirmares, só são enviados para o repositório privado de relatórios do ZeppBridge: a estrutura dos campos a nível do produto, os números de modelo dos dispositivos não identificados (apenas números inteiros que indicam qual o modelo de relógio, não qual a unidade), o parte do nome do dispositivo que identifica o modelo (a alcunha nunca é enviada) e os códigos de treino desconhecidos com as respetivas contagens. Nunca são enviados a conta, tokens, números de série, IDs de dispositivo, MAC, GPS, valores de saúde, respostas originais nem caminhos locais.',
       mcpBadge: 'Dados de saúde só de leitura · não escuta em portas de rede',
       mcpCopyPrompt: 'Copiar instrução para a IA',
       mcpCopyConfig: 'Copiar apenas excerto de configuração',
@@ -4267,8 +4267,31 @@ Regras:
       attachReport: 'Anexar relatório de diagnóstico anonimizado',
       reportShort: 'Diagnóstico',
       removeReport: 'Remover o relatório de diagnóstico',
-      attachHint: 'Apenas versão da aplicação, estrutura de campos e modelos não reconhecidos — sem conta, dados de saúde ou localização',
+      attachHint: 'Apenas a versão da aplicação, a estrutura dos campos e os números e nomes dos modelos não reconhecidos — sem conta, alcunhas, valores de saúde ou localização',
       reportFailedPlain: 'Não foi possível enviar o relatório de diagnóstico e o anexo foi retirado. Clica novamente em «Enviar» para enviares apenas a carta.',
+    },
+    'components/letters/sample': {
+      short: 'Amostra',
+      attached: '1 amostra de estrutura anexada',
+      attach: 'Anexar amostra de estrutura deste treino',
+      remove: 'Remover amostra de estrutura',
+      hint:
+        'Dados brutos de um treino, mantendo apenas os nomes dos campos, a estrutura e códigos como o estilo de nado, a distância e a duração. Os valores de frequência cardíaca e outros dados de saúde são substituídos por marcadores; as coordenadas e os IDs do dispositivo e da conta são removidos.',
+      title: 'Amostra da estrutura do treino',
+      pick: 'Que treino?',
+      dropped: (count: number) => `${count} ${count === 1 ? 'campo removido' : 'campos removidos'}`,
+      masked: (count: number) => `${count} ${count === 1 ? 'valor substituído' : 'valores substituídos'}`,
+      size: (kb: string) => `${kb} KB`,
+      truncated: 'Há mais conteúdo abaixo; será enviada a amostra completa',
+      loading: 'A criar a amostra…',
+      missing: 'Não foram guardados dados brutos para este treino; experimenta outro',
+      none: 'Ainda não há treinos na tua biblioteca',
+      keep: 'Anexar esta amostra',
+      cancel: 'Não anexar',
+      close: 'Fechar',
+      writeAuthor: 'Escrever ao autor',
+      writeAuthorHint:
+        'A carta incluirá a amostra de estrutura deste treino; podes pré-visualizá-la antes de enviar',
     },
     'components/letters/stamps': {
       kind: {
@@ -5071,6 +5094,10 @@ Regras:
       'A sua resposta não pôde ser guardada neste computador. Verifique o espaço livre em disco e tente novamente.',
     'err.letters.attachment_invalid':
       'Uma das imagens não pôde ser lida ou é demasiado grande. Tenta outra.',
+    'err.letters.sample_missing':
+      'Não foram guardados dados brutos para este treino, pelo que não é possível anexar a amostra de estrutura. Experimenta outro treino.',
+    'err.letters.sample_too_large':
+      'A amostra de estrutura deste treino é demasiado grande e não foi enviada. Experimenta outro treino.',
     'err.letters.invalid': 'Esta resposta aponta para uma versão incorreta e não foi enviada.',
     'err.letters.empty': 'A resposta está vazia — escreva algumas palavras antes de enviar.',
     'err.letters.rejected':
