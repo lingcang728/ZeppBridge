@@ -65,7 +65,7 @@ const pack: P4Copy = {
       { id: 'privacy', title: 'Privacy en beveiliging', text: 'Inloggegevens beschermd door het besturingssysteem. Tokens komen nooit in logs.', icon: 'browser-login' },
       { id: 'filename', title: 'Bestandsnamen', text: 'Bepaal zelf hoe geëxporteerde AI-bestanden heten.', icon: 'document' },
       { id: 'folder', title: 'Altijd mee te nemen', text: 'Je gegevens staan in een map op deze computer, en alles wat je hier hebt geschreven — beoordelingen, plannen, AI-taken — exporteer je naar één JSON-bestand.', icon: 'database' },
-      { id: 'language', title: 'Dertien talen', text: 'Vereenvoudigd en traditioneel Chinees, Engels, Spaans en meer. Wissel wanneer je maar wilt.', icon: 'profile' },
+      { id: 'language', title: 'Veertien talen', text: 'Vereenvoudigd en traditioneel Chinees, Engels, Spaans en meer. Wissel wanneer je maar wilt.', icon: 'profile' },
     ],
   },
   nav: [

@@ -4,7 +4,9 @@ import korean from '../ko';
 import { P4_COPY } from '../p4Copy';
 import { JOURNEY } from '../journeyCopy';
 import { reelCopy } from '../reelCopy';
-import { filmPlayerLabels } from '../film/copy';
+import { filmCaption, filmLocale, filmPlayerLabels, filmScript } from '../film/copy';
+import film from '../film/locales/ko';
+import { dialogueCopy } from '../../../demo/dialogueCopy';
 import { LANDING_LOCALES, LOCALE_LABELS } from '../../../composables/useLandingLocale';
 
 const leafPaths = (value: unknown, prefix = ''): string[] =>
@@ -27,5 +29,14 @@ describe('Korean website integration', () => {
     );
     expect(leafPaths(reelCopy('ko')).sort()).toEqual(leafPaths(reelCopy('en')).sort());
     expect(leafPaths(filmPlayerLabels('ko')).sort()).toEqual(leafPaths(filmPlayerLabels('en')).sort());
+  });
+
+  it('keeps Korean through films and the demo conversation', () => {
+    expect(filmLocale('ko')).toBe('ko');
+    expect(filmCaption('ko', 'tagline')).toEqual(film.captions.tagline);
+    expect(filmScript('ko')).toEqual(film.script);
+    expect(filmScript('ko')).not.toEqual(filmScript('en'));
+    expect(dialogueCopy('ko').finalTurn.answer).toBeTruthy();
+    expect(dialogueCopy('ko').finalTurn.answer).not.toBe(dialogueCopy('en').finalTurn.answer);
   });
 });

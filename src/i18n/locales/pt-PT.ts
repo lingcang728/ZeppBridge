@@ -4273,12 +4273,14 @@ Regras:
     'components/letters/sample': {
       short: 'Amostra',
       attached: '1 amostra de estrutura anexada',
+      attachedMany: (count: number) => `${count} ${count === 1 ? 'amostra de estrutura anexada' : 'amostras de estrutura anexadas'}`,
       attach: 'Anexar amostra de estrutura deste treino',
       remove: 'Remover amostra de estrutura',
       hint:
         'Dados brutos de um treino, mantendo apenas os nomes dos campos, a estrutura e códigos como o estilo de nado, a distância e a duração. Os valores de frequência cardíaca e outros dados de saúde são substituídos por marcadores; as coordenadas e os IDs do dispositivo e da conta são removidos.',
       title: 'Amostra da estrutura do treino',
       pick: 'Que treino?',
+      pickSome: (max: number) => `Que treinos (até ${max})?`,
       dropped: (count: number) => `${count} ${count === 1 ? 'campo removido' : 'campos removidos'}`,
       masked: (count: number) => `${count} ${count === 1 ? 'valor substituído' : 'valores substituídos'}`,
       size: (kb: string) => `${kb} KB`,
@@ -4287,6 +4289,7 @@ Regras:
       missing: 'Não foram guardados dados brutos para este treino; experimenta outro',
       none: 'Ainda não há treinos na tua biblioteca',
       keep: 'Anexar esta amostra',
+      keepMany: (count: number) => (count === 1 ? 'Anexar esta amostra' : `Anexar estas ${count} amostras`),
       cancel: 'Não anexar',
       close: 'Fechar',
       writeAuthor: 'Escrever ao autor',

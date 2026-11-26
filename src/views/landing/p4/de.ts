@@ -65,7 +65,7 @@ const pack: P4Copy = {
       { id: 'privacy', title: 'Datenschutz und Sicherheit', text: 'Zugangsdaten schützt das Betriebssystem. Tokens tauchen nie in Logs auf.', icon: 'browser-login' },
       { id: 'filename', title: 'Dateinamen', text: 'Bestimme selbst, wie die Exportdateien für die KI heißen.', icon: 'document' },
       { id: 'folder', title: 'Jederzeit mitnehmen', text: 'Deine Daten liegen in einem Ordner auf diesem Rechner, und alles, was du hier geschrieben hast – Bewertungen, Pläne, KI-Aufgaben –, lässt sich in eine einzige JSON-Datei exportieren.', icon: 'database' },
-      { id: 'language', title: 'Dreizehn Sprachen', text: 'Vereinfachtes und traditionelles Chinesisch, English, Español und mehr. Jederzeit wechseln.', icon: 'profile' },
+      { id: 'language', title: 'Vierzehn Sprachen', text: 'Vereinfachtes und traditionelles Chinesisch, English, Español und mehr. Jederzeit wechseln.', icon: 'profile' },
     ],
   },
   nav: [

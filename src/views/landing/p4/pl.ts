@@ -64,7 +64,7 @@ const pack: P4Copy = {
       { id: 'privacy', title: 'Prywatność i bezpieczeństwo', text: 'Poświadczenia chroni system operacyjny. Tokeny nigdy nie trafiają do dzienników zdarzeń.', icon: 'browser-login' },
       { id: 'filename', title: 'Nazwy plików', text: 'Sam decydujesz, jak mają się nazywać pliki przygotowywane dla AI.', icon: 'document' },
       { id: 'folder', title: 'Zabierz w każdej chwili', text: 'Twoje dane znajdują się w folderze na tym komputerze, a wszystko, co tutaj zapisano — oceny, plany, zadania AI — wyeksportujesz do jednego pliku JSON.', icon: 'database' },
-      { id: 'language', title: 'Trzynaście języków', text: 'Chiński uproszczony i tradycyjny, angielski, hiszpański i więcej. Przełączaj w dowolnej chwili.', icon: 'profile' },
+      { id: 'language', title: 'Czternaście języków', text: 'Chiński uproszczony i tradycyjny, angielski, hiszpański i więcej. Przełączaj w dowolnej chwili.', icon: 'profile' },
     ],
   },
   nav: [

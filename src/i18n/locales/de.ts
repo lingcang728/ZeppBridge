@@ -529,12 +529,15 @@ export default {
     'components/letters/sample': {
       short: 'Strukturprobe',
       attached: '1 Strukturprobe angehängt',
+      attachedMany: (count: number) =>
+        plural(count, { one: '1 Strukturprobe angehängt', other: `${count} Strukturproben angehängt` }),
       attach: 'Strukturprobe dieses Trainings anhängen',
       remove: 'Strukturprobe entfernen',
       hint:
         'Rohdaten eines Trainings mit nur Feldnamen, Struktur und Codes wie Schwimmstil, Distanz und Dauer. Herzfrequenz und andere Gesundheitswerte werden durch Platzhalter ersetzt; Koordinaten sowie Geräte- und Konto-IDs werden entfernt',
       title: 'Strukturprobe eines Trainings',
       pick: 'Welches Training?',
+      pickSome: (max: number) => `Welche Trainings (bis zu ${max})?`,
       dropped: (count: number) =>
         plural(count, { one: '1 Feld entfernt', other: `${count} Felder entfernt` }),
       masked: (count: number) =>
@@ -545,6 +548,8 @@ export default {
       missing: 'Für dieses Training wurden keine Rohdaten gespeichert – probiere ein anderes Training',
       none: 'Noch keine Trainings in deiner Bibliothek',
       keep: 'Diese Strukturprobe anhängen',
+      keepMany: (count: number) =>
+        plural(count, { one: 'Diese Strukturprobe anhängen', other: `Diese ${count} Strukturproben anhängen` }),
       cancel: 'Nicht anhängen',
       close: 'Schließen',
       writeAuthor: 'Dem Autor schreiben',

@@ -101,7 +101,7 @@ const pack: P4Copy = {
       { id: 'privacy', title: '隱私與安全', text: '憑證交由系統保護，權杖不寫入記錄檔。', icon: 'browser-login' },
       { id: 'filename', title: '檔案命名', text: '交給 AI 的檔案叫什麼，由你決定。', icon: 'document' },
       { id: 'folder', title: '隨時帶走', text: '資料就在本機資料夾中；你寫下的評分、計畫、AI 任務，一鍵匯出為 JSON。', icon: 'database' },
-      { id: 'language', title: '十三種語言', text: '繁體、簡體、English、Español 等，隨時切換。', icon: 'profile' },
+      { id: 'language', title: '十四種語言', text: '繁體、簡體、English、Español 等，隨時切換。', icon: 'profile' },
     ],
   },
   nav: [

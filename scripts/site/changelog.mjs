@@ -29,7 +29,7 @@ const LABELS = {
   'pt-PT': { ...EN, title: 'Registo de alterações', added: 'Novo', improved: 'Melhorado', fixed: 'Corrigido' },
   ru: { ...EN, title: 'История изменений', added: 'Новое', improved: 'Улучшено', fixed: 'Исправлено' },
   pl: { title: 'Dziennik zmian', added: 'Nowości', improved: 'Ulepszenia', fixed: 'Poprawki', note: 'Aktualizacja' },
-  ko: { ...EN, added: '추가됨', improved: '개선됨', fixed: '수정됨', note: '업데이트' },
+  ko: { ...EN, title: '변경 내역', added: '추가됨', improved: '개선됨', fixed: '수정됨', note: '업데이트' },
   'zh-TW': { title: '更新日誌', added: '新增', improved: '改進', fixed: '修復', note: '更新' },
 };
 

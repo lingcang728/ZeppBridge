@@ -65,7 +65,7 @@ const pack: P4Copy = {
       { id: 'privacy', title: 'Confidentialité et sécurité', text: 'Identifiants protégés par le système. Les jetons ne figurent jamais dans les journaux.', icon: 'browser-login' },
       { id: 'filename', title: 'Nom des fichiers', text: 'Définissez la nomenclature des fichiers exportés vers l’IA.', icon: 'document' },
       { id: 'folder', title: 'Emportez tout avec vous', text: 'Vos données restent dans un dossier sur cet ordinateur, et tout ce que vous avez consigné ici — évaluations, plans, tâches IA — s’exporte dans un seul fichier JSON.', icon: 'database' },
-      { id: 'language', title: 'Treize langues', text: 'Chinois simplifié et traditionnel, English, Español et bien d’autres. Changez à tout moment.', icon: 'profile' },
+      { id: 'language', title: 'Quatorze langues', text: 'Chinois simplifié et traditionnel, English, Español et bien d’autres. Changez à tout moment.', icon: 'profile' },
     ],
   },
   nav: [

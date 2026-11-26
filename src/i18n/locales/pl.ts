@@ -1208,11 +1208,19 @@ export default {
   'components/letters/sample': {
     short: 'Próbka',
     attached: 'Dołączono 1 próbkę struktury',
+    attachedMany: (count: number) =>
+      plural(count, {
+        one: `Dołączono ${count} próbkę struktury`,
+        few: `Dołączono ${count} próbki struktury`,
+        many: `Dołączono ${count} próbek struktury`,
+        other: `Dołączono ${count} próbki struktury`,
+      }),
     attach: 'Dołącz próbkę struktury tego treningu',
     remove: 'Usuń próbkę struktury',
     hint: 'Surowe dane jednego treningu: tylko nazwy pól, struktura i kody, takie jak styl pływania, dystans i czas trwania; tętno i inne wartości zdrowotne są zastępowane wartościami zastępczymi, a współrzędne i identyfikatory urządzenia oraz konta są usuwane',
     title: 'Próbka struktury treningu',
     pick: 'Który trening?',
+    pickSome: (max: number) => `Które treningi (do ${max})?`,
     dropped: (count: number) =>
       plural(count, {
         one: `Usunięto ${count} pole`,
@@ -1233,6 +1241,13 @@ export default {
     missing: 'Nie zapisano surowych danych dla tego treningu — spróbuj wybrać inny',
     none: 'W bibliotece nie ma jeszcze treningów',
     keep: 'Dołącz tę próbkę',
+    keepMany: (count: number) =>
+      plural(count, {
+        one: 'Dołącz tę próbkę',
+        few: `Dołącz te ${count} próbki`,
+        many: `Dołącz tych ${count} próbek`,
+        other: `Dołącz te ${count} próbki`,
+      }),
     cancel: 'Nie dołączaj',
     close: 'Zamknij',
     writeAuthor: 'Napisz do twórcy',

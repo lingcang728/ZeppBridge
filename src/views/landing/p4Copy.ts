@@ -87,7 +87,7 @@ const zh: P4Copy = {
       { id: 'privacy', title: '隐私与安全', text: '凭据交给系统保护，令牌不写进日志。', icon: 'browser-login' },
       { id: 'filename', title: '文件命名', text: '交给 AI 的文件叫什么，你来定。', icon: 'document' },
       { id: 'folder', title: '随时带走', text: '数据就在本机文件夹里；你写下的打分、计划、AI 任务，一键导出成 JSON。', icon: 'database' },
-      { id: 'language', title: '十三种语言', text: '简体、繁体、English、Español 等，随时切换。', icon: 'profile' },
+      { id: 'language', title: '十四种语言', text: '简体、繁体、English、Español 等，随时切换。', icon: 'profile' },
     ],
   },
   nav: [

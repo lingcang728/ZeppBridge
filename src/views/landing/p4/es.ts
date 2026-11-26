@@ -65,7 +65,7 @@ const pack: P4Copy = {
       { id: 'privacy', title: 'Privacidad y seguridad', text: 'Credenciales custodiadas por el sistema. Los tokens nunca se escriben en logs.', icon: 'browser-login' },
       { id: 'filename', title: 'Nombres de archivo', text: 'Tú decides cómo se nombran los archivos preparados para la IA.', icon: 'document' },
       { id: 'folder', title: 'Llévatelo', text: 'Tus datos están en una carpeta de este equipo, y todo lo que escribiste aquí —valoraciones, planes, tareas de IA— se exporta en un solo JSON.', icon: 'database' },
-      { id: 'language', title: 'Trece idiomas', text: 'Chino simplificado y tradicional, inglés, español y más. Cámbialo cuando quieras.', icon: 'profile' },
+      { id: 'language', title: 'Catorce idiomas', text: 'Chino simplificado y tradicional, inglés, español y más. Cámbialo cuando quieras.', icon: 'profile' },
     ],
   },
   nav: [
