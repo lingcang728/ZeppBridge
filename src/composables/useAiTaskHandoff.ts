@@ -52,7 +52,7 @@ const copy = () => messagesOf(messages);
 const idle = (): HandoffStep => ({ state: 'idle', errorText: null });
 const freshSteps = (): Record<HandoffStepId, HandoffStep> => ({ prepare: idle(), copy: idle(), open: idle() });
 
-/** 「上次交付给谁」的持久化键——下次进页按它预选提供方。 */
+/** 「选的是哪个 AI」的持久化键：门锁轮盘上换一下、或交出去一次都记下，下次进页和今日一问按它预选提供方。 */
 const LAST_PROVIDER_KEY = 'zeppbridge.ai.handoff.provider';
 
 const readLastProvider = (): AiProvider | null => {
@@ -64,7 +64,7 @@ const readLastProvider = (): AiProvider | null => {
   }
 };
 
-const storeLastProvider = (provider: AiProvider) => {
+export const storeLastProvider = (provider: AiProvider) => {
   try {
     window.localStorage.setItem(LAST_PROVIDER_KEY, provider.id);
   } catch {

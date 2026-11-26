@@ -18,7 +18,7 @@ import { planGuide } from '../../lib/aiTask/planGuide';
 import { isDesktop } from '../../lib/bridge';
 import type { AiTask, AiTaskPrepareResult, AiTaskPreview } from '../../lib/bridge/types';
 import { useAiTaskDraft } from '../useAiTaskDraft';
-import { useAiTaskHandoff } from '../useAiTaskHandoff';
+import { storeLastProvider, useAiTaskHandoff } from '../useAiTaskHandoff';
 import { useAiTaskPreview } from '../useAiTaskPreview';
 import { useSyncController } from '../useSyncController';
 import { useAiDerived } from './useAiHub';
@@ -35,6 +35,8 @@ const recalled = ref(false);
 /** 交出编排在跑（锁的环在转）。 */
 const gathering = ref(false);
 watch(provider, (next) => { currentProviderId.value = next.id; }, { immediate: true });
+// 轮盘上换了就记住（不必等交出去）：今日一问的「按住交给」和下次开应用都跟着这个默认 AI。
+watch(provider, (next) => storeLastProvider(next));
 
 export interface SendChoreography {
   /** 牌沿线进锁、附件落进托盘（和准备文件同时开跑）。被 `recall` 打断时不等它。 */
