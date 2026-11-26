@@ -797,3 +797,97 @@ fn the_device_cache_omits_fields_that_are_computed_on_read() {
     assert!(!cache.profiles[0].has_local_data);
     let _ = fs::remove_dir_all(dir);
 }
+
+/// 设备名里只取产品那一段：Zepp 默认名是「账号昵称 + 的 + 产品名」，昵称绝不能发出去。
+#[test]
+fn only_the_product_part_of_a_device_name_is_kept() {
+    for (name, expected) in [
+        ("凌苍的T-Rex 3", Some("T-Rex 3")),
+        ("Alex's  T-Rex 3 Pro", Some("T-Rex 3 Pro")),
+        ("Alex\u{2019}s Active 2 (Round)", Some("Active 2 (Round)")),
+        ("アレックスのBalance 2", Some("Balance 2")),
+        ("凌苍的Future Watch 9", Some("Future Watch 9")),
+        ("Amazfit Bip 6", Some("Amazfit Bip 6")),
+        // 自己起的名字：没有「谁的」分隔，也不是品牌开头
+        ("My private nickname", None),
+        ("Bip 6", None),
+        // 品牌开头但后面夹着人名
+        ("Amazfit Alex", None),
+        // 分隔后面是中文、人名或邮箱这类东西
+        ("我的手表", None),
+        ("我的 Pro 表", None),
+        ("Mom's Alex", None),
+        ("凌苍的alex@example.com", None),
+        ("凌苍的0123456789abcdef01", None),
+        ("", None),
+    ] {
+        assert_eq!(
+            product_name_from_display_name(name).as_deref(),
+            expected,
+            "{name}"
+        );
+    }
+}
+
+/// 认不出的设备一台一组上报：编号、族码和产品名配在一起，昵称、序列号、MAC 都不带。
+#[test]
+fn unknown_devices_are_reported_as_pairs_without_the_owner_name() {
+    let payload = json!({
+        "items": [
+            {
+                "deviceId": "WATCH-PRIVATE-1",
+                "deviceSource": 12340001,
+                "deviceType": 0,
+                "displayName": "凌苍的Future Watch 9",
+                "macAddress": "AA:BB:CC:DD:EE:FF",
+                "sn": "SERIAL-PRIVATE-998877"
+            },
+            {
+                "deviceId": "BAND-PRIVATE-1",
+                "deviceSource": 12340002,
+                "deviceType": 7,
+                "displayName": "我的耳机"
+            },
+            { "deviceId": "SCALE-PRIVATE-1", "deviceSource": 102, "deviceType": 1, "displayName": "凌苍的体脂秤" },
+            { "deviceId": "KNOWN-1", "deviceSource": 8716547, "deviceType": 0, "displayName": "凌苍的T-Rex 3" }
+        ]
+    });
+    let report = build_device_diagnostic(&payload);
+    assert_eq!(report.unknown_device_count, 2);
+    assert_eq!(
+        report.unknown_devices,
+        vec![
+            DiagnosticUnknownDevice {
+                device_source: Some(12340001),
+                device_type: Some(0),
+                product_name: Some("Future Watch 9".into()),
+            },
+            DiagnosticUnknownDevice {
+                device_source: Some(12340002),
+                device_type: Some(7),
+                product_name: None,
+            },
+        ]
+    );
+    let encoded = serde_json::to_string(&report).unwrap();
+    for private in [
+        "凌苍",
+        "我的耳机",
+        "WATCH-PRIVATE-1",
+        "AA:BB:CC:DD:EE:FF",
+        "SERIAL-PRIVATE-998877",
+        "T-Rex 3",
+    ] {
+        assert!(!encoded.contains(private), "诊断泄露了 {private}");
+    }
+    assert!(encoded.contains("\"unknownDevices\""));
+    assert!(encoded.contains("\"productName\":\"Future Watch 9\""));
+
+    // 没有认不出的设备时整段不出现，旧服务端照样收。
+    let known = build_device_diagnostic(&json!({ "items": [
+        { "deviceSource": 8716547, "deviceType": 0, "displayName": "凌苍的T-Rex 3" }
+    ]}));
+    assert!(!serde_json::to_string(&known)
+        .unwrap()
+        .contains("unknownDevices"));
+}

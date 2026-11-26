@@ -76,7 +76,7 @@
 
       <h2>4. Reports and letters you choose to send</h2>
       <h3>Problem reports</h3>
-      <p>ZeppBridge never sends usage telemetry or crash reports automatically. A problem report is sent only after you choose the report and confirm. It can contain app and parser versions, operating-system type, database schema version, response field names and types, counts and codes for unrecognized devices or workouts, a numeric Zepp rejection code, and an optional short note. It does not contain Zepp account IDs, tokens, cookies, serial numbers, device IDs, MAC addresses, GPS, health values, raw responses, or local file paths. The client removes common email, path, and long-identifier patterns from the optional note before sending; please review the note yourself before you confirm.</p>
+      <p>ZeppBridge never sends usage telemetry or crash reports automatically. A problem report is sent only after you choose the report and confirm. It can contain app and parser versions, operating-system type, database schema version, response field names and types, counts and codes for unrecognized devices or workouts, the model part of an unrecognized device’s name (any nickname in front of it is removed), a numeric Zepp rejection code, and an optional short note. It does not contain Zepp account IDs, tokens, cookies, serial numbers, device IDs, MAC addresses, GPS, health values, raw responses, or local file paths. The client removes common email, path, and long-identifier patterns from the optional note before sending; please review the note yourself before you confirm.</p>
       <p>Reports are stored in a private Cloudflare D1 database and are not available through a public read endpoint. A random report number is returned so you can refer to a report later. The service computes a daily hash of the request source IP for rate limiting; the raw IP is not stored in the report record. Report rows do not currently have an automatic expiry date. They remain until the maintainer removes them; you can request removal by quoting the report number through the in-app contact path below.</p>
 
       <h3>Letters to the author</h3>
@@ -141,7 +141,7 @@
 
       <h2>4. 你主动发送的报告与来信</h2>
       <h3>错误报告</h3>
-      <p>ZeppBridge 不会自动上报使用行为或崩溃报告。只有你选择报告并确认后，应用才会发送错误报告。内容可能包括应用与解析器版本、操作系统类型、数据库模式版本、响应字段名称与类型、未识别设备或运动的编号与数量、Zepp 返回的数字错误码，以及可选短备注。报告不包含 Zepp 账号 ID、令牌、Cookie、序列号、设备 ID、MAC、GPS、健康数值、原始响应或本机文件路径。发送前客户端会尝试删除备注里的常见邮箱、路径和长标识符格式；请在确认前自行检查备注。</p>
+      <p>ZeppBridge 不会自动上报使用行为或崩溃报告。只有你选择报告并确认后，应用才会发送错误报告。内容可能包括应用与解析器版本、操作系统类型、数据库模式版本、响应字段名称与类型、未识别设备或运动的编号与数量、未识别设备名里的型号那一段（前面的昵称会去掉）、Zepp 返回的数字错误码，以及可选短备注。报告不包含 Zepp 账号 ID、令牌、Cookie、序列号、设备 ID、MAC、GPS、健康数值、原始响应或本机文件路径。发送前客户端会尝试删除备注里的常见邮箱、路径和长标识符格式；请在确认前自行检查备注。</p>
       <p>报告保存在 Cloudflare D1 私有数据库中，没有公开读取接口。应用会返回随机报告编号，方便之后查询。服务会计算请求来源 IP 的每日哈希用于限流；原始 IP 不写入报告记录。目前报告没有自动到期时间，会保留到维护者手动删除为止。你可以在应用内联系开发者，并提供报告编号申请删除。</p>
 
       <h3>给作者的信</h3>

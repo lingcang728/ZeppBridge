@@ -33,6 +33,9 @@ export interface DiagnosticReport {
     firmwareFieldObjects: number;
     candidates: DiagnosticDeviceCandidate[];
     unmatchedProductHints: string[];
+    modelIdentifierHints?: string[];
+    /** 认不出的设备一台一组；没有认不出的设备时不出现 */
+    unknownDevices?: Array<{ deviceSource?: number; deviceType?: number; productName?: string }>;
     shapes: DiagnosticObjectShape[];
   };
   unknownWorkoutCodes: Array<{ code: number; records: number }>;

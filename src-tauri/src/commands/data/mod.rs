@@ -18,11 +18,11 @@ use crate::models::{
     AiHandoffMetadata, AiHandoffResult, CapabilityOverview, DailyHeartRateExtreme,
     DeviceCacheMetadata, DeviceMatchStatus, DeviceProfile, DeviceProfilesResult,
     DiagnosticDeviceEvidence, DiagnosticField, DiagnosticObjectShape, DiagnosticReport,
-    DiagnosticWorkoutCorrection, ExportDetail, ExportResult, ExportSelection,
-    FeedbackSubmissionResult, HealthOverview, HeartRatePoint, HeartRateZoneOptions,
-    HeartRateZonePreference, MetricSeries, RawPayloadCompaction, SleepSession, SleepStageSlice,
-    StorageEstimate, StressPoint, TrainingBalancePoint, UserPrefs, Workout, WorkoutSeries,
-    DIAGNOSTIC_NOTE_MAX_CHARS,
+    DiagnosticUnknownDevice, DiagnosticWorkoutCorrection, ExportDetail, ExportResult,
+    ExportSelection, FeedbackSubmissionResult, HealthOverview, HeartRatePoint,
+    HeartRateZoneOptions, HeartRateZonePreference, MetricSeries, RawPayloadCompaction,
+    SleepSession, SleepStageSlice, StorageEstimate, StressPoint, TrainingBalancePoint, UserPrefs,
+    Workout, WorkoutSeries, DIAGNOSTIC_NOTE_MAX_CHARS,
 };
 
 use crate::storage::corrections::WorkoutCodeLabel;

@@ -250,7 +250,8 @@ const corrections = () => {
  *
  * 3.1.1 起不再收用户指认（众包冻结），这里只回答两件事：哪些编号现在已经认得出
  * （官方表 / 冻结的众包），哪些仍然认不出——后者等官方表更新或有了产品名再补，
- * 不靠投票。旧报告里的 deviceType 族码一律不看。
+ * 不靠投票。旧报告里散装的 deviceType 族码一律不看；3.3.0 起 `unknownDevices` 一台
+ * 一组，族码和产品名跟着自己的编号走，这两样才看。
  */
 const devices = () => {
   const catalog = JSON.parse(readFileSync(new URL('../../src/assets/devices/catalog.json', import.meta.url), 'utf8'));
@@ -272,16 +273,27 @@ const devices = () => {
       .map((hint) => /^deviceSource:(\d+)$/.exec(hint)?.[1])
       .filter(Boolean)
       .map(Number));
+    // 3.3.0 起一台一组：编号旁边就是族码和 Zepp 给这台设备起的产品名（已去掉昵称）
+    const paired = new Map((evidence.unknownDevices ?? [])
+      .filter((device) => Number.isInteger(device.deviceSource))
+      .map((device) => [device.deviceSource, device]));
+    for (const code of paired.keys()) codes.add(code);
     for (const code of codes) {
-      const stat = byCode.get(code) ?? { reports: 0, versions: new Set() };
+      const stat = byCode.get(code) ?? { reports: 0, versions: new Set(), types: new Set(), names: new Map() };
       stat.reports += 1;
       stat.versions.add(row.app_version);
+      const device = paired.get(code);
+      if (Number.isInteger(device?.deviceType)) stat.types.add(device.deviceType);
+      if (device?.productName) stat.names.set(device.productName, (stat.names.get(device.productName) ?? 0) + 1);
       byCode.set(code, stat);
     }
   }
   const rowsOut = [...byCode.entries()].map(([code, stat]) => ({
     deviceSource: code,
     reports: stat.reports,
+    deviceType: [...stat.types].sort((a, b) => a - b).join(' '),
+    // 同一个编号报上来的产品名不止一个就是分歧，按次数排着看
+    productName: [...stat.names].sort((a, b) => b[1] - a[1]).map(([name, n]) => `${name} ×${n}`).join(' / '),
     versions: [...stat.versions].sort().join(' '),
     now: known.get(code) ?? '仍认不出',
   }));
@@ -292,7 +304,8 @@ const devices = () => {
   console.log(`\n现在已经认得出的编号（${resolved.length}）：`);
   table(resolved);
   console.log('\n目录以 Zepp 官方 deviceSource 对照表为准（scripts/assets/build-device-catalog.py 的 OFFICIAL_DEVICE_SOURCE_CODES）；');
-  console.log('仍认不出的先去核官方表有没有更新，不按指认票数收。');
+  console.log('仍认不出的先去核官方表有没有更新，不按指认票数收。productName 是 Zepp 自己给设备起的名字（已去掉昵称），');
+  console.log('同一个编号的产品名一致、族码对得上，才拿它当去核官方资料的线索。');
 };
 
 const list = (status) => {

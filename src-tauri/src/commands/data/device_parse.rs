@@ -14,8 +14,84 @@ pub(super) fn empty_device_diagnostic(status: &str) -> DiagnosticDeviceEvidence 
         candidates: Vec::new(),
         unmatched_product_hints: Vec::new(),
         model_identifier_hints: Vec::new(),
+        unknown_devices: Vec::new(),
         shapes: Vec::new(),
     }
+}
+
+/// 品牌词：没有「谁的」前缀的设备名，只有以它们开头才可能是产品名。
+const DEVICE_BRAND_WORDS: &[&str] = &["amazfit", "zepp", "xiaomi", "mi", "redmi", "huami"];
+
+/// 设备名里「谁的」和产品名之间的分隔：`凌苍的T-Rex 3`、`Alex's T-Rex 3`、`アレックスのT-Rex 3`。
+const DEVICE_OWNER_MARKERS: &[&str] = &["的", "の", "'s ", "\u{2019}s ", "s' ", "s\u{2019} "];
+
+/// 目录里所有型号名拆出来的词（小写），用来判断一段名字像不像产品名。
+fn catalog_name_words() -> &'static BTreeSet<String> {
+    static WORDS: std::sync::OnceLock<BTreeSet<String>> = std::sync::OnceLock::new();
+    WORDS.get_or_init(|| {
+        crate::device_catalog::catalog_entries()
+            .iter()
+            .flat_map(|entry| {
+                std::iter::once(&entry.canonical_name)
+                    .chain(std::iter::once(&entry.display_name))
+                    .chain(entry.aliases.iter())
+            })
+            .flat_map(|name| name_words(name))
+            .collect()
+    })
+}
+
+fn name_words(value: &str) -> Vec<String> {
+    value
+        .split(|ch: char| !ch.is_ascii_alphanumeric())
+        .filter(|word| !word.is_empty())
+        .map(str::to_ascii_lowercase)
+        .collect()
+}
+
+/// Zepp 设备名里的产品那一段，用于认不出的设备的反馈。
+///
+/// Zepp 给设备起的默认名是「账号昵称 + 的 + 产品名」（`凌苍的T-Rex 3`）。昵称是用户
+/// 自己的名字，绝不能发出去，所以只取最后一个「的」/ `'s ` 后面那一段；没有这类分隔
+/// 的名字，只在以品牌词开头、后面每个词都是目录里出现过的型号词或带数字时才收
+/// （`Amazfit Bip 6` 收，`Amazfit Alex`、`My watch`、`我的手表` 都不收）。
+///
+/// 收下的那一段还要过形状关：只许 ASCII 字母数字、空格和 `- + ( ) .`，至少一个字母，
+/// 不超过 6 个词、40 个字符，而且至少有一个词是品牌词、目录型号词或带数字——
+/// 中文自定义名、邮箱、长串标识和单独一个人名都进不来。
+pub(super) fn product_name_from_display_name(value: &str) -> Option<String> {
+    let value = value.trim();
+    let owner_split = DEVICE_OWNER_MARKERS
+        .iter()
+        .filter_map(|marker| value.rfind(marker).map(|at| at + marker.len()))
+        .max();
+    let product = match owner_split {
+        Some(at) => value[at..].trim(),
+        None => value,
+    };
+    let shape_ok = (2..=40).contains(&product.chars().count())
+        && product.chars().all(|ch| {
+            ch.is_ascii_alphanumeric() || matches!(ch, ' ' | '-' | '+' | '(' | ')' | '.')
+        })
+        && product.chars().any(|ch| ch.is_ascii_alphabetic());
+    if !shape_ok || safe_product_hint(product).is_none() {
+        return None;
+    }
+    let words = name_words(product);
+    if words.is_empty() || words.len() > 6 {
+        return None;
+    }
+    let known = |word: &String| {
+        DEVICE_BRAND_WORDS.contains(&word.as_str())
+            || catalog_name_words().contains(word)
+            || word.chars().any(|ch| ch.is_ascii_digit())
+    };
+    let accepted = if owner_split.is_some() {
+        words.iter().any(known)
+    } else {
+        DEVICE_BRAND_WORDS.contains(&words[0].as_str()) && words[1..].iter().all(known)
+    };
+    accepted.then(|| product.split_whitespace().collect::<Vec<_>>().join(" "))
 }
 
 pub(super) fn safe_product_hint(value: &str) -> Option<String> {
@@ -201,6 +277,7 @@ pub(super) fn build_device_diagnostic(value: &Value) -> DiagnosticDeviceEvidence
     // `candidates` 恒为空（字段留着，旧服务端的校验要求它在）。
     let mut unmatched_product_hints = BTreeSet::new();
     let mut model_identifier_hints = BTreeSet::new();
+    let mut unknown_devices = BTreeSet::new();
     for item in device_items(value) {
         let Some(profile) = parse_device_profiles(&item).into_iter().next() else {
             continue;
@@ -213,14 +290,30 @@ pub(super) fn build_device_diagnostic(value: &Value) -> DiagnosticDeviceEvidence
         evidence.unknown_device_count += 1;
         collect_unmatched_product_hints(&item, &mut unmatched_product_hints, 0);
         let extra = flattened_device_metadata(&item);
-        for code in device_source_numbers(&item, &extra) {
-            if code <= 99_999_999 {
-                model_identifier_hints.insert(format!("deviceSource:{code}"));
-            }
+        let sources = device_source_numbers(&item, &extra)
+            .into_iter()
+            .filter(|code| *code <= 99_999_999)
+            .collect::<Vec<_>>();
+        for code in &sources {
+            model_identifier_hints.insert(format!("deviceSource:{code}"));
+        }
+        // 一台一组。只看 `displayName` / `deviceName`：`nickname` / `name` 本来就是人起的。
+        let display_name = first_string(&item, &["displayName", "deviceName"])
+            .or_else(|| first_string(&extra, &["displayName", "deviceName"]));
+        let device = DiagnosticUnknownDevice {
+            device_source: sources.first().copied(),
+            device_type: device_type_number(&item, &extra).filter(|code| (0..=999).contains(code)),
+            product_name: display_name
+                .as_deref()
+                .and_then(product_name_from_display_name),
+        };
+        if device != DiagnosticUnknownDevice::default() {
+            unknown_devices.insert(device);
         }
     }
     evidence.unmatched_product_hints = unmatched_product_hints.into_iter().collect();
     evidence.model_identifier_hints = model_identifier_hints.into_iter().take(8).collect();
+    evidence.unknown_devices = unknown_devices.into_iter().take(8).collect();
     evidence
 }
 

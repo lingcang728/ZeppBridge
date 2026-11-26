@@ -47,7 +47,29 @@ pub struct DiagnosticDeviceEvidence {
     /// 已认出的设备和体脂秤的编号也不收。
     #[serde(default)]
     pub model_identifier_hints: Vec<String>,
+    /// 认不出的设备，一台一组：型号编号、族码和设备名里的产品那一段配在一起。
+    ///
+    /// `model_identifier_hints` 是一袋散的编号，一个账号有表又有别的设备时，
+    /// 分不清哪个编号是哪台；配成一组后，`deviceSource` 旁边就是 Zepp 自己给
+    /// 这台设备起的产品名。没有认不出的设备时整段不出现。
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub unknown_devices: Vec<DiagnosticUnknownDevice>,
     pub shapes: Vec<DiagnosticObjectShape>,
+}
+
+/// 认不出的一台设备。三样都描述「哪一款」，没有一样描述「哪一台」。
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "camelCase")]
+pub struct DiagnosticUnknownDevice {
+    /// Zepp 设备列表里的 `deviceSource`。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub device_source: Option<i64>,
+    /// `deviceType` 族码（0 = 表 / 手环、1 = 体脂秤……）。只用来分大类，不拿去认型号。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub device_type: Option<i64>,
+    /// Zepp 设备名里的产品那一段（`凌苍的T-Rex 3` 只取 `T-Rex 3`），昵称绝不带上。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub product_name: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

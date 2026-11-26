@@ -52,6 +52,19 @@ const validCandidate = (candidate) => hasOnlyKeys(
   && (candidate.firmware === null || candidate.firmware === undefined || boundedString(candidate.firmware, 40))
   && ['exact', 'alias', 'unknown'].includes(candidate.matchStatus);
 
+/**
+ * 认不出的一台设备。产品名和客户端 `product_name_from_display_name` 同一道形状关：
+ * 只许 ASCII 字母数字、空格和 `- + ( ) .`，至少一个字母，不超过 40 个字符——
+ * 客户端已经去掉了「谁的」那一段昵称，这里不因为「客户端应该处理过」就放行别的形状。
+ */
+const PRODUCT_NAME = /^(?=.*[A-Za-z])[A-Za-z0-9 ()+.-]{2,40}$/;
+const validUnknownDevice = (entry) => hasOnlyKeys(entry, ['deviceSource', 'deviceType', 'productName'])
+  && Object.keys(entry).length > 0
+  && (entry.deviceSource === undefined || boundedInteger(entry.deviceSource, 1, 99_999_999))
+  && (entry.deviceType === undefined || boundedInteger(entry.deviceType, 0, 999))
+  && (entry.productName === undefined
+    || (boundedString(entry.productName, 40) && PRODUCT_NAME.test(entry.productName)));
+
 const validDeviceEvidence = (device) => hasOnlyKeys(device, [
   'status',
   'objectCount',
@@ -63,6 +76,7 @@ const validDeviceEvidence = (device) => hasOnlyKeys(device, [
   'candidates',
   'unmatchedProductHints',
   'modelIdentifierHints',
+  'unknownDevices',
   'shapes',
 ])
   && boundedString(device.status, 40)
@@ -82,6 +96,12 @@ const validDeviceEvidence = (device) => hasOnlyKeys(device, [
       && device.modelIdentifierHints.length <= 8
       && device.modelIdentifierHints.every((hint) => boundedString(hint, 32)
         && /^(deviceSource|deviceType):\d{1,8}$/.test(hint))))
+  // 认不出的设备一台一组（客户端 3.3.0 起）：型号编号、族码和设备名里的产品那一段。
+  // 字段可缺省：旧客户端和没有认不出的设备的报告都不带它。
+  && (device.unknownDevices === undefined
+    || (Array.isArray(device.unknownDevices)
+      && device.unknownDevices.length <= 8
+      && device.unknownDevices.every(validUnknownDevice)))
   && Array.isArray(device.shapes)
   && device.shapes.length <= 40
   && device.shapes.every(validShape);

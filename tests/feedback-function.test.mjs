@@ -61,6 +61,39 @@ test('model identifier hints only accept model-class integers', () => {
   assert.equal(validateFeedbackReport(tooMany), false);
 });
 
+test('unknown devices pair the model number, family code and product name, and are optional', () => {
+  const good = report();
+  good.deviceEvidence.unknownDevices = [
+    { deviceSource: 12340001, deviceType: 0, productName: 'Future Watch 9' },
+    { deviceSource: 12340002, deviceType: 7 },
+    { productName: 'Active 2 (Round)' },
+  ];
+  assert.equal(validateFeedbackReport(good), true);
+  assert.deepEqual(retiredFieldsDropped(good).deviceEvidence.unknownDevices, good.deviceEvidence.unknownDevices, '入库时原样留着');
+
+  for (const bad of [
+    [{}],
+    [{ deviceSource: 12340001, sn: 'SERIAL' }],
+    [{ deviceSource: 123456789 }],
+    [{ deviceSource: 0 }],
+    [{ deviceType: 1000 }],
+    [{ deviceSource: '12340001' }],
+    [{ productName: '凌苍的T-Rex 3' }],
+    [{ productName: 'alex@example.com' }],
+    [{ productName: '12345' }],
+    [{ productName: 'x'.repeat(41) }],
+    'not-an-array',
+  ]) {
+    const invalid = report();
+    invalid.deviceEvidence.unknownDevices = bad;
+    assert.equal(validateFeedbackReport(invalid), false, `不该接受 ${JSON.stringify(bad)}`);
+  }
+
+  const tooMany = report();
+  tooMany.deviceEvidence.unknownDevices = Array.from({ length: 9 }, (_, i) => ({ deviceSource: i + 1 }));
+  assert.equal(validateFeedbackReport(tooMany), false);
+});
+
 test('user-assigned model pairings are model-class only, and optional', () => {
   const base = report();
   assert.equal(base.userAssignedModels, undefined);
