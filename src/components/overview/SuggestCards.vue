@@ -38,6 +38,7 @@ import { useSleepJournalText } from '../sleepJournal/sleepJournal.i18n';
 import { isBlank, useSleepJournal } from '../../composables/useSleepJournal';
 import { dayKey as localDayKey } from '../../lib/aiTask/bridgeScale';
 import { armPageMorph } from '../../composables/usePageMorph';
+import { main as mainScroller } from '../../composables/pageMorph/links';
 import { useStageSend } from '../../composables/ai/useStageSend';
 import { useAiTaskDraft } from '../../composables/useAiTaskDraft';
 import { backend, isDesktop } from '../../lib/bridge';
@@ -323,6 +324,38 @@ const FLY_MS = paced(520);
 /** 卡的圆角（整段形变用它；胶囊那一端浏览器自动夹成半圆）。 */
 const radiusOf = (el: HTMLElement) => Number.parseFloat(getComputedStyle(el).borderTopLeftRadius) || 26;
 /**
+ * 形变的另一头在屏幕外（缩回去时胶囊在上面看不见、长回来时卡在下面看不见）：页面跟着滚，让那一头落在看得见的地方。
+ * 返回这次要滚的距离（正 = 往下），调用方把终点框按滚完的位置交给形变；滚动和形变同一时长、同一种先快后慢，一起走完。
+ */
+const COMFORT_TOP = 96;
+const COMFORT_BOTTOM = 24;
+const scrollNeed = (rect: DOMRect | { top: number; bottom: number }) => {
+  const box = mainScroller();
+  if (!box) return 0;
+  const view = box.getBoundingClientRect();
+  const top = view.top + COMFORT_TOP;
+  const bottom = view.bottom - COMFORT_BOTTOM;
+  let delta = 0;
+  if (rect.top < top) delta = rect.top - top;
+  else if (rect.bottom > bottom) delta = Math.min(rect.bottom - bottom, rect.top - top);
+  const max = box.scrollHeight - box.clientHeight;
+  return Math.round(Math.max(-box.scrollTop, Math.min(max - box.scrollTop, delta)));
+};
+const glideScroll = (delta: number, duration: number) => {
+  const box = mainScroller();
+  if (!box || !delta) return;
+  const start = box.scrollTop;
+  const t0 = performance.now();
+  const ease = (x: number) => 1 - (1 - x) ** 3;
+  const step = (now: number) => {
+    const p = Math.min(1, (now - t0) / duration);
+    box.scrollTop = start + delta * ease(p);
+    if (p < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+};
+const shifted = (rect: DOMRect, delta: number) => ({ left: rect.left, top: rect.top - delta, width: rect.width, height: rect.height });
+/**
  * 卡在概览网格里占的那一格收拢 / 让开：卡高在原高和 0 之间过渡。网格的行距收不掉（0 高的一行照样夹着上下两道行距），
  * 所以下一行同时借走一道行距（负的上外边距）；收完卡撤掉、借的还回去，前后版面一样，下面的行一路平滑、最后不跳。
  */
@@ -347,7 +380,11 @@ const minimize = async () => {
   // 开着也不先收牌：摊着牌的整张卡就是起点，一步缩进胶囊（先收牌、再回扇牌、再缩，三段太拖）。
   suggestMorph.value = 'to-chip';
   releaseSize();
-  const flight = flyCardChip({ from: el, to: chip, radius: radiusOf(el), duration: FLY_MS, easing: OPEN_EASE });
+  // 胶囊在上面、已经滚出屏幕：页面跟着往上回，胶囊落在看得见的地方。
+  const chipRect = chip.getBoundingClientRect();
+  const delta = scrollNeed(chipRect);
+  const flight = flyCardChip({ from: el, to: chip, toRect: shifted(chipRect, delta), radius: radiusOf(el), duration: FLY_MS, easing: OPEN_EASE });
+  glideScroll(delta, FLY_MS);
   el.style.visibility = 'hidden';
   const slot = slotMotion(el, true);
   await flight.finished;
@@ -367,7 +404,11 @@ watch(root, (el) => {
   if (!el || suggestMorph.value !== 'from-chip') return;
   const chip = suggestChip.value;
   if (!chip) { suggestMorph.value = 'idle'; return; }
-  const flight = flyCardChip({ from: chip, to: el, radius: radiusOf(el), duration: FLY_MS, easing: OPEN_EASE });
+  // 卡长回的位置在下面、看不全：页面跟着往下拉，卡整张落在屏幕里。
+  const cardRect = el.getBoundingClientRect();
+  const delta = scrollNeed(cardRect);
+  const flight = flyCardChip({ from: chip, to: el, toRect: shifted(cardRect, delta), radius: radiusOf(el), duration: FLY_MS, easing: OPEN_EASE });
+  glideScroll(delta, FLY_MS);
   el.style.visibility = 'hidden';
   const slot = slotMotion(el, false);
   void flight.finished.then(() => {
@@ -457,11 +498,12 @@ onDeactivated(() => {
 .ask-text strong { color: var(--ink); font-size: var(--fs-3xl); font-weight: 700; line-height: 1.22; text-wrap: balance; overflow-wrap: anywhere; }
 .ask-text small { color: var(--subtle); font-size: var(--fs-sm); font-weight: 600; overflow-wrap: anywhere; }
 /* 右边一把扇开的小牌：这一手的缩影，每张画一个图标。展开时牌从这里抽出来、收起时缩回这里。 */
-.ask-fan { position: relative; flex: none; width: calc(74px + (var(--n) - 1) * 26px); height: 104px; margin-top: 28px; }
-.ask-mini { position: absolute; bottom: 0; left: calc(var(--i) * 26px); display: grid; place-items: start; padding: 9px; width: 74px; height: 98px; border-radius: 12px;
+/* 牌多一张（昨晚的睡前牌）时不加宽：总跨度、总角度固定，按张数均分，整把留在卡里不出界。 */
+.ask-fan { --step: calc(78px / var(--n)); position: relative; flex: none; width: calc(70px + (var(--n) - 1) * var(--step)); height: 94px; margin: 24px 10px 0 0; }
+.ask-mini { position: absolute; bottom: 0; left: calc(var(--i) * var(--step)); display: grid; place-items: start; padding: 9px; width: 70px; height: 90px; border-radius: 12px;
   background: var(--mat-raised); color: var(--ask-tone);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ask-tone) 28%, transparent), 0 14px 24px -16px rgb(0 0 0 / .7);
-  transform-origin: 50% 120%; rotate: calc((var(--i) - (var(--n) - 1) / 2) * 8deg); }
+  transform-origin: 50% 120%; rotate: calc((var(--i) - (var(--n) - 1) / 2) * 24deg / var(--n)); }
 /* 睡前牌：睡眠的蓝，右上角一个小点。 */
 .ask-mini.journal { background: linear-gradient(160deg, var(--mat-raised), color-mix(in srgb, var(--sleep) 12%, var(--mat-raised)));
   box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--sleep) 70%, transparent), 0 14px 24px -16px rgb(0 0 0 / .7); }

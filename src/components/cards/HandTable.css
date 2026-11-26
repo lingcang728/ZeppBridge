@@ -16,7 +16,8 @@
 /* 候补一叠：错开叠着，每张露出上沿（--step）。最新抽下来的那张（数组头）排在最下面、压在最上层，整张看得见；
    越早的越往上、越往底下压（--z 由模板按序号给）。 */
 .bench-row { display: flex; flex-direction: column-reverse; align-items: center; padding-top: 2px; }
-.bench-row .hslot { z-index: var(--z, auto); }
+/* flex：牌按钮不留行内基线下的那几像素，错开量就是 --step。 */
+.bench-row .hslot { display: flex; z-index: var(--z, auto); }
 .bench-row .hslot + .hslot { margin-bottom: calc(var(--card-w) * -1.4 + var(--step, 30px)); }
 .bench-row .hslot:hover, .bench-row .hslot:focus-within { z-index: 30; }
 /* 刚换过去的那张：飞的途中和落定后都在同一叠最上面，鼠标停着的那张、后面的牌都盖不住它（指针离开候补、或下一次换牌时放下）。 */

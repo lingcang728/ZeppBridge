@@ -62,16 +62,19 @@ const face = (card: HandCard) => faces.value.get(card.id)!;
 /* ---------- 版式：主牌一道微拱的扇面，候补一排小牌 ---------- */
 /** 候补那一叠的牌宽：和主牌比例固定，不跟着候补张数变窄。 */
 const BENCH_W = 96;
-/** 候补每张往下错开多少（露出上沿的图标和名字）；张数多时压紧，整叠不超过两张牌高。 */
-const benchStep = computed(() => {
-  const n = hand.value.bench.length;
-  return n < 2 ? 0 : Math.max(14, Math.min(34, (BENCH_W * 1.4) / (n - 1)));
-});
 const mainW = computed(() => {
   const n = Math.max(1, hand.value.cards.length);
   const room = stageBox.value.width - (props.showBench ? BENCH_W + 32 : 0);
   const fit = (room - GAP * (n - 1)) / n;
   return Math.max(72, Math.floor(Math.min(140, fit)));
+});
+/** 候补每张往下错开多少（露出上沿的图标和名字）；张数多时压紧，整叠和主牌差不多高，
+ *  不把牌桌撑高（撑高了主牌上下各空出一大截）。 */
+const benchStep = computed(() => {
+  const n = hand.value.bench.length;
+  if (n < 2) return 0;
+  const room = mainW.value * 1.4 + 24 - BENCH_W * 1.4;
+  return Math.max(16, Math.min(34, room / (n - 1)));
 });
 const fanStyle = (i: number): Record<string, string> => {
   const n = hand.value.cards.length;
