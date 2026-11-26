@@ -43,7 +43,7 @@ const messages = defineMessages(
       '同步跑通了，但一条记录也没取到。可能这账号在 Zepp 里本就没有这段数据，也可能手表还没上传到 Zepp App。先在手机 Zepp 里确认有数据，再回来同步。',
     emptyUnconfirmedRegion:
       '同步跑通了，但一条记录也没取到。登录时没能确认账号属于哪个 Zepp 区域，现在用的是猜的那个——打向错误区域的同步就是这样：一路成功，什么都没有。重新连接账号试试。',
-    wrongAccount: '登录的可能不是手表绑定的那个账号；用 Google / Apple 注册的账号，要先在 Zepp App 里绑定邮箱，再用邮箱登录。',
+    wrongAccount: '登录的可能不是手表绑定的那个账号；用 Google / Apple 注册的账号，要先在 Zepp App 里绑定邮箱（首页右上角头像 → 最下面的「设置」→「账号与安全」→「更换邮箱」），再用邮箱登录。',
     reconnect: '去重新连接',
     short: (covered: number, earliest: string) =>
       `本机只有 ${covered} 天数据（最早 ${earliest}）。更早的空白是因为还没从云端取回——不是那段时间没有记录。`,
