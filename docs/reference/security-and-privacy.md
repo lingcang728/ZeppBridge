@@ -282,6 +282,20 @@ counter keyed by a SHA-256 of the date and your IP address with a fixed public
 prefix. That hash is not salted with a secret, so it is not anonymous with
 respect to the IP address.
 
+### Workout structure samples
+
+For a workout the app cannot read yet (for example the per-length strokes, rests at the wall and stroke counts of a pool swim), a diagnostic report is not enough: the author needs to see how the raw data for one workout is shaped. The letter to the author has a "Sample" stamp that attaches a structure sample of one workout (the most recent one by default, or the workout you came from when you use "Write to the author" on a workout's detail page). Once attached, you can open it and read the whole sample before deciding to send it.
+
+The app builds the sample from an allow list, in one format only (`zeppbridge.workout-structure-sample.v1`):
+
+- **Kept**: the field names, nesting and JSON types of the raw data stored for that workout (its entry in the workout list, the detail, splits and laps); sport and stroke codes, pool length, number of lengths, stroke counts, distances, durations, pauses, enumerations and version numbers. Each `lap` row keeps its columns as they are, except the known average heart-rate column, which becomes 0. Point-by-point series keep the time offset of each row.
+- **Replaced**: every other value, such as heart rate, calories, body weight, altitude, SpO₂ and temperature, becomes a 0 of the same type. Strings the app does not recognise, including workout notes and device names, become `<text>`. Strings that contain JSON are cleaned inside with the same rules.
+- **Removed**: coordinates, tracks, places, cities, weather and time zones are removed as whole fields, and so are account, device ID, serial number, MAC, paired device, gear ID, third-party workout ID and token fields. No local paths are included.
+- **Shifted**: absolute times such as start, end, creation and update times are shifted together so that the workout starts at 2000-01-01T00:00:00Z. The intervals between them stay the same.
+- The sample lists which fields were removed and how many values were replaced and times shifted.
+
+The sample travels with the letter: the letter is sent first, then the sample is uploaded as an attachment to `https://zeppbridge.com/api/letters/attachment` and kept, like images, in the author's private Cloudflare R2 bucket (one per letter, at most 1 MB, deleted together with its record after 30 days). The server accepts only this JSON format within that size, not arbitrary files. Until it is uploaded, the sample waits on this computer in `data/letters/attachments/` and is removed once uploaded.
+
 ## Letters to the author
 
 Replies written in the letter box go to zeppbridge.com and are stored in the author's D1 table `letter_replies`, separate from problem reports.

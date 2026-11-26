@@ -528,6 +528,8 @@ export interface BridgeBackend {
   lettersSendReply(input: import('../../types/letters').LetterReplyInput): Promise<import('../../types/letters').LetterSendResult>;
   /** 补寄待寄出、再取一次回执；连不上就原样返回本机的。 */
   lettersSync(): Promise<import('../../types/letters').LetterBoxView>;
+  /** 一次运动的结构样本（不给编号取最近一次）；这次运动没存原始报文时为 null。 */
+  workoutStructureSample(workoutId?: string | null): Promise<import('../../types/letters').StructureSample | null>;
   /** 信匣的数据来信：顺手寄出上一周的来信，再读出全部来信和那年今天。 */
   dataLettersState(): Promise<import('../../types/letters').DataLettersView>;
   /** 来信提醒要看的状态：最新一封每周来信的 id、到了日子还封着的胶囊（顺手寄出上一周的来信）。 */

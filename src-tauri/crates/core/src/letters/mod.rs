@@ -16,6 +16,7 @@ use crate::unique_suffix;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
+pub mod structure_sample;
 #[cfg(test)]
 mod tests;
 
@@ -153,7 +154,13 @@ pub fn attachment_file_name(local_id: &str, index: usize, content_type: &str) ->
     format!("{local_id}-{index}.{ext}")
 }
 
-/// 状态文件里记的附图名只能是 `attachment_file_name` 造出来的那种：不带路径分隔，不会读到目录外面。
+/// 随信附上的运动结构样本的本机文件名：`<回信本机编号>-sample.json`（一封信最多一份）。
+pub fn sample_file_name(local_id: &str) -> String {
+    format!("{local_id}-sample.json")
+}
+
+/// 状态文件里记的附件名只能是 `attachment_file_name` / `sample_file_name` 造出来的那种：
+/// 不带路径分隔，不会读到目录外面。
 pub fn is_attachment_file_name(name: &str) -> bool {
     (5..=96).contains(&name.len())
         && name
@@ -161,7 +168,7 @@ pub fn is_attachment_file_name(name: &str) -> bool {
             .all(|ch| ch.is_ascii_alphanumeric() || ch == '-' || ch == '.')
         && !name.starts_with('.')
         && !name.contains("..")
-        && (name.ends_with(".jpg") || name.ends_with(".png"))
+        && (name.ends_with(".jpg") || name.ends_with(".png") || name.ends_with("-sample.json"))
 }
 
 impl LetterBoxState {

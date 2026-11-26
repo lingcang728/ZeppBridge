@@ -66,6 +66,22 @@ export interface LetterReplyInput {
   reportId?: string;
   /** 附图：界面压缩好的 JPEG（base64，不带 data: 前缀），最多 3 张。没有就不给。 */
   attachments?: string[];
+  /** 附上这次运动的结构样本：只给运动编号，样本由后端按脱敏规则现做。没附就不给。 */
+  sampleWorkoutId?: string;
+}
+
+/** 一次运动的结构样本（后端 `letters::structure_sample`）：`json` 就是随信寄出的那份，其余给预览用。 */
+export interface StructureSample {
+  workout_id: string;
+  /** 真实开始时间：只用来标出是哪一次，不在样本里。 */
+  start_time: string;
+  workout_type: string;
+  json: string;
+  bytes: number;
+  parts: string[];
+  dropped_fields: string[];
+  masked_values: number;
+  shifted_times: number;
 }
 
 /* 信匣里的数据来信（批次 7）：每周数据来信、时间胶囊、那年今天。 */

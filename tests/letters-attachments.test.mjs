@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { ATTACHMENT_BUDGET_BYTES, ATTACHMENT_MAX_BYTES, ATTACHMENTS_PER_DAY, ATTACHMENTS_PER_REPLY, installHash, onRequestPost, sniffImage } from '../functions/api/letters/[action].js';
+import { ATTACHMENT_BUDGET_BYTES, ATTACHMENT_MAX_BYTES, ATTACHMENTS_PER_DAY, ATTACHMENTS_PER_REPLY, SAMPLE_FORMAT, SAMPLE_MAX_BYTES, installHash, isStructureSample, onRequestPost, sniffImage } from '../functions/api/letters/[action].js';
 
 const INSTALL = '3f2b8c1e-9d4a-4c6b-8e2f-1a2b3c4d5e6f';
 const OTHER_INSTALL = '9a8b7c6d-5e4f-4a3b-9c2d-1e0f2a3b4c5d';
@@ -32,7 +32,10 @@ const fakeEnv = async ({ replyAgeDays = 0 } = {}) => {
               today: attachments.filter((row) => row.received_at >= args[0]).length,
             };
           }
-          if (sql.includes('COUNT(*)')) return { count: attachments.filter((row) => row.reply_id === args[0]).length };
+          if (sql.includes('COUNT(*)')) {
+            const rows = attachments.filter((row) => row.reply_id === args[1]);
+            return { count: rows.length, samples: rows.filter((row) => row.content_type === args[0]).length };
+          }
           if (sql.includes('FROM feedback_intake_counters')) return counters.get(args[0]) ?? null;
           return null;
         },
@@ -153,4 +156,30 @@ test('a full bucket or a busy day postpones uploads instead of growing the bill'
 
   const room = await fakeEnv();
   assert.equal((await upload(room.env, jpeg(1))).status, 201);
+});
+
+const sampleBytes = (extra = {}) => new TextEncoder().encode(JSON.stringify({ format: SAMPLE_FORMAT, appVersion: '9.9.9', parts: [], ...extra }));
+
+test('a workout structure sample is accepted once per reply, next to up to three images', async () => {
+  const { env, attachments, objects } = await fakeEnv();
+  const first = await upload(env, sampleBytes(), { type: 'application/json' });
+  assert.equal(first.status, 201);
+  assert.equal(attachments[0].content_type, 'application/json');
+  assert.match([...objects.keys()][0], /\.json$/);
+  assert.equal((await upload(env, sampleBytes({ appVersion: '9.9.8' }), { type: 'application/json' })).status, 409);
+  for (let index = 0; index < ATTACHMENTS_PER_REPLY; index += 1) {
+    assert.equal((await upload(env, jpeg(index + 2))).status, 201);
+  }
+  assert.equal((await upload(env, jpeg(9))).status, 409);
+});
+
+test('only our own sample format passes as JSON, within its size limit', async () => {
+  assert.equal(isStructureSample(sampleBytes()), true);
+  assert.equal(isStructureSample(new TextEncoder().encode('{"format":"other","parts":[]}')), false);
+  assert.equal(isStructureSample(new TextEncoder().encode('not json')), false);
+  const { env } = await fakeEnv();
+  assert.equal((await upload(env, new TextEncoder().encode('{"hello":1}'), { type: 'application/json' })).status, 415);
+  assert.equal((await upload(env, jpeg(), { type: 'application/json' })).status, 415);
+  const big = sampleBytes({ padding: 'x'.repeat(SAMPLE_MAX_BYTES) });
+  assert.equal((await upload(env, big, { type: 'application/json' })).status, 413);
 });

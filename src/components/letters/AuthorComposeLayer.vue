@@ -24,7 +24,7 @@ import { showSentNote } from '../../lib/letters/sentNote';
 import { playPaperSlide } from '../../lib/letters/sound';
 
 const t = useLetterText();
-const { writing, attach, category, sent } = useAuthorCompose();
+const { writing, attach, category, sample, sent } = useAuthorCompose();
 
 const AUTHOR_DRAFT = 'author';
 const draft = ref(loadDraft(AUTHOR_DRAFT));
@@ -99,9 +99,11 @@ const send = async () => {
       }
     }
     if (!sameDraft()) return;
+    const sampleWorkoutId = sample.value?.workoutId;
     const result = await sendLetterReply({
       localId, letterVersion: BUNDLED_VERSION, locale: sendLocale, text: text.trim(),
       allowQuote: false, alsoHit: [], ...(reportId ? { reportId } : {}), ...imagePayload(),
+      ...(sampleWorkoutId ? { sampleWorkoutId } : {}),
     });
     if (!sameDraft()) return;
     // 先拷信纸起飞（拷的是此刻的字和附图），再清草稿：附图的 blob 地址一清就失效，拷贝里的图会变成破图。
@@ -110,6 +112,7 @@ const send = async () => {
     clearImages();
     draft.value = loadDraft(AUTHOR_DRAFT);
     attach.value = false;
+    sample.value = null;
     sent.value += 1;
   } catch (cause) {
     if (sameDraft()) error.value = toUserMessage(cause, t.value.sendFailed);
@@ -137,6 +140,7 @@ const send = async () => {
             v-model:text="draft.text"
             v-model:attach="attach"
             v-model:category="category"
+            v-model:sample="sample"
             :busy="sending"
             :error="error"
             :images="replyImages"

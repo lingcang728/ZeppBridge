@@ -15,7 +15,7 @@ import { at, dayKey, iso } from './rng';
 import { letterVersions } from '../services/letters';
 import type { CloudCompanionState, CloudConfigInput, CloudSetupCommand } from '../lib/bridge/types';
 import type { SleepStageSlice, Workout, WorkoutCodeLabel, WorkoutFitOverride } from '../types';
-import type { LetterBoxView, LetterReplyInput } from '../types/letters';
+import type { LetterBoxView, LetterReplyInput, StructureSample } from '../types/letters';
 
 const unknownWorkout = (now: Date, back: number, hour: number, code: number, minutes: number, avg: number): Workout => {
   const start = at(now, -back, hour, 30);
@@ -155,6 +155,22 @@ export const createDemoExtras = (data: DemoData): Record<string, DemoHandler> =>
       return true;
     },
 
+    // 演示里的结构样本：和后端同样的外形，字段都是虚构的占位值。
+    workout_structure_sample: (a): StructureSample | null => {
+      const w = typeof a.workoutId === 'string' ? data.workouts.find(item => item.workout_id === a.workoutId) : data.workouts[0];
+      if (!w) return null;
+      const document = {
+        format: 'zeppbridge.workout-structure-sample.v1', appVersion: 'demo',
+        workout: { workoutType: w.workout_type, zeppType: w.zepp_type ?? null }, timeBase: '2000-01-01T00:00:00Z',
+        redactions: { droppedFields: ['summary.location', 'summary.deviceid', 'detail.data.longitude_latitude'], maskedValues: 42, shiftedTimes: 4 },
+        parts: [
+          { part: 'summary', channel: 'legacy', payload: { trackid: '946684800', type: w.zepp_type ?? 1, dis: String(Math.round(w.distance_meters ?? 0)), run_time: String(w.moving_seconds ?? 0), avg_heart_rate: '0', calorie: '0' } },
+          { part: 'detail', channel: 'legacy', payload: { code: 1, message: 'success', data: { trackid: 946684800, heart_rate: '0,0;1,0;1,0', time: '0;1;1', lap: '' } } },
+        ],
+      };
+      const json = JSON.stringify(document, null, 2);
+      return { workout_id: w.workout_id, start_time: w.start_time, workout_type: w.workout_type, json, bytes: json.length, parts: ['summary', 'detail'], dropped_fields: document.redactions.droppedFields, masked_values: 42, shifted_times: 4 };
+    },
     letters_state: () => letters,
     letters_sync: () => { letters.receipts_checked_at = new Date().toISOString(); return letters; },
     letters_send_reply: a => {

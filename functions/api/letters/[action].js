@@ -5,7 +5,7 @@
  *   POST /api/letters/reply     寄一封回信（可以只按「我也遇到」，不写字）
  *                               写给作者的信可以附一份脱敏诊断报告的编号 `reportId`（/api/feedback 返回的那个，
  *                               migrations/0010_letter_report_id.sql）；作者读信时据此找到那份报告
- *   POST /api/letters/attachment?reply=<编号>  给自己刚寄出的回信补一张截图（存私有 R2，见下面 attachment()）
+ *   POST /api/letters/attachment?reply=<编号>  给自己刚寄出的回信补一张截图或一份运动结构样本（存私有 R2，见下面 attachment()）
  *   POST /api/letters/receipts  按本机随机 install id 取回自己回信的状态（已读 / 归类 / 哪版修），
  *                               以及作者对这封信的一对一回复（migrations/0009_letter_author_reply.sql）
  *
@@ -168,17 +168,35 @@ async function receipts(context, body) {
  *   头：content-type = image/jpeg | image/png，x-zeppbridge-install-id = 寄这封信的那个 install id
  *   体：图片原始字节。客户端已经重新编码过（去掉 EXIF / 定位），这里只认文件头、限大小。
  * 只给寄出 7 天内的回信补图。图存在私有 R2 桶里，只有作者能取；30 天后连同记录一起删。
+ * 除了图，还收一种 JSON：应用生成的运动结构样本（content-type = application/json，
+ * format = zeppbridge.workout-structure-sample.v1，一封信最多一份）。样本在应用里已经脱敏
+ * （健康数值换成占位值、坐标和标识删掉、时间平移），这里只认格式、限大小。
  * 总量闸：桶里留存的图合计到 2 GB、或当天全站收满 300 张就先不收（507，客户端退避重试），
  * 留在 R2 免费额度（10 GB 存储、每月 100 万次写入）以内。桶上另有 31 天过期的生命周期规则兜底。
  */
 export const ATTACHMENT_MAX_BYTES = 1024 * 1024;
 export const ATTACHMENTS_PER_REPLY = 3;
+/** 运动结构样本：一封信一份，上限和应用里的 STRUCTURE_SAMPLE_MAX_BYTES 一致。2 小时带轨迹的跑步约 340 KB。 */
+export const SAMPLE_MAX_BYTES = 1024 * 1024;
+export const SAMPLES_PER_REPLY = 1;
+export const SAMPLE_FORMAT = 'zeppbridge.workout-structure-sample.v1';
+const SAMPLE_TYPE = 'application/json';
 const ATTACHMENT_REPLY_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 const ATTACHMENT_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 export const ATTACHMENT_BUDGET_BYTES = 2 * 1024 * 1024 * 1024;
 export const ATTACHMENTS_PER_DAY = 300;
 const REPLY_ID = REPORT_ID;
 const IMAGE_TYPES = { 'image/jpeg': 'jpg', 'image/png': 'png' };
+
+/** 是不是应用生成的那种结构样本：能解析、是对象、格式标记对得上。 */
+export const isStructureSample = (bytes) => {
+  try {
+    const value = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
+    return isObject(value) && value.format === SAMPLE_FORMAT && Array.isArray(value.parts);
+  } catch {
+    return false;
+  }
+};
 
 /** 看文件头认图片，不信 content-type 一面之词。 */
 export const sniffImage = (bytes) => {
@@ -214,13 +232,15 @@ async function attachment(context) {
   const installId = request.headers.get('x-zeppbridge-install-id') || '';
   const declared = (request.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
   if (!REPLY_ID.test(replyId) || !INSTALL_ID.test(installId)) return response({ ok: false, error: 'invalid_request' }, 422);
-  if (!IMAGE_TYPES[declared]) return response({ ok: false, error: 'unsupported_media_type' }, 415);
-  if (Number(request.headers.get('content-length') || 0) > ATTACHMENT_MAX_BYTES) return response({ ok: false, error: 'payload_too_large' }, 413);
+  const sample = declared === SAMPLE_TYPE;
+  if (!IMAGE_TYPES[declared] && !sample) return response({ ok: false, error: 'unsupported_media_type' }, 415);
+  const maxBytes = sample ? SAMPLE_MAX_BYTES : ATTACHMENT_MAX_BYTES;
+  if (Number(request.headers.get('content-length') || 0) > maxBytes) return response({ ok: false, error: 'payload_too_large' }, 413);
   let bytes;
   try { bytes = new Uint8Array(await request.arrayBuffer()); } catch { return response({ ok: false, error: 'invalid_request' }, 400); }
   if (bytes.length === 0) return response({ ok: false, error: 'invalid_request' }, 422);
-  if (bytes.length > ATTACHMENT_MAX_BYTES) return response({ ok: false, error: 'payload_too_large' }, 413);
-  if (sniffImage(bytes) !== declared) return response({ ok: false, error: 'unsupported_media_type' }, 415);
+  if (bytes.length > maxBytes) return response({ ok: false, error: 'payload_too_large' }, 413);
+  if (sample ? !isStructureSample(bytes) : sniffImage(bytes) !== declared) return response({ ok: false, error: 'unsupported_media_type' }, 415);
 
   const now = new Date();
   let owner;
@@ -237,8 +257,13 @@ async function attachment(context) {
   try {
     const existing = await db.prepare('SELECT id FROM letter_attachments WHERE reply_id = ? AND sha256 = ?').bind(replyId, sha256).first();
     if (existing) return response({ attachmentId: existing.id, duplicate: true });
-    const counted = await db.prepare('SELECT COUNT(*) AS count FROM letter_attachments WHERE reply_id = ?').bind(replyId).first();
-    if (Number(counted?.count ?? 0) >= ATTACHMENTS_PER_REPLY) return response({ ok: false, error: 'too_many_attachments' }, 409);
+    const counted = await db.prepare(`
+      SELECT COUNT(*) AS count, COALESCE(SUM(CASE WHEN content_type = ? THEN 1 ELSE 0 END), 0) AS samples
+      FROM letter_attachments WHERE reply_id = ?
+    `).bind(SAMPLE_TYPE, replyId).first();
+    const samples = Number(counted?.samples ?? 0);
+    const images = Number(counted?.count ?? 0) - samples;
+    if (sample ? samples >= SAMPLES_PER_REPLY : images >= ATTACHMENTS_PER_REPLY) return response({ ok: false, error: 'too_many_attachments' }, 409);
   } catch {
     return response({ ok: false, error: 'storage_unavailable' }, 503);
   }
@@ -260,7 +285,7 @@ async function attachment(context) {
   }
 
   const attachmentId = crypto.randomUUID();
-  const objectKey = `letters/${replyId}/${attachmentId}.${IMAGE_TYPES[declared]}`;
+  const objectKey = `letters/${replyId}/${attachmentId}.${sample ? 'json' : IMAGE_TYPES[declared]}`;
   try {
     await bucket.put(objectKey, bytes, { httpMetadata: { contentType: declared } });
     await db.prepare(`

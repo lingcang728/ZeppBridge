@@ -16,6 +16,7 @@ import { ATTACH_MAX, isImageFile, type ReplyImage } from '../../lib/letters/atta
 import AttachButton from './AttachButton.vue';
 import ClippedPhotos from './ClippedPhotos.vue';
 import ReportPicker from './ReportPicker.vue';
+import SampleTag from './SampleTag.vue';
 import type { SegmentItem } from '../SegmentTrack.vue';
 import { useLetterText } from './letters.i18n';
 import { stampMessages } from './stamps.i18n';
@@ -27,11 +28,13 @@ const CATEGORIES: ReportCategory[] = ['device', 'workout', 'data', 'other'];
 const props = withDefaults(defineProps<{
   text: string; attach: boolean; category: ReportCategory; busy: boolean; error: string;
   images?: ReplyImage[]; preparing?: boolean; attachFailed?: boolean;
-}>(), { images: () => [] });
+  sample?: { workoutId: string } | null;
+}>(), { images: () => [], sample: null });
 const emit = defineEmits<{
   (event: 'update:text', text: string): void;
   (event: 'update:attach', attach: boolean): void;
   (event: 'update:category', category: ReportCategory): void;
+  (event: 'update:sample', sample: { workoutId: string } | null): void;
   (event: 'send'): void;
   (event: 'addImages', files: File[]): void;
   (event: 'removeImage', id: string): void;
@@ -91,6 +94,7 @@ const snap = (event: Event) => {
           <span v-if="images.length < ATTACH_MAX" ref="attachEl" class="clip"><AttachButton icon :count="images.length" :disabled="busy" :preparing="preparing" @add="addFromButton" /></span>
           <ReportPicker :attach="attach" :category="category" :busy="busy" :items="reportItems" :label="reportLabel" :group-label="s.reportCategoryAria"
             @update:attach="emit('update:attach', $event)" @update:category="emit('update:category', $event)" />
+          <SampleTag :sample="sample" :busy="busy" @update:sample="emit('update:sample', $event)" />
         </div>
         <CharCount :text="text" />
         <button type="button" class="seal" :disabled="!canSend" @click="emit('send')">

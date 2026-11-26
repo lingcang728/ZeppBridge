@@ -1,7 +1,8 @@
 <script setup lang="ts">
 /* 运动详情的「来源信息」小卡。它放在哪一列由页面按两列实际高度决定（放进更矮的那列），
    两列底部尽量齐平，不再有一边空出一大片。
-   #140：用修正过的 .fit 顶替这条运动也在这里——它改的正是「这条数据从哪来」。 */
+   #140：用修正过的 .fit 顶替这条运动也在这里——它改的正是「这条数据从哪来」。
+   「写信给作者」也在这里：信纸上先附上这一次运动的结构样本（认没见过的运动报文用）。 */
 import GlyphTile from '../GlyphTile.vue';
 import Icon from '../Icon.vue';
 import type { WorkoutMetrics } from '../../composables/useWorkoutDetail';
@@ -11,6 +12,8 @@ import { formatDistance } from '../../lib/format';
 import { isTauri } from '../../composables/useTauriApi';
 import { useMessages } from '../../i18n';
 import { workoutDetailMessages } from '../../views/WorkoutDetail.i18n';
+import { openAuthorCompose, prefetchAuthorCompose } from '../../composables/useAuthorCompose';
+import { useSampleText } from '../letters/sample.i18n';
 
 defineProps<{
   workout: WorkoutMetrics;
@@ -20,6 +23,8 @@ defineProps<{
 }>();
 const emit = defineEmits<{ replaceFit: []; restoreFit: [] }>();
 const t = useMessages(workoutDetailMessages);
+const s = useSampleText();
+const writeAuthor = (event: MouseEvent, workoutId: string) => openAuthorCompose(event.currentTarget as HTMLElement, { sampleWorkoutId: workoutId });
 const desktop = isTauri();
 // 从 GPX / Strava / Apple 健康导入的运动（core::storage::imports）：没经过 Zepp 云端。
 const imported = (workout: WorkoutMetrics) => workout.type_source === 'imported';
@@ -43,6 +48,10 @@ const imported = (workout: WorkoutMetrics) => workout.type_source === 'imported'
       <button class="button secondary" type="button" :disabled="fit.busy" @click="emit('replaceFit')">{{ fit.override ? t.fitReplaceAgain : t.fitReplace }}</button>
       <button v-if="fit.override" class="button secondary" type="button" :disabled="fit.busy" @click="emit('restoreFit')">{{ t.fitRestore }}</button>
     </div>
+    <div class="author-row">
+      <button class="button secondary" type="button" :title="s.writeAuthorHint" @pointerenter="prefetchAuthorCompose" @focus="prefetchAuthorCompose"
+        @click="writeAuthor($event, workout.workout_id)"><Icon name="mail" :size="15" />{{ s.writeAuthor }}</button>
+    </div>
     <p v-if="fit.note" class="fit-note ok" role="status"><Icon name="circle-check" :size="13" />{{ fit.note }}</p>
     <p v-if="fit.error" class="fit-note bad" role="alert"><Icon name="warning" :size="13" />{{ fit.error }}</p>
   </section>
@@ -60,6 +69,9 @@ dd { margin: 0; color: var(--ink); font-size: var(--fs-sm); overflow-wrap: anywh
 .fit-row dd { color: var(--accent); }
 .fit-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
 .fit-actions .button { flex: 1 1 auto; min-height: 36px; }
+.author-row { display: flex; margin-top: 14px; }
+.fit-actions + .author-row { margin-top: 8px; }
+.author-row .button { display: inline-flex; flex: 1 1 auto; align-items: center; justify-content: center; gap: 6px; min-height: 36px; }
 .fit-note { display: flex; align-items: center; gap: 6px; margin: 10px 0 0; font-size: var(--fs-sm); }
 .fit-note.ok { color: var(--accent); } .fit-note.bad { color: var(--danger); }
 </style>

@@ -205,6 +205,10 @@ fn attachment_names_never_leave_the_attachments_folder_and_only_images_pass() {
     assert!(is_attachment_file_name(
         "3f2b8c1e-9d4a-4c6b-8e2f-1a2b3c4d5e6f-0.jpg"
     ));
+    assert!(is_attachment_file_name(&sample_file_name(
+        "3f2b8c1e-9d4a-4c6b-8e2f-1a2b3c4d5e6f"
+    )));
+    assert!(!is_attachment_file_name("x.json"));
     for bad in [
         "../state.json",
         "a/b.jpg",

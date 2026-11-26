@@ -246,7 +246,9 @@ pub(crate) use data_letters::{
 pub(crate) use imports::{
     export_for_unstrap, import_batches, import_workouts, undo_import_batch, workout_import_sources,
 };
-pub(crate) use letters::{letters_send_reply, letters_state, letters_sync};
+pub(crate) use letters::{
+    letters_send_reply, letters_state, letters_sync, workout_structure_sample,
+};
 pub(crate) use login::{
     cancel_web_login, get_login_status, recover_advanced_credentials, start_web_login,
 };

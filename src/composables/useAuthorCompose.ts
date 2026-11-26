@@ -7,19 +7,26 @@
 import { ref, shallowRef } from 'vue';
 import type { ReportCategory } from '../components/letters/AuthorCompose.vue';
 
-/** 带着来意打开：device = 设备没认出（设备卡的入口），report = 旧的「反馈问题」链接；都会先盖上「附上诊断报告」的章。 */
-export type AuthorComposePreset = 'device' | 'report';
+/**
+ * 带着来意打开：device = 设备没认出（设备卡的入口），report = 旧的「反馈问题」链接，这两种先盖上「附上诊断报告」的章；
+ * `{ sampleWorkoutId }` = 从运动详情进来，先附上那一次运动的结构样本。
+ */
+export type AuthorComposePreset = 'device' | 'report' | { sampleWorkoutId: string };
 
 const writing = shallowRef<{ origin: HTMLElement | null } | null>(null);
 const attach = ref(false);
 const category = ref<ReportCategory>('other');
+/** 附上的运动结构样本：哪一次运动。`null` 是没附。 */
+const sample = ref<{ workoutId: string } | null>(null);
 /** 每寄出一封加一：信匣据此切到「我的回信」。 */
 const sent = ref(0);
 
 /** 从 origin 那里一镜到底展开成写信信纸；关掉时原路缩回 origin。已经开着就不再开第二张。 */
 export function openAuthorCompose(origin: HTMLElement | null, preset?: AuthorComposePreset): void {
   if (writing.value) return;
-  if (preset) {
+  if (typeof preset === 'object') {
+    sample.value = { workoutId: preset.sampleWorkoutId };
+  } else if (preset) {
     attach.value = true;
     category.value = preset === 'device' ? 'device' : 'other';
   }
@@ -43,4 +50,4 @@ export function closeAuthorCompose(): void {
   writing.value = null;
 }
 
-export const useAuthorCompose = () => ({ writing, attach, category, sent });
+export const useAuthorCompose = () => ({ writing, attach, category, sample, sent });

@@ -183,6 +183,7 @@ mod queries;
 mod record_album;
 mod replay;
 pub mod sleep_journal;
+mod structure_sample;
 pub mod training_context;
 pub(crate) mod training_coverage;
 pub mod training_plan;

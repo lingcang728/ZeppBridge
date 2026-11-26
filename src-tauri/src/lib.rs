@@ -72,7 +72,7 @@ use commands::{
     undo_import_batch, undo_workout_edit, verify_auth, verify_backup, workout_feedback_adjusted,
     workout_feedback_dismiss, workout_feedback_get, workout_feedback_prompt, workout_feedback_save,
     workout_feedback_snooze, workout_feedback_toast_due, workout_feedback_toast_show,
-    workout_feel_get, workout_feel_save, workout_import_sources,
+    workout_feel_get, workout_feel_save, workout_import_sources, workout_structure_sample,
 };
 use commands::{card_hand_facts, card_hand_lines, suggestion_cards};
 use commands::{
@@ -799,6 +799,7 @@ pub fn run() {
             submit_diagnostic_report,
             letters_state,
             letters_send_reply,
+            workout_structure_sample,
             letters_sync,
             data_letters_state,
             data_letters_mail_status,

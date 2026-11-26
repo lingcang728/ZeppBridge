@@ -1,17 +1,22 @@
 //! 作者来信的回信与回执（批次 6「信匣」）。状态文件和脱敏在 core 的 `letters`，这里只负责联网：
 //! 寄回信、补寄待寄出、取回执。连不上一律放进「待寄出」，不算失败——下次打开或联网时补寄。
 
+use super::spawn_independent_read;
 use crate::app_state::AppState;
 use crate::ipc_error::AppError;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 use std::time::Duration;
 use tokio::sync::Mutex;
+use zeppbridge_core::letters::structure_sample::{
+    is_structure_sample, StructureSample, STRUCTURE_SAMPLE_MAX_BYTES,
+};
 use zeppbridge_core::letters::{
     attachment_file_name, attachments_dir, decode_attachment, is_attachment_file_name,
     is_letter_version, is_report_id, normalize_also_hit, normalize_locale, random_install_bytes,
-    sanitize_reply, sniff_image, LetterBoxState, LetterReceipt, PendingAttachment, PendingReply,
-    SentReply, LETTER_ATTACHMENTS_MAX, LETTER_ATTACHMENT_MAX_ATTEMPTS, LETTER_ATTACHMENT_MAX_BYTES,
+    sample_file_name, sanitize_reply, sniff_image, LetterBoxState, LetterReceipt,
+    PendingAttachment, PendingReply, SentReply, LETTER_ATTACHMENTS_MAX,
+    LETTER_ATTACHMENT_MAX_ATTEMPTS, LETTER_ATTACHMENT_MAX_BYTES,
 };
 
 const REPLY_ENDPOINT: &str = "https://zeppbridge.com/api/letters/reply";
@@ -150,9 +155,13 @@ async fn upload_attachment(
     let Ok(bytes) = std::fs::read(attachments_dir(data_dir).join(&item.file)) else {
         return Delivery::Rejected(0);
     };
-    let Some(content_type) =
+    // 结构样本是 JSON（我们自己生成的那种格式），其余是压好的 JPEG / PNG。
+    let content_type = if item.file.ends_with(".json") {
+        is_structure_sample(&bytes).then_some("application/json")
+    } else {
         sniff_image(&bytes).filter(|_| bytes.len() <= LETTER_ATTACHMENT_MAX_BYTES)
-    else {
+    };
+    let Some(content_type) = content_type else {
         return Delivery::Rejected(0);
     };
     let Ok(response) = client
@@ -174,6 +183,10 @@ async fn upload_attachment(
     }
     // 服务端还没有附图接口（应用先于站点更新，旧版回 404 not_found / 405）：图留在本机，下次再传，
     // 不当成「不收」删掉。真正的「这封回信不是你的 / 不存在」是 404 unknown_reply，照旧删。
+    // 站点还没上收结构样本的接口时会回 415：样本留在本机，等站点更新后再传（最多试 20 次）。
+    if status.as_u16() == 415 && content_type == "application/json" {
+        return Delivery::Retry;
+    }
     if matches!(status.as_u16(), 404 | 405) {
         let body = response.text().await.unwrap_or_default();
         if !body.contains("unknown_reply") {
@@ -253,6 +266,37 @@ fn store_attachments(
     Ok(files)
 }
 
+/// 随信附上的运动结构样本存进本机附件目录，和附图一起排队上传。
+fn store_sample(
+    data_dir: &Path,
+    local_id: &str,
+    sample: &StructureSample,
+) -> Result<String, AppError> {
+    if sample.bytes > STRUCTURE_SAMPLE_MAX_BYTES {
+        return Err(AppError::new(
+            "err.letters.sample_too_large",
+            "这次运动的结构样本太大，没有寄出；换一次运动试试",
+        ));
+    }
+    let dir = attachments_dir(data_dir);
+    std::fs::create_dir_all(&dir).map_err(|_| save_error())?;
+    let file = sample_file_name(local_id);
+    std::fs::write(dir.join(&file), sample.json.as_bytes()).map_err(|_| save_error())?;
+    Ok(file)
+}
+
+/// 一次运动的结构样本（`workout_id` 为空取最近一次），给信纸预览；寄信时按同样的规则再生成一次。
+#[tauri::command]
+pub async fn workout_structure_sample(
+    state: tauri::State<'_, AppState>,
+    workout_id: Option<String>,
+) -> std::result::Result<Option<StructureSample>, AppError> {
+    spawn_independent_read(state.data_dir.clone(), move |db| {
+        db.workout_structure_sample(workout_id.as_deref(), env!("CARGO_PKG_VERSION"))
+    })
+    .await
+}
+
 fn save_error() -> AppError {
     AppError::new(
         "err.letters.save_failed",
@@ -328,6 +372,7 @@ pub async fn letters_send_reply(
     also_hit: Vec<String>,
     report_id: Option<String>,
     attachments: Option<Vec<String>>,
+    sample_workout_id: Option<String>,
 ) -> std::result::Result<LetterSendResult, AppError> {
     // 只收 /api/feedback 发的那种编号（小写 UUID），别的一律不带，免得把奇怪的东西寄出去。
     let report_id = report_id.filter(|id| is_report_id(id));
@@ -348,9 +393,28 @@ pub async fn letters_send_reply(
     if text.is_empty() && also_hit.is_empty() {
         return Err(AppError::new("err.letters.empty", "回信是空的，写几句再寄"));
     }
+    // 样本在后端按运动编号现做，不收界面交来的内容：寄出去的只能是脱敏规则产出的那一份。
+    let sample = match sample_workout_id {
+        Some(id) => Some(
+            spawn_independent_read(state.data_dir.clone(), move |db| {
+                db.workout_structure_sample(Some(&id), env!("CARGO_PKG_VERSION"))
+            })
+            .await?
+            .ok_or_else(|| {
+                AppError::new(
+                    "err.letters.sample_missing",
+                    "这次运动没有存原始报文，附不了结构样本",
+                )
+            })?,
+        ),
+        None => None,
+    };
     let _guard = LETTERS_LOCK.lock().await;
-    let attachments =
+    let mut attachments =
         store_attachments(&state.data_dir, &local_id, &attachments.unwrap_or_default())?;
+    if let Some(sample) = &sample {
+        attachments.push(store_sample(&state.data_dir, &local_id, sample)?);
+    }
     let mut letters = LetterBoxState::load(&state.data_dir);
     letters.ensure_install_id(random_install_bytes());
     letters.queue(PendingReply {

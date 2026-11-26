@@ -548,6 +548,9 @@ export const tauriBackend: BridgeBackend = {
   lettersSync() {
     return call<import('../../types/letters').LetterBoxView>('letters_sync');
   },
+  workoutStructureSample(workoutId?: string | null) {
+    return call<import('../../types/letters').StructureSample | null>('workout_structure_sample', { workoutId: workoutId ?? null });
+  },
   dataLettersState() {
     return call<import('../../types/letters').DataLettersView>('data_letters_state');
   },
