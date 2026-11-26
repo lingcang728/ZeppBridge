@@ -5146,7 +5146,7 @@ Regeln:
       badge: 'Experimentell',
       unstrapImportTitle: 'Trainings aus unstrap importieren',
       unstrapImportSub:
-        'Wähle eine unstrap-Backup-ZIP: Die vom Brustgurt und Telefon aufgezeichneten Trainings (Herzfrequenz, Strecke, Pausen) werden übernommen, eins pro Einheit, zusammen mit allen noch nicht auf diesem Rechner vorhandenen Herzfrequenz-, SpO₂-, Ruheherzfrequenz- und Schlafdaten. Von Zepp synchronisierte Daten bleiben unberührt. Von unstrap selbst berechnete Werte werden weggelassen. Importe werden auf der Trainings-Seite aufgeführt und können einzeln rückgängig gemacht werden.',
+        'Wähle eine unstrap-Backup-ZIP: Die vom Brustgurt und Telefon aufgezeichneten Trainings (Herzfrequenz, Strecke, Pausen) werden übernommen, eins pro Einheit, zusammen mit allen noch nicht auf diesem Rechner vorhandenen Herzfrequenz-, SpO₂-, HRV-, Ruheherzfrequenz- und Schlafdaten. Von Zepp synchronisierte Daten bleiben unberührt. Von unstrap selbst berechnete Werte werden weggelassen. Importe werden auf der Trainings-Seite aufgeführt und können einzeln rückgängig gemacht werden.',
       unstrapImportButton: 'Backup auswählen',
       unstrapExportTitle: 'Für unstrap exportieren',
       unstrapExportSub:

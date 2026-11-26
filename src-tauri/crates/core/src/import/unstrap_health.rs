@@ -1,7 +1,7 @@
 //! unstrap 备份里的健康样本（计划 C2 二期）。逐表的口径见 `docs/development/unstrap-mapping.md`。
 //!
-//! 只读、只挑：心率（带子存的历史，一分钟一条）、单点血氧、静息心率（按 unstrap 记的本地日）、
-//! 睡眠（不含小睡、不含分数）。这里只管把表读成结构，「本机已有就不收」在落库那边做
+//! 只读、只挑：心率（带子存的历史，一分钟一条）、单点血氧、夜间 HRV（RMSSD）、
+//! 静息心率（按 unstrap 记的本地日）、睡眠（不含小睡、不含分数）。这里只管把表读成结构，「本机已有就不收」在落库那边做
 //! （`storage::import_health`）。
 
 use std::collections::{BTreeMap, HashMap};
@@ -134,6 +134,19 @@ pub fn parse_unstrap_health<R: Read + Seek>(
         "%",
         "percent",
         50.0..=100.0,
+        |_, _| true,
+        &mut health.samples,
+    );
+    // HRV：unstrap 的 hrv 表只从带子的 RMSSD 记录（GDSP 73）写入，SDNN 另在 hrv_sdnn.csv，
+    // 所以进 hrv_rmssd，和云端夜间 RMSSD 同一个指标、同一个有效范围。SDNN 不收（本机的
+    // hrv 是 Zepp 自己的口径，两种算法混成一条线不行）。
+    let hrv = load(archive, "hrv.csv", &mut unreadable);
+    unreadable += point_samples(
+        hrv,
+        "hrv_rmssd",
+        "ms",
+        "milliseconds",
+        1.0..=400.0,
         |_, _| true,
         &mut health.samples,
     );

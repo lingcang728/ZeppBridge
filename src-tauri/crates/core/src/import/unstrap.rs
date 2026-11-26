@@ -141,7 +141,42 @@ struct Summary {
     pauses: Vec<PauseInterval>,
 }
 
+/// 心率和轨迹是两张表、各自一秒一条：同一秒的并成一个点，缺的格子互相补（先到的为准）。
+/// 不并的话每秒会落成两行残缺的样本，一行只有心率、一行只有坐标。
+fn merge_same_second(points: Vec<TrackPoint>) -> Vec<TrackPoint> {
+    let mut by_second: BTreeMap<i64, TrackPoint> = BTreeMap::new();
+    let mut untimed = Vec::new();
+    for point in points {
+        let Some(time) = point.time else {
+            untimed.push(point);
+            continue;
+        };
+        match by_second.entry(time.timestamp()) {
+            std::collections::btree_map::Entry::Vacant(slot) => {
+                slot.insert(point);
+            }
+            std::collections::btree_map::Entry::Occupied(mut slot) => {
+                let kept = slot.get_mut();
+                kept.segment_start |= point.segment_start;
+                if kept.latitude.is_none() || kept.longitude.is_none() {
+                    kept.latitude = point.latitude;
+                    kept.longitude = point.longitude;
+                }
+                kept.altitude_m = kept.altitude_m.or(point.altitude_m);
+                kept.heart_rate = kept.heart_rate.or(point.heart_rate);
+                kept.cadence = kept.cadence.or(point.cadence);
+                kept.power_watts = kept.power_watts.or(point.power_watts);
+                kept.distance_m = kept.distance_m.or(point.distance_m);
+            }
+        }
+    }
+    let mut merged: Vec<TrackPoint> = by_second.into_values().collect();
+    merged.extend(untimed);
+    merged
+}
+
 fn build(summary: Summary, points: Vec<TrackPoint>) -> ParsedActivity {
+    let points = merge_same_second(points);
     let mut activity =
         activity_from_track(points, summary.sport.clone(), None).unwrap_or(ParsedActivity {
             sport: summary.sport.clone(),

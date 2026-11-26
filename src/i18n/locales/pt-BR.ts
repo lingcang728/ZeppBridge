@@ -3627,7 +3627,7 @@ Regras:
       lead: 'Tudo aqui é experimental: pode mudar ou ser removido. Se algo der errado, escreva para o autor pela caixa de correio.',
       badge: 'Experimental',
       unstrapImportTitle: 'Importar treinos do unstrap',
-      unstrapImportSub: 'Escolha um zip de backup do unstrap: os treinos gravados pela cinta e pelo celular (frequência cardíaca, trajeto, pausas) entram, um por sessão, junto com dados de frequência cardíaca, SpO₂, frequência em repouso e sono que ainda não estejam neste computador. Nada sincronizado do Zepp é alterado. Pontuações calculadas pelo unstrap não são importadas. As importações aparecem na página de Treinos, onde cada uma pode ser desfeita.',
+      unstrapImportSub: 'Escolha um zip de backup do unstrap: os treinos gravados pela cinta e pelo celular (frequência cardíaca, trajeto, pausas) entram, um por sessão, junto com dados de frequência cardíaca, SpO₂, HRV, frequência em repouso e sono que ainda não estejam neste computador. Nada sincronizado do Zepp é alterado. Pontuações calculadas pelo unstrap não são importadas. As importações aparecem na página de Treinos, onde cada uma pode ser desfeita.',
       unstrapImportButton: 'Escolher backup',
       unstrapExportTitle: 'Exportar para o unstrap',
       unstrapExportSub: 'Grava os treinos deste computador em um zip que o unstrap pode importar (resumo e frequência cardíaca de cada treino); selecione-o em Restaurar do backup no unstrap. Valores ausentes ficam em branco, nunca 0. A carga de treino e o VO₂max do Zepp não são incluídos.',

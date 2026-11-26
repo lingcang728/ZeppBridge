@@ -4839,7 +4839,7 @@ Regels:
       badge: 'Experimenteel',
       unstrapImportTitle: 'Trainingen importeren uit unstrap',
       unstrapImportSub:
-        'Kies een unstrap-back-up-zip: de trainingen die de band en de telefoon hebben vastgelegd (hartslag, route, pauzes) worden geïmporteerd, één per sessie, plus eventuele hartslag, SpO₂, rusthartslag en slaap die nog niet op deze computer staan. Aan gegevens gesynchroniseerd vanuit Zepp verandert niets. Scores die unstrap zelf berekent worden overgeslagen. Geïmporteerde sessies staan op de pagina Trainingen, waar ze per stuk ongedaan kunnen worden gemaakt.',
+        'Kies een unstrap-back-up-zip: de trainingen die de band en de telefoon hebben vastgelegd (hartslag, route, pauzes) worden geïmporteerd, één per sessie, plus eventuele hartslag, SpO₂, HRV, rusthartslag en slaap die nog niet op deze computer staan. Aan gegevens gesynchroniseerd vanuit Zepp verandert niets. Scores die unstrap zelf berekent worden overgeslagen. Geïmporteerde sessies staan op de pagina Trainingen, waar ze per stuk ongedaan kunnen worden gemaakt.',
       unstrapImportButton: 'Kies back-up',
       unstrapExportTitle: 'Exporteren voor unstrap',
       unstrapExportSub:

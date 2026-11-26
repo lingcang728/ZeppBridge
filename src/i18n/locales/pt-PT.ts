@@ -3835,7 +3835,7 @@ Regras:
       badge: 'Experimental',
       unstrapImportTitle: 'Importar treinos do unstrap',
       unstrapImportSub:
-        'Escolhe um zip de cópia de segurança do unstrap: os treinos gravados pela banda e pelo telemóvel (frequência cardíaca, trajeto, pausas) entram, um por sessão, juntamente com quaisquer dados de frequência cardíaca, SpO₂, frequência em repouso e sono ainda não presentes neste computador. Nada do que foi sincronizado do Zepp é alterado. As pontuações calculadas pelo unstrap não são importadas. As importações aparecem na página de Treinos, onde podes anular cada uma.',
+        'Escolhe um zip de cópia de segurança do unstrap: os treinos gravados pela banda e pelo telemóvel (frequência cardíaca, trajeto, pausas) entram, um por sessão, juntamente com quaisquer dados de frequência cardíaca, SpO₂, HRV, frequência em repouso e sono ainda não presentes neste computador. Nada do que foi sincronizado do Zepp é alterado. As pontuações calculadas pelo unstrap não são importadas. As importações aparecem na página de Treinos, onde podes anular cada uma.',
       unstrapImportButton: 'Escolher cópia',
       unstrapExportTitle: 'Exportar para o unstrap',
       unstrapExportSub:

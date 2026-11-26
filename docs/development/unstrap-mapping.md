@@ -20,9 +20,10 @@ Beta 实验室「从 unstrap 导入」读的是 unstrap（Helio Strap 的开源�
 | 表 | 用到的列 | 进哪里 | 口径 |
 |---|---|---|---|
 | `workout.csv` + `workout_hr.csv` | `start_epoch` `end_epoch` `sport_type` `exercise_seconds` `calories` `avg_hr` `max_hr`；心率 `epoch` `bpm` | `workouts` + 逐点心率 | 心率带自己记的运动。`workout_deleted.csv` 里的（用户在 unstrap 里删的）不导。训练效果、训练负荷、VO₂max 是带子 / unstrap 的算法结果，不收。 |
-| `app_workout.csv` + `app_workout_hr.csv` + `app_workout_route.csv` | 起止、`sport_type`、`pauses`（`起-止` 秒对，逗号分隔）、`avg_hr` `max_hr`、`distance_m` + `distance_from_steps`、`total_kcal`；轨迹 `epoch` `lat` `lon` `altitude_m` | `workouts` + 逐点心率 / 轨迹 / 暂停 | 手机上开始的运动。和带子那条起点两分钟内的并成一条，以手机为准、缺的从带子补。按步数估出来的距离（`distance_from_steps = true`）不要。 |
+| `app_workout.csv` + `app_workout_hr.csv` + `app_workout_route.csv` | 起止、`sport_type`、`pauses`（`起-止` 秒对，逗号分隔）、`avg_hr` `max_hr`、`distance_m` + `distance_from_steps`、`total_kcal`；轨迹 `epoch` `lat` `lon` `altitude_m` | `workouts` + 逐点心率 / 轨迹 / 暂停 | 手机上开始的运动。和带子那条起点两分钟内的并成一条，以手机为准、缺的从带子补。心率和轨迹同一秒的并成一个样本点（不拆成一行只有心率、一行只有坐标）。按步数估出来的距离（`distance_from_steps = true`）不要。 |
 | `heart_rate.csv` | `epoch` `bpm` `source` | `metric_samples`：`heart_rate`，bpm | 只收 `source = 0`（带子存的历史，一分钟一条）；`1` 是运动时手机实时收到的，运动导入已经带了。 |
 | `spo2.csv` | `epoch` `percent` | `metric_samples`：`spo2`，% | 带子测的单点血氧。夜间连续血氧 `sleep_spo2.csv` 不收（见下）。 |
+| `hrv.csv` | `epoch` `milliseconds` | `metric_samples`：`hrv_rmssd`，ms | 夜间 HRV。unstrap 的 `hrv` 表只从带子的 RMSSD 记录（GDSP 类型 73）写入，SDNN 另在 `hrv_sdnn.csv`，所以统计量是确定的 RMSSD，和云端夜间 RMSSD 是同一个指标。有效范围 1–400 ms，和解码云端的口径一致。 |
 | `resting_hr.csv` | `date` `bpm` | `daily_metrics`：`resting_hr`，bpm | 按 `date` 列落本地日。 |
 | `sleep_session.csv` + `sleep_stage.csv` + `sleep_edit.csv` | 起止、`nap`、`deep_min` `light_min` `rem_min` `awake_min` `wake_count`；阶段 `session_start_epoch` `start` `end` `stage`（0 清醒 1 浅 2 深 3 REM） | `sleep_sessions` + `sleep_stages`，id `unstrap:<起点秒>` | 小睡（`nap = true`）不收：本机小睡另有一套，一期不接。`score` 不收（不顶替 Zepp 的睡眠分）。用户在 unstrap 里删掉的（`sleep_edit.deleted`）不收，改过起止的用改过的。分钟数照表里的，空就是没有；阶段条按表里的顺序，不按总量拼。 |
 
@@ -30,8 +31,7 @@ Beta 实验室「从 unstrap 导入」读的是 unstrap（Helio Strap 的开源�
 
 | 表 | 原因 |
 |---|---|
-| `hrv.csv` | 只写了「毫秒」，没说是 RMSSD 还是别的统计量 → 禁令：不进 SDNN / RMSSD 列。 |
-| `hrv_sdnn.csv` | 是 SDNN，但本机没有 SDNN 列；塞进 `hrv` 会和 Zepp 的 HRV 混成一条线。 |
+| `hrv_sdnn.csv` | 是 SDNN，但本机的 `hrv` 是 Zepp 自己的口径；带子的 SDNN 塞进去会和它混成一条线。 |
 | `stress.csv` | 本机的全天压力是按天的最小 / 平均 / 最大，逐条压力没有对应的列；从逐条值算日均是派生，不做。 |
 | `breath_rate.csv` | 本机呼吸率是按晚的一个值，逐条均值是派生。 |
 | `skin_temperature.csv` | 本机没有皮温样本指标。 |

@@ -360,16 +360,28 @@ not-a-day,50
             ("sleep_edit.csv", edits.as_bytes()),
             (
                 "hrv.csv",
-                b"epoch,ms
-1714521600,40
+                b"time,epoch,milliseconds
+x,1714521600,40.5
+x,1714521900,900
+",
+            ),
+            (
+                "hrv_sdnn.csv",
+                b"time,epoch,milliseconds
+x,1714521600,55
 ",
             ),
         ]);
         let file = parse_unstrap_archive(Cursor::new(bytes)).unwrap();
         let health = file.health.unwrap();
         // 手机实时收的（source 1）运动已带；300 bpm 超出范围算读不出。
+        // hrv.csv 是 RMSSD，进 hrv_rmssd；900 ms 超出范围算读不出；SDNN 不收。
         let points: Vec<(&str, f64)> = health.samples.iter().map(|s| (s.metric, s.value)).collect();
-        assert_eq!(points, [("heart_rate", 62.0), ("spo2", 97.0)]);
+        assert_eq!(
+            points,
+            [("heart_rate", 62.0), ("spo2", 97.0), ("hrv_rmssd", 40.5)]
+        );
+        assert_eq!(health.samples[2].unit, "ms");
         assert_eq!(health.daily.len(), 1);
         assert_eq!(health.daily[0].date, "2024-05-01");
         // 小睡和删掉的那晚不要；分数不收；阶段按时间排好。
@@ -379,8 +391,51 @@ not-a-day,50
         assert_eq!((sleep.deep_minutes, sleep.rem_minutes), (Some(60), None));
         let order: Vec<&str> = sleep.stages.iter().map(|s| s.stage.as_str()).collect();
         assert_eq!(order, ["light", "deep"]);
-        // 300 bpm 一条、坏日期一条。
-        assert_eq!(file.unreadable, 2);
+        // 300 bpm 一条、900 ms 一条、坏日期一条。
+        assert_eq!(file.unreadable, 3);
+    }
+
+    #[test]
+    fn phone_heart_rate_and_route_in_the_same_second_become_one_sample() {
+        let app_workout = format!(
+            "start_epoch,end_epoch,sport_type,distance_m,distance_from_steps\n{T0},{end},1,1000.0,false\n",
+            end = T0 + 600,
+        );
+        let hr = format!(
+            "workout_start_epoch,epoch,bpm\n{T0},{T0},120\n{T0},{t1},130\n{T0},{t3},140\n",
+            t1 = T0 + 60,
+            t3 = T0 + 180,
+        );
+        let route = format!(
+            "workout_start_epoch,epoch,lat,lon,accuracy_m,speed_ms,bearing_deg,altitude_m\n\
+             {T0},{T0},31.0,121.0,5,,,10\n{T0},{t1},31.001,121.0,5,,,11\n{T0},{t2},31.002,121.0,5,,,12\n",
+            t1 = T0 + 60,
+            t2 = T0 + 120,
+        );
+        let bytes = zip_of(&[
+            ("workout.csv", b"start_epoch,end_epoch,sport_type\n"),
+            ("app_workout.csv", app_workout.as_bytes()),
+            ("app_workout_hr.csv", hr.as_bytes()),
+            ("app_workout_route.csv", route.as_bytes()),
+        ]);
+        let file = parse_unstrap_archive(Cursor::new(bytes)).unwrap();
+        let decoded = file.activities[0].decoded.as_ref().unwrap();
+        // 0 秒、60 秒两边都有，并成一行；120 秒只有坐标，180 秒只有心率。
+        let rows: Vec<(i64, Option<i32>, Option<f64>)> = decoded
+            .samples
+            .iter()
+            .map(|s| (s.timestamp.timestamp() - T0, s.heart_rate, s.altitude_m))
+            .collect();
+        assert_eq!(
+            rows,
+            [
+                (0, Some(120), Some(10.0)),
+                (60, Some(130), Some(11.0)),
+                (120, None, Some(12.0)),
+                (180, Some(140), None),
+            ]
+        );
+        assert_eq!(decoded.route.len(), 3);
     }
 
     #[test]
