@@ -527,7 +527,7 @@ export default {
       close: 'Schließen',
     },
     'components/letters/sample': {
-      short: 'Stichprobe',
+      short: 'Strukturprobe',
       attached: '1 Strukturprobe angehängt',
       attach: 'Strukturprobe dieses Trainings anhängen',
       remove: 'Strukturprobe entfernen',

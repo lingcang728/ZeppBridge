@@ -1,0 +1,19 @@
+Aan alle vrienden van ZeppBridge,
+
+Hallo, ik ben Lingcang.
+
+Ik hoor dat het vandaag Thanksgiving is. Fijne Thanksgiving voor iedereen die het vandaag viert! Of je het nu viert of niet, ik wil van deze gelegenheid gebruikmaken om ieder van jullie te bedanken dat je deel uitmaakt van de ZeppBridge-gemeenschap. Jullie steun, feedback en aanmoediging betekenen heel veel voor me. Dank dat je deze reis met me meegaat!
+
+Sinds de vorige versie heb ik weer heel wat updates gedaan, dus we zijn met een grote sprong bij 3.3.0 uitgekomen. Geïnspireerd door hoe een Personal Agent uit zichzelf contact met je opneemt, heb ik een “Vraag van de dag” aan de startpagina toegevoegd om de drempel van “Naar de AI” wat te verlagen: op basis van hoe jouw dag eruitziet, kiest ZeppBridge de ene vraag die het meest de moeite waard is om aan een AI te stellen, en die kun je meteen overdragen voor analyse. Trouwens, je kunt ZeppBridge nu ook laten opstarten zodra je computer opstart. Bij elke opstart synchroniseert het automatisch nieuwe gegevens uit de Zepp App, zodat je ’s ochtends bij het wakker worden meteen kunt zien hoe je de afgelopen nacht hebt geslapen.
+
+Ik heb ook jullie suggesties over de slaap- en trainingslijsten opgepakt: vroeger was de hele lijst zo lang dat een bepaalde dag vinden een heel karwei was. Nu kun je, net als met twee vingers knijpen in het fotoalbum van je telefoon, schakelen tussen de weergaven per jaar, maand en dag. Op de computer gebruik je Ctrl + muiswiel (Command + scrollwiel op een Mac) of knijp je op je trackpad. Daarnaast kun je nu meerdere trainingen in de lijst selecteren en ze in één keer als FIT-bestanden exporteren, en is het importpaneel opnieuw ontworpen.
+
+De slaapweergave heeft ook een flinke upgrade gekregen. Nogmaals heel veel dank aan Felipe Dias voor de hulp: je kunt nu in ZeppBridge de stemming waarmee je wakker werd en het slaapdagboek van gisteravond kiezen en ze als context aan de prompt voor de AI toevoegen, zodat die je slaap nauwkeuriger kan analyseren. De slaaplijst is ook flink verbeterd: duidelijker en prettiger leesbaar, met veel meer informatie, en het hele scherm voelt “efficiënter”. Ik hoop dat jullie de nieuwe slaapschermen mooi vinden.
+
+Ik heb ook de animaties van het uit- en inklappen van een paar kaarten op de pagina Overzicht soepeler gemaakt. Er vallen minder frames weg en er is minder hapering dan voorheen (helaas nog niet nul), en ik blijf ermee bezig. En goed nieuws: je kunt nu direct vanaf de briefpagina een diagnoserapport en een structuurvoorbeeld meesturen. Klik op “Voorbeeld” en je kunt me één training rechtstreeks sturen, wat het voor mij veel makkelijker maakt om problemen op te sporen. Eigenlijk geldt: als er iets is wat je door mij verbeterd wilt zien, klik dan op “Schrijf naar de auteur” rechtsboven op de startpagina. Blijf vooral suggesties sturen en laat me weten welke functie je graag zou willen zien; is het een bug die je dagelijks gebruik in de weg zit, dan is dat des te meer reden om het me te laten weten! Jullie feedback is wat mij ZeppBridge laat blijven updaten. Dank jullie wel!
+
+Nog één ding: ZeppBridge is een samenwerking aangegaan met SparkyFitness. In hun volgende release zouden ze ZeppBridge als een van de ondersteunde platforms moeten vermelden, naast Garmin Connect en Apple Health. De maker van SparkyFitness is ronduit indrukwekkend. Ik heb veel geleerd van het samenwerken en wil daar graag extra dank voor uitspreken. Het is een geweldig GitHub-project met 6,9k sterren: het is self-hosted, en eerlijk gezegd heeft het zelfs native iOS- en Android-apps, wat gewoon ongelooflijk is. Als je SparkyFitness al kende, kan deze samenwerking je eigen data-opzet misschien completer maken. Als er na de update iets niet klopt, laat het me weten, dan zoek ik met de maker van SparkyFitness uit hoe we het kunnen verbeteren.
+
+Ik wens jullie allemaal een fijne winter!
+
+— Lingcang

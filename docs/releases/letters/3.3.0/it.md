@@ -1,0 +1,19 @@
+A tutti gli amici che usano ZeppBridge:
+
+Ciao, sono Lingcang.
+
+Ho saputo che oggi è il Giorno del Ringraziamento. Buon Ringraziamento a tutti quelli che lo festeggiano oggi! Che lo festeggiate o no, voglio cogliere l’occasione per ringraziare ognuno di voi per essere parte della community di ZeppBridge. Il vostro supporto, i vostri feedback e il vostro incoraggiamento significano molto per me. Grazie per aver fatto questo percorso insieme a me!
+
+Dall’ultima versione ho fatto parecchi altri aggiornamenti, così siamo passati direttamente alla 3.3.0 con un bel salto. Ispirato dal modo in cui i Personal Agent si fanno avanti di propria iniziativa, ho aggiunto alla pagina iniziale «La domanda del giorno», per togliere un po’ di attrito da «Passa all’IA»: in base a com’è la tua giornata, ZeppBridge sceglie la domanda che vale più la pena rivolgere a un’IA, e tu puoi passargliela subito da analizzare. A proposito, ora puoi anche far avviare ZeppBridge insieme al computer. Ogni volta che lo accendi sincronizza da solo i nuovi dati presenti nella Zepp App, così appena ti svegli la mattina vedi com’è andata la notte.
+
+Ho raccolto anche i vostri suggerimenti sulle liste del sonno e degli allenamenti: prima erano così lunghe che trovare un giorno preciso era una fatica. Adesso, come quando fai la pizzicata con due dita nell’album di foto del telefono, puoi passare tra la vista per anno, quella per mese e quella per giorno. Sul computer si usa Ctrl + rotella del mouse (su Mac Command + rotella) oppure la pizzicata sul trackpad. In più, ora puoi selezionare più allenamenti nella lista ed esportarli in un colpo solo come file FIT, e anche il pannello di importazione è stato rifatto.
+
+Anche la vista del sonno è stata migliorata parecchio. Grazie ancora una volta a Felipe Dias per l’aiuto: ora puoi scegliere in ZeppBridge l’umore al risveglio e il diario della sera prima, e aggiungerli come contesto al prompt che dai all’IA, così può analizzare il tuo sonno con più precisione. Anche la lista del sonno è migliorata molto: è più chiara e più facile da leggere, contiene molte più informazioni e l’intera schermata dà una sensazione di maggiore «efficienza». Spero che le nuove schermate del sonno vi piacciano.
+
+Ho anche reso più fluide le animazioni di apertura e chiusura di alcune schede della pagina Panoramica. I frame persi e gli scatti sono meno di prima (purtroppo non sono ancora spariti del tutto), e continuerò a lavorarci. E c’è una buona notizia: ora puoi allegare una relazione diagnostica e un campione strutturale direttamente dalla pagina della lettera. Clicca su «Campione» e puoi mandarmi subito un singolo allenamento, il che mi rende molto più facile individuare i problemi. In pratica, ogni volta che c’è qualcosa che vorresti migliorassi, ti basta cliccare su «Scrivi all’autore» nell’angolo in alto a destra della pagina iniziale. Continuate a mandarmi suggerimenti e raccontatemi qualsiasi funzione vorreste vedere; e se si tratta di un bug che vi intralcia nell’uso quotidiano, a maggior ragione ditemelo! I vostri feedback sono ciò che mi tiene al lavoro sugli aggiornamenti di ZeppBridge. Grazie!
+
+Un’altra cosa: ZeppBridge ha avviato una collaborazione con SparkyFitness. Nella loro prossima versione dovrebbero inserire ZeppBridge tra le piattaforme supportate, accanto a Garmin Connect e Apple Health. L’autore di SparkyFitness è davvero in gamba. Lavorando insieme ho imparato molto, e per questo ci tengo a ringraziarlo in modo speciale. È un bellissimo progetto su GitHub con 6,9k stelle: è self-hosted e, a essere sinceri, ha persino app native per iOS e Android, una cosa davvero incredibile. Se già conosci SparkyFitness, questa collaborazione può forse aiutarti a completare il quadro dei tuoi dati. Se dopo l’aggiornamento qualcosa non torna, dimmelo e mi confronterò con l’autore di SparkyFitness su come migliorarla.
+
+Vi auguro un inverno sereno!
+
+— Lingcang
