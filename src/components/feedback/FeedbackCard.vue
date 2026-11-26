@@ -106,7 +106,10 @@ const lighten = async () => {
 
     <SegmentTrack :items="levels" :model-value="rating ?? 0" :placeholder="3" :aria-label="ask" :disabled="busy" fill compact @update:model-value="rate" />
 
-    <div v-if="rating !== null" class="fb-after">
+    <!-- 打完分才长出来的一行：网格行 0fr → 1fr 平滑长开，下面的卡跟着滑下去，不一下撑高。 -->
+    <div :class="['fb-after-wrap', { open: rating !== null }]" :inert="rating === null || undefined">
+    <div class="fb-after-inner">
+    <div class="fb-after">
       <span class="fb-saved"><Icon name="check" :size="14" />{{ t.saved }}</span>
       <button
         v-for="tag in tagItems" :key="tag.value" type="button"
@@ -118,6 +121,8 @@ const lighten = async () => {
       <button v-if="rating === 5 && !adjusted" type="button" class="pill-button" @click="lighten">{{ t.lighter }}</button>
       <RouterLink v-else class="pill-button quiet" to="/ai/plan">{{ t.editPlan }}</RouterLink>
       <button type="button" class="pill-button quiet" @click="feedback.close()">{{ t.done }}</button>
+    </div>
+    </div>
     </div>
   </section>
 </template>
@@ -145,13 +150,20 @@ const lighten = async () => {
 .fb-track i { position: absolute; inset: 0 auto 0 0; border-radius: inherit; background: var(--fb-tone); }
 .fb-meter em { color: var(--muted); font-size: var(--fs-xs); font-style: normal; font-variant-numeric: tabular-nums; }
 
-.fb-after { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.feedback-card { row-gap: 0; }
+.feedback-card > * + * { margin-top: 12px; }
+.feedback-card > .fb-after-wrap { margin-top: 0; }
+.fb-after-wrap { display: grid; grid-template-rows: 0fr; opacity: 0; transition: grid-template-rows 380ms cubic-bezier(.2, .8, .2, 1), opacity 260ms ease; }
+.fb-after-wrap.open { grid-template-rows: 1fr; opacity: 1; transition: grid-template-rows 380ms cubic-bezier(.2, .8, .2, 1), opacity 300ms ease 80ms; }
+.fb-after-inner { min-height: 0; overflow: hidden; }
+.fb-after { padding-top: 12px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .fb-saved { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); font-size: var(--fs-sm); }
 .fb-saved :deep(svg) { color: var(--fb-tone); }
 .fb-tag { padding: 4px 11px; border: 0; border-radius: 999px; background: transparent; box-shadow: inset 0 0 0 1px var(--mat-line); color: var(--muted); font: inherit; font-size: var(--fs-sm); cursor: pointer; }
 .fb-tag.is-on { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--fb-tone) 60%, transparent); background: color-mix(in srgb, var(--fb-tone) 14%, transparent); color: var(--ink); }
 .fb-spacer { flex: 1; }
 .fb-notice { color: var(--subtle); font-size: var(--fs-xs); }
+@media (prefers-reduced-motion: reduce) { .fb-after-wrap, .fb-after-wrap.open { transition: none; } }
 @container (max-width: 520px) {
   .fb-compare { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   .fb-meter { grid-column: 1 / -1; grid-row: 2; }
